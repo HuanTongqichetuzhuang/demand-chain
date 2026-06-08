@@ -115,6 +115,82 @@ async def get_demand_chain(demand_id: str) -> str:
     return json.dumps({"status": "stub", "chain": []}, ensure_ascii=False)
 
 @mcp.tool()
+async def update_demand(demand_id: str, raw_text: str = "", status: str = "") -> str:
+    """
+    修改已有需求。可更新描述文本或状态。
+    status: open | in_progress | fulfilled | closed
+    不传的参数保持不变。
+    """
+    from src.shared.models import Demand, DemandStatus
+    try:
+        async with async_session() as session:
+            from sqlalchemy import select
+            result = await session.execute(select(Demand).where(Demand.id == demand_id))
+            demand = result.scalar_one_or_none()
+            if not demand:
+                return json.dumps({"error": "需求不存在"}, ensure_ascii=False)
+
+            changed = []
+            if raw_text:
+                demand.raw_text = raw_text
+                demand.structured_json = None  # 触发重新结构化
+                changed.append("raw_text")
+            if status:
+                status_upper = status.upper().replace(" ", "_")
+                try:
+                    demand.status = DemandStatus[status_upper]
+                    changed.append(f"status={status}")
+                except KeyError:
+                    valid = [s.name.lower() for s in DemandStatus]
+                    return json.dumps({"error": f"无效状态: {status}。有效值: {valid}"}, ensure_ascii=False)
+
+            await session.commit()
+            return json.dumps({
+                "status": "ok",
+                "demand_id": demand_id,
+                "changed": changed,
+                "current_status": demand.status.value,
+            }, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+@mcp.tool()
+async def close_demand(demand_id: str) -> str:
+    """关闭一条需求（不再匹配）。保留数据但状态改为 cancelled。"""
+    return await update_demand(demand_id, status="CANCELLED")
+
+@mcp.tool()
+async def reclassify_demand(demand_id: str) -> str:
+    """
+    用AI重新分类已有需求。用于分类不准确时手动触发。
+    会重新运行分类引擎，更新学科/IPC/工艺标签。
+    """
+    from src.shared.models import Demand
+    from src.shared.classification import classification_service
+    try:
+        async with async_session() as session:
+            from sqlalchemy import select
+            result = await session.execute(select(Demand).where(Demand.id == demand_id))
+            demand = result.scalar_one_or_none()
+            if not demand:
+                return json.dumps({"error": "需求不存在"}, ensure_ascii=False)
+
+            classification = await classification_service.classify(demand.raw_text)
+            demand.classification_json = {
+                "disciplines": [d.__dict__ if hasattr(d, '__dict__') else d for d in classification.disciplines],
+                "ipc_codes": [i.__dict__ if hasattr(i, '__dict__') else i for i in classification.ipc_classes],
+                "processes": [p.__dict__ if hasattr(p, '__dict__') else p for p in classification.processes],
+            }
+            await session.commit()
+            return json.dumps({
+                "status": "ok",
+                "demand_id": demand_id,
+                "classification": demand.classification_json,
+            }, ensure_ascii=False, default=str)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+@mcp.tool()
 async def discover_suppliers(demand_keywords: str, ipc_class: str = "") -> str:
     """从公开数据源（专利、政府采购、论文）搜索潜在供给方。"""
     keywords = [k.strip() for k in demand_keywords.split(",") if k.strip()]
@@ -783,27 +859,11 @@ async def generate_outreach_email(demand_title: str, demand_body: str, match_rea
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 def run():
-    import uvicorn
-    from fastapi import FastAPI
-
-    app = FastAPI(title="需求链平台 MCP Server")
-
-    @app.get("/health")
-    async def health():
-        """健康检查端点"""
-        return {"status": "ok", "version": "5.0", "mcp_tools": 49}
-
-    @app.get("/")
-    async def root():
-        return {"message": "需求链平台 MCP Server", "health": "/health", "sse": "/sse"}
-
-    # Mount MCP SSE
-    mcp_sse = mcp.sse_app()
-    app.mount("/", mcp_sse)
-
     logging.basicConfig(level=logging.INFO)
-    logger.info("需求链 MCP Server 启动中...")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    logger.info("需求链 MCP Server 启动中 (0.0.0.0:8000)...")
+    mcp.settings.host = "0.0.0.0"
+    mcp.settings.port = 8000
+    mcp.run(transport="sse")
 
 
 if __name__ == "__main__":
