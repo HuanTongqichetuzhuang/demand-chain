@@ -22,3 +22,8 @@ pgdata/
 # OS
 .DS_Store
 Thumbs.db
+
+# Temp & unrelated
+test_api_key.py
+Dockerfile.db
+*.html
