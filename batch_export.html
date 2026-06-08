@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>批量操作 + 数据导出</title>
+<style>:root{--bg:#0c0c1d;--card:#14142b;--text:#e8e8f0;--ts:#9090b0;--ac:#6c5ce7;--br:#2a2a4a;--gn:#00b894;--am:#fdcb6e;}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.container{max-width:800px;margin:0 auto;padding:20px}
+h1{font-size:1.6em;margin:10px 0}.sub{color:var(--ts);font-size:.9em;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--br);border-radius:14px;padding:20px;margin-bottom:16px}
+.card h3{font-size:1.1em;margin-bottom:12px}
+table{width:100%;font-size:.85em;border-collapse:collapse}
+th{text-align:left;padding:6px 8px;color:var(--ts);border-bottom:1px solid var(--br);font-weight:500}
+td{padding:8px;border-bottom:1px solid rgba(42,42,74,.4)}
+td input[type=checkbox]{margin-right:6px}
+.badge{padding:2px 8px;border-radius:4px;font-size:.72em}
+.b-open{background:rgba(0,184,148,.15);color:var(--gn)}.b-match{background:rgba(253,203,110,.15);color:var(--am)}
+.bar{display:flex;gap:8px;margin:12px 0;align-items:center}.bar select{padding:6px 10px;border-radius:6px;border:1px solid var(--br);background:var(--card);color:var(--text);font-size:.85em}
+.btn{padding:8px 18px;border-radius:8px;font-size:.9em;font-weight:600;cursor:pointer;border:none}.btn-p{background:var(--ac);color:#fff}.btn-o{background:transparent;border:1px solid var(--br);color:var(--text)}
+.msg{padding:10px;border-radius:8px;margin:10px 0;font-size:.85em}.msg-ok{background:rgba(0,184,148,.1);border:1px solid var(--gn);color:#9FE1CB}
+.preview{background:#1a1a38;border-radius:8px;padding:12px;font-family:monospace;font-size:.78em;white-space:pre-wrap;color:#a29bfe;max-height:200px;overflow:auto;margin:10px 0}
+</style></head>
+<body>
+<div class="container">
+  <h1>批量操作</h1>
+  <p class="sub">企业用户批量管理多条需求的状态——一键关闭、批量延伸、导出数据。</p>
+  <div class="card">
+    <div class="bar">
+      <input type="checkbox" id="selectAll" onclick="toggleAll()">全选
+      <select id="batchAction"><option value="">批量操作...</option><option value="close">标记为已关闭</option><option value="pause">暂停匹配</option><option value="resume">恢复匹配</option></select>
+      <button class="btn btn-p" onclick="doBatch()">执行</button>
+      <button class="btn btn-o" onclick="exportData('csv')">导出 CSV</button>
+      <button class="btn btn-o" onclick="exportData('json')">导出 JSON</button>
+    </div>
+    <table id="demandTable">
+      <tr><th><input type="checkbox" disabled></th><th>需求</th><th>状态</th><th>匹配数</th><th>创建时间</th></tr>
+    </table>
+    <div id="batchMsg"></div>
+  </div>
+
+  <div class="card">
+    <h3>导出预览</h3>
+    <div class="preview" id="exportPreview">选择一个格式然后点击导出...</div>
+  </div>
+</div>
+<script>
+const demands=[
+  {id:"d001",title:"800°C高温管道裂缝检测传感器",status:"open",matches:3,created:"2026-06-01"},
+  {id:"d002",title:"新型碳纤维复合材料轻量化车身",status:"matching",matches:5,created:"2026-05-28"},
+  {id:"d003",title:"AI驱动的蛋白质折叠加速算法",status:"in_progress",matches:7,created:"2026-05-20"},
+  {id:"d004",title:"低温等离子体灭菌设备小型化",status:"open",matches:2,created:"2026-06-03"},
+  {id:"d010",title:"高精度光纤陀螺仪微型化",status:"open",matches:0,created:"2026-06-05"},
+];
+function render(){document.getElementById("demandTable").innerHTML='<tr><th>选择</th><th>需求</th><th>状态</th><th>匹配数</th><th>创建时间</th></tr>'+demands.map(d=>`<tr><td><input type="checkbox" value="${d.id}" onchange="updateSelectAll()"></td><td>${d.title}</td><td><span class="badge ${d.status==='open'?'b-open':'b-match'}">${d.status==='open'?'开放':d.status==='matching'?'匹配中':'解决中'}</span></td><td>${d.matches}</td><td>${d.created}</td></tr>`).join('')}
+function toggleAll(){const c=document.getElementById("selectAll").checked;document.querySelectorAll("#demandTable input[type=checkbox][value]").forEach(b=>b.checked=c)}
+function updateSelectAll(){const all=document.querySelectorAll("#demandTable input[type=checkbox][value]");document.getElementById("selectAll").checked=all.length&&[...all].every(b=>b.checked)}
+function getSelected(){return [...document.querySelectorAll("#demandTable input[type=checkbox][value]:checked")].map(b=>b.value)}
+function doBatch(){const ids=getSelected();const act=document.getElementById("batchAction").value;if(!ids.length)return showMsg("请选择至少一条需求");if(!act)return showMsg("请选择操作");const selected=demands.filter(d=>ids.includes(d.id));if(act==="close")selected.forEach(d=>d.status="closed");if(act==="pause")selected.forEach(d=>{if(d.status==="open")d.status="matching"});
+  render();showMsg(`已${act==="close"?"关闭":act==="pause"?"暂停":"恢复"} ${ids.length} 条需求`,"ok")}
+function exportData(fmt){const ids=getSelected();const data=(ids.length?demands.filter(d=>ids.includes(d.id)):demands).map(d=>({需求ID:d.id,标题:d.title,状态:d.status,匹配数:d.matches,创建时间:d.created}));
+  let out=fmt==="json"?JSON.stringify(data,null,2):"需求ID,标题,状态,匹配数,创建时间\n"+data.map(r=>Object.values(r).join(",")).join("\n");
+  document.getElementById("exportPreview").textContent=out;
+  const b=new Blob([out],{type:fmt==="json"?"application/json":"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`demand_chain_export.${fmt}`;a.click();showMsg(`已导出 ${data.length} 条记录为 .${fmt}`,"ok")}
+function showMsg(t,c){const m=document.getElementById("batchMsg");m.innerHTML=`<div class="msg msg-${c||'ok'}">${t}</div>`;setTimeout(()=>m.innerHTML="",3000)}
+render()
+</script>
+</body>
+</html>

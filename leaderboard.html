@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>信誉排行榜 | Leaderboard</title>
+<style>
+  :root {
+    --bg:#0c0c1d;--card:#14142b;--text:#e8e8f0;--ts:#9090b0;--ac:#6c5ce7;--br:#2a2a4a;--gn:#00b894;--am:#fdcb6e;--rd:#e24b4a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  .container{max-width:800px;margin:0 auto;padding:20px}
+  h1{font-size:1.6em;margin:10px 0}
+  .sub{color:var(--ts);font-size:.9em;margin-bottom:20px}
+  .leaderboard{display:flex;flex-direction:column;gap:8px}
+  .row{background:var(--card);border:1px solid var(--br);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;transition:.15s}
+  .row:hover{border-color:var(--ac)}
+  .rank{font-size:1.4em;font-weight:800;width:36px;text-align:center}
+  .rank.gold{color:#fdcb6e}.rank.silver{color:#b2bec3}.rank.bronze{color:#e17055}
+  .info{flex:1}
+  .info h4{font-size:1em;margin-bottom:2px}
+  .info .meta{font-size:.78em;color:var(--ts);display:flex;gap:12px}
+  .stats{display:flex;gap:16px;text-align:center;font-size:.82em}
+  .stats .v{font-size:1.3em;font-weight:700}.stats .l{font-size:.72em;color:var(--ts)}
+  .badge{padding:2px 8px;border-radius:5px;font-size:.72em;font-weight:600}
+  .b-verified{background:rgba(0,184,148,.15);color:var(--gn)}
+  .b-new{background:rgba(108,92,231,.15);color:#a29bfe}
+  .filter-bar{display:flex;gap:8px;margin:16px 0}
+  .f-btn{padding:6px 16px;border-radius:8px;border:1px solid var(--br);background:transparent;color:var(--ts);font-size:.85em;cursor:pointer}
+  .f-btn.active{border-color:var(--ac);color:#a29bfe;background:rgba(108,92,231,.08)}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>信誉排行榜</h1>
+  <p class="sub">供给方排名：成功率、响应速度、好评率。信誉越高，匹配越靠前。</p>
+  <div class="filter-bar">
+    <span class="f-btn active" onclick="rankBy('score')">综合信誉</span>
+    <span class="f-btn" onclick="rankBy('success')">成功率</span>
+    <span class="f-btn" onclick="rankBy('speed')">响应速度</span>
+    <span class="f-btn" onclick="rankBy('volume')">匹配量</span>
+  </div>
+  <div class="leaderboard" id="board"></div>
+</div>
+<script>
+const data = [
+  {n:"XX传感器研究所",r:"企业",sc:98,su:95,sp:"2h",m:47,c:"高温压电传感",v:1,loc:"中国北京"},
+  {n:"AI药物筛选实验室",r:"科研",sc:96,su:92,sp:"4h",m:35,c:"蛋白质折叠、AI药物发现",v:1,loc:"中国上海"},
+  {n:"先进材料科技有限公司",r:"企业",sc:94,su:88,sp:"8h",m:62,c:"碳纤维复合材料",v:1,loc:"德国慕尼黑"},
+  {n:"精密测量仪器研究所",r:"科研",sc:93,su:90,sp:"3h",m:28,c:"光学测量、精密仪器",v:1,loc:"日本东京"},
+  {n:"等离子体技术实验室",r:"科研",sc:91,su:85,sp:"6h",m:19,c:"低温等离子体、灭菌",v:0,loc:"中国深圳"},
+  {n:"智能机器人研究所",r:"企业",sc:89,su:82,sp:"12h",m:73,c:"工业机器人、抓取方案",v:1,loc:"中国杭州"},
+  {n:"纳米材料有限公司",r:"企业",sc:87,su:80,sp:"24h",m:15,c:"纳米传感器、柔性电子",v:0,loc:"韩国首尔"},
+];
+let sortBy="sc";
+function rankBy(k){sortBy=k;document.querySelectorAll(".f-btn").forEach(b=>b.classList.toggle("active",b.textContent===["综合信誉","成功率","响应速度","匹配量"][["sc","su","sp","m"].indexOf(k)]));render()}
+function render(){
+  const sorted=[...data].sort((a,b)=>b[sortBy]-a[sortBy]);
+  const rc=["gold","silver","bronze"];
+  document.getElementById("board").innerHTML=sorted.map((d,i)=>`
+    <div class="row">
+      <div class="rank ${i<3?rc[i]:""}">${i+1}</div>
+      <div class="info">
+        <h4>${d.n} ${d.v?'<span class="badge b-verified">已认证</span>':'<span class="badge b-new">新入驻</span>'}</h4>
+        <div class="meta"><span>${d.r}</span><span>${d.loc}</span><span>${d.c}</span></div>
+      </div>
+      <div class="stats"><div class="v" style="color:var(--gn)">${d.su}%</div><div class="l">成功率</div></div>
+      <div class="stats"><div class="v">${d.sp}</div><div class="l">响应</div></div>
+      <div class="stats"><div class="v" style="color:#a29bfe">${d.m}</div><div class="l">匹配数</div></div>
+    </div>
+  `).join('')}
+}render()
+</script>
+</body>
+</html>

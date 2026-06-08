@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全局搜索 | Global Search</title>
+<style>
+  :root {
+    --bg: #0c0c1d; --card-bg: #14142b; --text: #e8e8f0;
+    --text-secondary: #9090b0; --accent: #6c5ce7; --border: #2a2a4a;
+    --green: #00b894; --amber: #fdcb6e; --red: #e24b4a;
+  }
+  * { margin:0;padding:0;box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+
+  .search-hero { text-align: center; padding: 60px 20px 30px; }
+  .search-hero h1 { font-size: 2em; margin-bottom: 16px; }
+  .search-box { display: flex; gap: 8px; max-width: 600px; margin: 0 auto; }
+  .search-box input { flex:1; padding: 14px 18px; border-radius: 12px; border: 2px solid var(--border); background: var(--card-bg); color: var(--text); font-size: 1.1em; }
+  .search-box input:focus { border-color: var(--accent); outline: none; }
+  .search-box button { padding: 14px 24px; border-radius: 12px; background: var(--accent); color: #fff; border: none; font-size: 1em; font-weight: 600; cursor: pointer; }
+  .search-box button:hover { background: #7c6ef0; }
+  .search-meta { color: var(--text-secondary); font-size: 0.85em; margin-top: 10px; }
+
+  .filter-row { display: flex; gap: 8px; margin: 20px 0; flex-wrap: wrap; justify-content: center; }
+  .f-btn { padding: 6px 16px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); font-size: 0.85em; cursor: pointer; }
+  .f-btn.active { border-color: var(--accent); color: #a29bfe; background: rgba(108,92,231,0.08); }
+
+  .results-section { margin: 30px 0; }
+  .results-section h3 { font-size: 1.1em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .results-section h3 .badge { padding: 2px 8px; border-radius: 4px; font-size: 0.7em; font-weight: 600; }
+  .badge-demand { background: rgba(108,92,231,0.15); color: #a29bfe; }
+  .badge-capability { background: rgba(0,184,148,0.15); color: var(--green); }
+  .badge-forum { background: rgba(253,203,110,0.15); color: var(--amber); }
+  .badge-supplier { background: rgba(226,75,74,0.15); color: var(--red); }
+
+  .result-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; margin-bottom: 8px; cursor: pointer; transition: all 0.15s; }
+  .result-card:hover { border-color: var(--accent); }
+  .result-card .r-title { font-size: 1em; font-weight: 600; margin-bottom: 4px; }
+  .result-card .r-body { font-size: 0.85em; color: var(--text-secondary); }
+  .result-card .r-meta { font-size: 0.75em; color: var(--text-secondary); margin-top: 6px; display: flex; gap: 10px; }
+  .result-card .r-type { padding: 1px 6px; border-radius: 4px; font-size: 0.7em; }
+  .type-demand { background: rgba(108,92,231,0.1); color: #a29bfe; }
+  .type-capability { background: rgba(0,184,148,0.1); color: var(--green); }
+  .type-forum { background: rgba(253,203,110,0.1); color: var(--amber); }
+  .type-supplier { background: rgba(226,75,74,0.1); color: var(--red); }
+
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+  .highlight { background: rgba(253,203,110,0.2); padding: 0 2px; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="search-hero">
+    <h1>全局搜索</h1>
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="搜索需求、能力画像、论坛帖子、供应商..." onkeydown="if(event.key==='Enter')doSearch()">
+      <button onclick="doSearch()">搜索</button>
+    </div>
+    <p class="search-meta" id="searchMeta"></p>
+  </div>
+
+  <div class="filter-row">
+    <span class="f-btn active" onclick="toggleFilter(this,'all')">全部</span>
+    <span class="f-btn active" onclick="toggleFilter(this,'demand')">需求</span>
+    <span class="f-btn active" onclick="toggleFilter(this,'capability')">能力画像</span>
+    <span class="f-btn active" onclick="toggleFilter(this,'forum')">论坛</span>
+    <span class="f-btn active" onclick="toggleFilter(this,'supplier')">供应商</span>
+  </div>
+
+  <div id="results"></div>
+</div>
+
+<script>
+// Mock cross-module data
+const allData = {
+  demands: [
+    { id:"d001",title:"800°C高温管道裂缝检测传感器",body:"需要在800°C环境下持续工作的管道裂缝检测传感器。精度±0.5%，响应<100ms。",tags:["传感器","高温","无损检测"],category:"sensor_tech",status:"open",discipline:"物理学/电磁学",_type:"demand" },
+    { id:"d003",title:"AI驱动的蛋白质折叠预测加速算法",body:"将AlphaFold类模型预测速度提升10倍以上，用于大规模药物筛选。",tags:["AI","蛋白质折叠","深度学习"],category:"information_tech",status:"in_progress",discipline:"计算机/AI 生物学",_type:"demand" },
+    { id:"d005",title:"耐高温压电陶瓷材料配方开发",body:"为传感器开发配套的耐800°C压电陶瓷材料。",tags:["压电陶瓷","材料"],category:"materials_science",status:"open",discipline:"材料科学/无机化学",_type:"demand" },
+    { id:"d006",title:"管道裂缝声波信号处理算法",body:"为传感器开发配套的声波信号处理算法，从噪声中提取裂缝特征。",tags:["信号处理","声波","算法"],category:"information_tech",status:"open",discipline:"计算机/信号处理",_type:"demand" },
+    { id:"d008",title:"大规模GPU集群蛋白质折叠推理调度",body:"为蛋白质折叠加速算法配套的GPU集群调度方案。",tags:["GPU","分布式","调度"],category:"information_tech",status:"open",discipline:"计算机/AI",_type:"demand" },
+    { id:"d002",title:"新型碳纤维复合材料轻量化车身结构",body:"开发碳纤维复合材料用于电动汽车车身，目标减重40%。",tags:["碳纤维","复合材料","汽车"],category:"materials_science",status:"matching",discipline:"材料科学/高分子",_type:"demand" },
+    { id:"d004",title:"低温等离子体医疗灭菌设备小型化",body:"将等离子体灭菌设备缩小到便携式，用于战地和灾区。",tags:["等离子体","灭菌","医疗"],category:"biomedicine",status:"open",discipline:"物理学/等离子体 生物医学",_type:"demand" },
+    { id:"d010",title:"高精度光纤陀螺仪微型化方案",body:"开发用于无人机导航的微型光纤陀螺仪，精度要求0.01°/h。",tags:["陀螺仪","光纤","导航","MEMS"],category:"sensor_tech",status:"open",discipline:"物理学/光学 电子科学",_type:"demand" },
+    { id:"d011",title:"基于强化学习的机器人抓取策略优化",body:"工业机器人抓取未知形状物体的实时路径规划算法。",tags:["强化学习","机器人","路径规划"],category:"information_tech",status:"open",discipline:"计算机/AI 机械工程",_type:"demand" },
+  ],
+  capabilities: [
+    { id:"c001",name:"XX传感器研究所",body:"专注高温压电传感器，12年经验。曾为国家重大项目提供传感器方案。",tags:["传感器","压电","高温"],_type:"capability" },
+    { id:"c002",name:"AI药物筛选实验室",body:"基于深度学习的蛋白质结构预测与药物分子筛选，已发表Nature论文3篇。",tags:["AI","药物","蛋白质"],_type:"capability" },
+    { id:"c003",name:"先进材料科技有限公司",body:"碳纤维复合材料研发与量产，服务汽车、航空航天行业。年产500吨。",tags:["碳纤维","复合材料"],_type:"capability" },
+  ],
+  forums: [
+    { id:"f001",title:"高温传感器材料选型讨论",body:"目前市面上有哪些材料能稳定工作在800°C以上？PZT系列还是铋层状结构？",category:"demand_board",_type:"forum" },
+    { id:"f002",title:"蛋白质折叠模型本地部署经验分享",body:"用4张A100跑AlphaFold-Multimer的优化经验，包括显存优化和推理加速。",category:"capability_showcase",_type:"forum" },
+    { id:"f003",title:"碳纤维车身量产工艺路线比较",body:"比较了热压罐、RTM和预浸料模压三种工艺的成本和性能差异。",category:"demand_board",_type:"forum" },
+  ],
+  suppliers: [
+    { id:"s001",name:"鸿远压电材料有限公司（未注册）",body:"IPC:G01 压电陶瓷材料专利15项。从专利数据库发现。",_type:"supplier",source:"专利DB" },
+    { id:"s002",name:"曙光精密测量仪器厂（未注册）",body:"政府采购中标：高温传感器采购项目。从政府采购公告发现。",_type:"supplier",source:"政府采购" },
+  ],
+};
+
+let activeFilters = { all: true, demand: true, capability: true, forum: true, supplier: true };
+
+function toggleFilter(btn, type) {
+  if (type === "all") {
+    const makeAll = !activeFilters.all;
+    ["all","demand","capability","forum","supplier"].forEach(t => activeFilters[t]=makeAll);
+    document.querySelectorAll(".f-btn").forEach(b=>b.classList.toggle("active",makeAll));
+  } else {
+    activeFilters[type] = !activeFilters[type];
+    btn.classList.toggle("active",activeFilters[type]);
+    activeFilters.all = activeFilters.demand && activeFilters.capability && activeFilters.forum && activeFilters.supplier;
+    document.querySelector(".f-btn").classList.toggle("active",activeFilters.all);
+  }
+  doSearch();
+}
+
+function doSearch() {
+  const q = document.getElementById("searchInput").value.trim().toLowerCase();
+  const resultsDiv = document.getElementById("results");
+  const meta = document.getElementById("searchMeta");
+
+  if (!q) {
+    resultsDiv.innerHTML = "";
+    meta.textContent = "输入关键词搜索，支持中文、英文、IPC代码、学科名称";
+    return;
+  }
+
+  let total = 0;
+  const sections = [];
+
+  // Search demands
+  if (activeFilters.demand) {
+    const hits = allData.demands.filter(d =>
+      d.title.toLowerCase().includes(q) || d.body.toLowerCase().includes(q) ||
+      d.tags.some(t=>t.includes(q)) || d.discipline.toLowerCase().includes(q) || d.status.includes(q)
+    );
+    if (hits.length) {
+      sections.push({ type:"demand", label:"需求", badge:"badge-demand", hits, total:hits.length });
+      total += hits.length;
+    }
+  }
+
+  if (activeFilters.capability) {
+    const hits = allData.capabilities.filter(c =>
+      c.name.toLowerCase().includes(q) || c.body.toLowerCase().includes(q) || c.tags.some(t=>t.includes(q))
+    );
+    if (hits.length) {
+      sections.push({ type:"capability", label:"能力画像", badge:"badge-capability", hits, total:hits.length });
+      total += hits.length;
+    }
+  }
+
+  if (activeFilters.forum) {
+    const hits = allData.forums.filter(f =>
+      f.title.toLowerCase().includes(q) || f.body.toLowerCase().includes(q)
+    );
+    if (hits.length) {
+      sections.push({ type:"forum", label:"论坛帖子", badge:"badge-forum", hits, total:hits.length });
+      total += hits.length;
+    }
+  }
+
+  if (activeFilters.supplier) {
+    const hits = allData.suppliers.filter(s =>
+      s.name.toLowerCase().includes(q) || s.body.toLowerCase().includes(q)
+    );
+    if (hits.length) {
+      sections.push({ type:"supplier", label:"供应商", badge:"badge-supplier", hits, total:hits.length });
+      total += hits.length;
+    }
+  }
+
+  meta.textContent = `找到 ${total} 条结果`;
+
+  if (total === 0) {
+    resultsDiv.innerHTML = '<div class="empty"><h3>未找到结果</h3><p>试一下其他关键词，或用IPC代码如 G01、G06 搜索</p></div>';
+    return;
+  }
+
+  const typeMap = { demand:"type-demand", capability:"type-capability", forum:"type-forum", supplier:"type-supplier" };
+  const labelMap = { demand:"需求", capability:"能力", forum:"论坛", supplier:"供应商" };
+
+  resultsDiv.innerHTML = sections.map(s => `
+    <div class="results-section">
+      <h3><span class="badge ${s.badge}">${s.label}</span> ${s.total} 条</h3>
+      ${s.hits.map(h => `
+        <div class="result-card">
+          <div class="r-title">${highlight(h.title||h.name, q)} <span class="r-type ${typeMap[s.type]}">${labelMap[s.type]}</span></div>
+          <div class="r-body">${highlight(h.body.slice(0,200), q)}</div>
+          <div class="r-meta">
+            ${h.tags?h.tags.map(t=>`<span>#${highlight(t,q)}</span>`).join(' '):''}
+            ${h.category?`<span>行业: ${h.category}</span>`:''}
+            ${h.status?`<span>状态: ${h.status}</span>`:''}
+            ${h.discipline?`<span>学科: ${highlight(h.discipline.slice(0,30),q)}</span>`:''}
+            ${h.source?`<span>来源: ${h.source}</span>`:''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+function highlight(text, q) {
+  if (!q) return text||"";
+  const re = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`,'gi');
+  return text.replace(re, '<span class="highlight">$1</span>');
+}
+
+// Init
+document.getElementById("searchMeta").textContent = "输入关键词搜索，支持中文、英文、IPC代码、学科名称";
+</script>
+</body>
+</html>

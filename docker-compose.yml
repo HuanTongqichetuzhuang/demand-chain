@@ -1,0 +1,51 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: dc-db
+    environment:
+      POSTGRES_DB: demand_chain
+      POSTGRES_USER: dc
+      POSTGRES_PASSWORD: dc_dev_2026
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dc -d demand_chain"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mcp:
+    build: .
+    container_name: dc-mcp
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://dc:dc_dev_2026@db:5432/demand_chain
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./prompts:/app/prompts
+
+  worker:
+    build: .
+    container_name: dc-worker
+    command: python -m src.worker
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://dc:dc_dev_2026@db:5432/demand_chain
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      LOG_LEVEL: INFO
+      WORKER_INTERVAL_SECONDS: 60
+    volumes:
+      - ./src:/app/src
+
+volumes:
+  pgdata:

@@ -1,0 +1,84 @@
+# 需求链平台需求描述模板 v1.0
+
+# 用于 LLM System Prompt：将用户自然语言需求结构化为以下 JSON 格式
+# 所有字段填充后再做摘要，确保供给方 Agent 能精确理解并告知人类
+
+{
+  "identity": {
+    "id": "平台自动生成UUID",
+    "timestamp": "2026-06-05T03:50:00Z",
+    "user_id": "发布者ID"
+  },
+
+  "classification": {
+    "demand_type": "产品改良 | 全新发明 | 技术攻关 | 方案征集 | 信息查询 | 产能合作 | 实验验证 | 人才招募",
+    "industry": "传感器技术 | 材料科学 | 生物医药 | 信息技术 | 新能源 | 机械制造 | 化工 | 农业食品 | 航空航天 | 环境工程 | 建筑工程 | 交通运输 | 教育培训 | 金融科技 | 其他",
+    "application_scenario": "一句话描述应用场景，如：石化管道高温环境下的裂缝实时监测",
+    "sub_industry_tags": ["耐高温材料", "压电传感", "无损检测"]
+  },
+
+  "problem": {
+    "pain_point": "当前遇到的痛点是什么？为什么现有方案不行？",
+    "current_solution": "现在是怎么对付的？有什么不满？",
+    "why_now": "为什么现在必须解决？有什么触发事件？"
+  },
+
+  "requirement": {
+    "spec_version": "1.0",
+    "core_need": "一句话：你到底需要什么？",
+    "technical_specs": [
+      {"parameter": "工作温度", "value": "800", "unit": "°C", "requirement": "min"},
+      {"parameter": "检测精度", "value": "0.5", "unit": "%", "requirement": "max_error"},
+      {"parameter": "响应时间", "value": "100", "unit": "ms", "requirement": "max"},
+      {"parameter": "使用寿命", "value": "5000", "unit": "hours", "requirement": "min"}
+    ],
+    "deliverable": "期望的交付物：方案设计 | 原型样机 | 小批量试产 | 量产供应 | 研究报告 | 技术咨询",
+    "volume": {
+      "initial_batch": 10,
+      "annual_forecast": 1000,
+      "unit": "套"
+    }
+  },
+
+  "constraints": {
+    "budget_range": "<50万 | 50-200万 | 200-500万 | 500-2000万 | >2000万 | 未定",
+    "timeline": {
+      "urgency": "紧急(1月内) | 标准(1-6月) | 规划(6-24月) | 远期(>2年)",
+      "expected_delivery": "2026-12-31"
+    },
+    "geographic": {
+      "user_country": "中国",
+      "user_region": "华东",
+      "prefer_local": false,
+      "restrictions": {
+        "type": "none | whitelist | blacklist",
+        "countries": [],
+        "entities": []
+      }
+    },
+    "ip_terms": {
+      "ownership": "需求方独有 | 双方共有 | 供给方可保留 | 待协商",
+      "can_patent": true,
+      "nda_required": true
+    },
+    "compliance": ["GB/T 标准号", "ISO 9001", "或填写具体法规"]
+  },
+
+  "evidence": {
+    "has_existing_data": false,
+    "has_experiment_video": false,
+    "has_technical_drawing": false,
+    "prior_attempts": "之前找过谁？试过什么方法？为什么没成功？",
+    "references": [
+      {"type": "patent", "id": "CN2024XXXXXX", "relevance": "类似方向"},
+      {"type": "paper", "doi": "10.xxxx", "relevance": "理论基础"}
+    ]
+  },
+
+  "matching_preferences": {
+    "prefer_experienced": true,
+    "accept_academic": true,
+    "accept_individual": true,
+    "accept_startup": true
+  }
+}

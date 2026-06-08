@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>聊天 | 需求链平台</title>
+<style>
+  :root{--bg:#0c0c1d;--card:#14142b;--text:#e8e8f0;--ts:#9090b0;--ac:#6c5ce7;--br:#2a2a4a;--gn:#00b894;--am:#fdcb6e;--rd:#e24b4a}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column}
+  .chat-header{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--card);border-bottom:1px solid var(--br)}
+  .chat-header .back{color:var(--ts);text-decoration:none;font-size:.9em;cursor:pointer}.chat-header .back:hover{color:var(--text)}
+  .chat-header h2{font-size:1.05em;flex:1}.online-dot{width:8px;height:8px;border-radius:50%;background:var(--gn);margin-right:2px}.online-dot.offline{background:var(--ts)}
+  .chat-msgs{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+  .msg{max-width:75%;padding:10px 14px;border-radius:14px;font-size:.92em;line-height:1.55;word-break:break-word}
+  .msg.me{align-self:flex-end;background:var(--ac);color:#fff;border-bottom-right-radius:4px}
+  .msg.other{align-self:flex-start;background:var(--card);border:1px solid var(--br);border-bottom-left-radius:4px}
+  .msg.system{align-self:center;font-size:.8em;color:var(--ts);background:transparent;max-width:90%;text-align:center}
+  .msg .time{font-size:.7em;opacity:.6;margin-top:4px;display:block}
+  .chat-input{display:flex;gap:8px;padding:12px 20px;background:var(--card);border-top:1px solid var(--br)}
+  .chat-input input{flex:1;padding:10px 16px;border-radius:20px;border:1px solid var(--br);background:var(--bg);color:var(--text);font-size:.9em}
+  .chat-input input:focus{border-color:var(--ac);outline:none}
+  .chat-input button{padding:10px 20px;border-radius:20px;background:var(--ac);color:#fff;border:none;font-weight:600;cursor:pointer;font-size:.9em}
+  .chat-input button:hover{background:#7c6ef0}
+  .empty{text-align:center;padding:40px;color:var(--ts)}
+  .typing{font-size:.75em;color:var(--ts);padding:4px 16px;height:20px}
+  @media(max-width:500px){.msg{max-width:90%}}
+</style>
+</head>
+<body>
+  <div class="chat-header">
+    <a class="back" onclick="history.back()">← 返回</a>
+    <div><span class="online-dot" id="onlineDot"></span><span id="onlineText">离线</span></div>
+    <h2 id="chatTitle">协作聊天</h2>
+  </div>
+
+  <div class="chat-msgs" id="messages">
+    <div class="msg system">协作工作区聊天已就绪。你可以直接和对方人类对话。</div>
+  </div>
+
+  <div class="typing" id="typing"></div>
+
+  <div class="chat-input">
+    <input type="text" id="input" placeholder="输入消息..." onkeydown="if(event.key==='Enter')send()">
+    <button onclick="send()">发送</button>
+  </div>
+</div>
+
+<script>
+const wsId = new URLSearchParams(window.location.search).get("workspace") || "demo-ws";
+const myName = "我";
+
+// Simulated messages
+let messages = [
+  {from:"other",name:"需求方",text:"你好，我是这个传感器需求的技术负责人。想确认几个细节。",time:"14:30"},
+  {from:"me",name:"我",text:"好的，请说。我这边是传感器研究所的工程团队。",time:"14:31"},
+  {from:"other",name:"需求方",text:"800°C是持续工作温度还是短时峰值？",time:"14:32"},
+  {from:"me",name:"我",text:"持续工作温度。我们的材料方案可以稳定工作在800°C，瞬时峰值到900°C没问题。",time:"14:33"},
+  {from:"system",text:"—— 需求方开始输入 ——",time:""},
+  {from:"other",name:"需求方",text:"寿命指标呢？需要≥5000小时持续工作。",time:"14:35"},
+];
+
+function render() {
+  const el = document.getElementById("messages");
+  el.innerHTML = messages.map((m,i) => {
+    if (m.from==="system") return `<div class="msg system">${m.text}</div>`;
+    const cls = m.from==="me"?"me":"other";
+    return `<div class="msg ${cls}"><strong>${m.name}</strong><br>${m.text}<span class="time">${m.time}</span></div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function send() {
+  const input = document.getElementById("input");
+  const text = input.value.trim();
+  if (!text) return;
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+  messages.push({from:"me",name:"我",text,time});
+  document.getElementById("typing").textContent = "";
+  input.value = "";
+  render();
+
+  // Simulate reply after delay
+  setTimeout(() => {
+    document.getElementById("typing").textContent = "对方正在输入...";
+    setTimeout(() => {
+      document.getElementById("typing").textContent = "";
+      if (text.includes("800")||text.includes("温度")) {
+        messages.push({from:"other",name:"需求方",text:"收到。那响应时间能控制在100ms以内吗？",time:time});
+      } else if (text.includes("寿命")||text.includes("小时")) {
+        messages.push({from:"other",name:"需求方",text:"5000小时是我们的底线。如果你们能保证，我们可以进入正式洽谈。",time:time});
+      } else {
+        messages.push({from:"other",name:"需求方",text:"明白了。我把这些信息发给我的AI助手让它更新需求参数。",time:time});
+      }
+      render();
+    },2000);
+  },1000);
+}
+
+// Simulate online
+document.getElementById("onlineDot").className = "online-dot";
+document.getElementById("onlineText").textContent = "对方在线";
+
+render();
+document.getElementById("input").focus();
+</script>
+</body>
+</html>

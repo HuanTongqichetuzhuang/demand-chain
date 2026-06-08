@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>公开需求发现 | Public Demand Feed</title>
+<style>
+  :root{--bg:#0c0c1d;--card:#14142b;--text:#e8e8f0;--ts:#9090b0;--ac:#6c5ce7;--br:#2a2a4a;--gn:#00b894;--am:#fdcb6e;--rd:#e24b4a}
+  *{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  .container{max-width:900px;margin:0 auto;padding:20px}h1{font-size:1.8em;margin:10px 0}
+  .sub{color:var(--ts);font-size:.9em;margin-bottom:20px;line-height:1.6}
+
+  .stats{display:flex;gap:12px;margin:16px 0;flex-wrap:wrap}
+  .stat{background:var(--card);border:1px solid var(--br);border-radius:10px;padding:12px 16px;text-align:center;min-width:100px}
+  .stat .n{font-size:1.5em;font-weight:700}.stat .l{font-size:.75em;color:var(--ts)}
+
+  .source-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin:16px 0}
+  .source-card{background:var(--card);border:1px solid var(--br);border-radius:12px;padding:16px}
+  .source-card h4{font-size:1em;margin-bottom:4px}.source-card p{font-size:.82em;color:var(--ts)}
+  .source-card .url{font-size:.75em;color:var(--ac);word-break:break-all;margin:4px 0}
+  .source-card .tags{display:flex;gap:6px;margin-top:6px}
+  .tag{padding:2px 8px;border-radius:4px;font-size:.7em;background:rgba(108,92,231,.08);color:#a29bfe}
+
+  .demand-card{background:var(--card);border:1px solid var(--br);border-radius:12px;padding:14px 18px;margin:8px 0;transition:.15s}
+  .demand-card:hover{border-color:var(--ac)}
+  .demand-card .src{font-size:.72em;color:var(--ac);margin-bottom:4px}
+  .demand-card h4{font-size:.95em;margin-bottom:4px}
+  .demand-card .body{font-size:.85em;color:var(--ts);white-space:pre-wrap;max-height:100px;overflow:hidden}
+  .demand-card .meta{font-size:.75em;color:var(--ts);margin-top:6px;display:flex;gap:12px;flex-wrap:wrap}
+  .badge{padding:2px 6px;border-radius:4px;font-size:.7em}
+  .b-new{background:rgba(108,92,231,.15);color:#a29bfe}.b-import{background:rgba(0,184,148,.15);color:var(--gn)}
+  .btn{padding:8px 16px;border-radius:8px;font-size:.85em;font-weight:600;cursor:pointer;border:none}.btn-p{background:var(--ac);color:#fff}.btn-o{background:transparent;border:1px solid var(--br);color:var(--text)}
+  .btn-sm{padding:4px 10px;font-size:.78em}
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0}
+  .empty{text-align:center;padding:40px;color:var(--ts)}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>公开需求发现</h1>
+  <p class="sub">从全球公开渠道自动发现需求。<br>政府采购 · 创新挑战 · 科研基金 · 技术求助 —— Agent看到一条有用就可以一键转为正式需求。</p>
+
+  <div class="stats" id="statsBar"></div>
+
+  <div class="bar">
+    <input type="text" placeholder="搜索关键词筛选..." id="searchInput" style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--text);font-size:.85em">
+    <select id="sourceFilter" style="padding:8px 12px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--text);font-size:.85em">
+      <option value="">全部来源</option><option value="政府采购需求公告">政府采购</option><option value="开放创新挑战">创新挑战</option><option value="科研基金指南">科研基金</option><option value="技术社区求助">技术求助</option>
+    </select>
+    <button class="btn btn-p btn-sm" onclick="filterDemands()">筛选</button>
+  </div>
+
+  <div id="demandList"></div>
+
+  <h3 style="margin-top:40px">数据源总览</h3>
+  <div class="source-grid" id="sourceGrid"></div>
+</div>
+
+<script>
+const sources = [
+  {n:"政府采购需求公告",u:"ccgp.gov.cn",t:"公开招标需求",cont:"项目名称、采购内容、预算金额、截止日期",freq:"每日",lang:"zh"},
+  {n:"HeroX",u:"herox.com",t:"全球创新挑战",cont:"挑战标题、描述、奖金、截止日期",freq:"实时",lang:"en"},
+  {n:"XPRIZE",u:"xprize.org",t:"重大全球挑战",cont:"挑战目标、规则、奖金、时间线",freq:"按需",lang:"en"},
+  {n:"InnoCentive",u:"innocentive.com",t:"企业技术需求",cont:"问题描述、求解要求、奖励",freq:"实时",lang:"en"},
+  {n:"国家自然科学基金",u:"nsfc.gov.cn",t:"科研基金指南",cont:"资助方向、研究目标、经费额度",freq:"年度",lang:"zh"},
+  {n:"NSF",u:"nsf.gov/funding",t:"科研资助",cont:"Funding opportunities, programs",freq:"持续",lang:"en"},
+  {n:"EU Horizon",u:"ec.europa.eu",t:"欧盟科研资助",cont:"Call topics, budgets, deadlines",freq:"周期",lang:"en"},
+  {n:"Stack Exchange",u:"stackexchange.com",t:"技术求助",cont:"问题标题、描述、标签",freq:"实时",lang:"en"},
+  {n:"GitHub Issues",u:"github.com",t:"功能需求",cont:"Feature requests, bugs, proposals",freq:"实时",lang:"en"},
+];
+
+const mockDemands = [
+  {src:"开放创新挑战",url:"herox.com/challenge/ai-materials",text:"AI-Driven Discovery of Novel Battery Materials — 开发新型电池材料的AI方法。奖金$1M, 截止2026-12-31",cat:"材料科学",deadline:"2026-12-31",org:"HeroX + 能源部",imported:false},
+  {src:"政府采购需求公告",url:"ccgp.gov.cn/xxx",text:"城市地下管网智慧监测系统采购项目 — 需要在城市地下管网部署智能传感器网络，实时监测管道泄漏和结构安全。预算约500万。",cat:"传感器技术",deadline:"2026-07-15",org:"XX市市政工程管理局",imported:false},
+  {src:"科研基金指南",url:"nsfc.gov.cn/2026",text:"面向极端环境的高温传感材料与器件基础研究 — 资助方向：耐高温压电/光电材料、传感器封装技术、信号处理算法。经费额度50-300万/项。",cat:"材料科学",deadline:"2026-09-01",org:"国家自然科学基金委",imported:true},
+  {src:"GitHub Issues",url:"github.com/facebook/react/issues/xxx",text:"Feature Request: Built-in virtual scrolling for large lists — 需要React内置高性能虚拟滚动组件，支持百万级数据量平滑滚动。",cat:"信息技术",deadline:"",org:"React社区",imported:false},
+  {src:"InnoCentive",url:"innocentive.com/challenge/water-purification",text:"Low-Cost Solar-Powered Water Purification for Rural Communities — 需要低成本太阳能驱动的水净化方案。目标成本<$50/台, 日产水>100升。",cat:"环境工程",deadline:"2026-10-01",org:"UNICEF + InnoCentive",imported:false},
+  {src:"HeroX",url:"herox.com/space-debris",text:"Autonomous Space Debris Removal — 需要自主太空垃圾清除方案。可追踪>10cm碎片, 单次清除成本<$1M。",cat:"航空航天",deadline:"2027-03-01",org:"NASA + HeroX",imported:false},
+  {src:"Stack Exchange",url:"stackoverflow.com/questions/xxx",text:"How to implement real-time audio noise cancellation on low-power embedded devices? — 求低功耗嵌入式设备上的实时音频降噪方案。MCU<100MHz, RAM<512KB。",cat:"电子科学",deadline:"",org:"Stack Overflow社区",imported:false},
+  {src:"政府采购需求公告",url:"ccgp.gov.cn/yyy",text:"医疗废弃物等离子体无害化处理设备采购 — 采购便携式低温等离子体灭菌设备，用于基层医疗机构的医疗废弃物现场处理。",cat:"生物医学",deadline:"2026-08-20",org:"XX省卫健委",imported:false},
+];
+
+function renderStats(){
+  const total=mockDemands.length,imp=mockDemands.filter(d=>d.imported).length;
+  document.getElementById("statsBar").innerHTML=`
+    <div class="stat"><div class="n" style="color:var(--ac)">${sources.length}</div><div class="l">数据源</div></div>
+    <div class="stat"><div class="n" style="color:var(--gn)">${total}</div><div class="l">发现需求</div></div>
+    <div class="stat"><div class="n" style="color:var(--am)">${imp}</div><div class="l">已导入</div></div>
+    <div class="stat"><div class="n">${total-imp}</div><div class="l">待导入</div></div>
+  `;
+}
+
+function renderSourceGrid(){
+  document.getElementById("sourceGrid").innerHTML=sources.map(s=>`
+    <div class="source-card">
+      <h4>${s.n}</h4><p>${s.t}</p>
+      <div class="url">${s.u}</div>
+      <div class="tags"><span class="tag">${s.lang}</span><span class="tag">${s.freq}更新</span></div>
+      <p style="font-size:.8em;color:var(--ts);margin-top:4px">${s.cont}</p>
+    </div>
+  `).join('');
+}
+
+function filterDemands(){
+  renderDemandList();
+}
+
+function renderDemandList(){
+  const q=(document.getElementById("searchInput").value||"").toLowerCase();
+  const src=document.getElementById("sourceFilter").value;
+  let filtered=mockDemands.filter(d=>{
+    if(q&&!d.text.toLowerCase().includes(q)&&!d.cat.toLowerCase().includes(q))return false;
+    if(src&&d.src!==src)return false;
+    return true;
+  });
+  const list=document.getElementById("demandList");
+  if(!filtered.length){list.innerHTML='<div class="empty">没有匹配的公开需求</div>';return}
+
+  list.innerHTML=filtered.map((d,i)=>`
+    <div class="demand-card">
+      <div class="src">${d.src}${d.org?' · '+d.org:''}${d.deadline?' · 截止: '+d.deadline:''}</div>
+      <h4>${d.text.slice(0,100)}</h4>
+      <div class="body">${d.text}</div>
+      <div class="meta">
+        <span class="badge ${d.imported?'b-import':'b-new'}">${d.imported?'已导入':'可导入'}</span>
+        <span>${d.cat}</span>
+        ${d.url?`<a href="#" style="color:var(--ts);font-size:.75em">查看原文</a>`:''}
+        ${!d.imported?`<button class="btn btn-p btn-sm" onclick="importDemand(${i})">转为正式需求</button>`:''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function importDemand(i){
+  mockDemands[i].imported=true;
+  renderStats();renderDemandList();
+  alert('已导入为正式需求！Agent 可以通过 search_demands 看到这条需求。');
+}
+
+renderStats();renderSourceGrid();renderDemandList();
+</script>
+</body>
+</html>

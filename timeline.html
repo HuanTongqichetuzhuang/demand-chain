@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>个人动态 | Timeline</title>
+<style>
+  :root {
+    --bg: #0c0c1d; --card-bg: #14142b; --text: #e8e8f0;
+    --text-secondary: #9090b0; --accent: #6c5ce7; --border: #2a2a4a;
+    --green: #00b894; --amber: #fdcb6e; --red: #e24b4a; --blue: #0984e3;
+  }
+  * { margin:0;padding:0;box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .container { max-width: 700px; margin: 0 auto; padding: 20px; }
+
+  h1 { font-size: 1.6em; margin: 10px 0 6px; }
+  .sub { color: var(--text-secondary); font-size: 0.9em; margin-bottom: 20px; }
+
+  .stats-bar { display: flex; gap: 16px; margin: 20px 0; flex-wrap: wrap; }
+  .stat { background: var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:14px 18px; flex:1; min-width:120px; text-align:center; }
+  .stat .num { font-size:1.8em;font-weight:700; }
+  .stat .label { font-size:0.78em;color:var(--text-secondary); }
+  .stat .num.green { color: var(--green); }
+  .stat .num.amber { color: var(--amber); }
+  .stat .num.blue { color: var(--blue); }
+  .stat .num.red { color: var(--red); }
+
+  /* Timeline */
+  .timeline { position: relative; padding-left: 32px; }
+  .timeline::before { content:''; position:absolute; left:12px;top:0;bottom:0;width:1px;background:var(--border); }
+  .t-entry { position:relative; margin-bottom: 20px; }
+  .t-entry::before { content:''; position:absolute; left:-24px; top:8px; width:10px;height:10px;border-radius:50%;border:2px solid var(--border);background:var(--bg); }
+  .t-entry.match::before { border-color:var(--green);background:var(--green); }
+  .t-entry.reply::before { border-color:var(--accent);background:var(--accent); }
+  .t-entry.status::before { border-color:var(--blue);background:var(--blue); }
+  .t-entry.alert::before { border-color:var(--red);background:var(--red); }
+  .t-entry.follow::before { border-color:var(--amber);background:var(--amber); }
+  .t-entry .time { font-size:0.75em;color:var(--text-secondary); }
+  .t-entry .t-body { font-size:0.92em;margin:4px 0; }
+  .t-entry .t-link { color:#a29bfe;font-size:0.82em;cursor:pointer;text-decoration:underline; }
+  .t-entry .t-tag { padding:1px 6px;border-radius:4px;font-size:0.7em;margin-left:8px; }
+  .t-tag-new { background:rgba(108,92,231,0.15);color:#a29bfe; }
+  .t-tag-urgent { background:rgba(226,75,74,0.15);color:var(--red); }
+
+  .filter-bar { display:flex;gap:8px;margin:16px 0;flex-wrap:wrap; }
+  .filter-btn { padding:5px 14px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:0.82em;cursor:pointer; }
+  .filter-btn.active { border-color:var(--accent);color:#a29bfe;background:rgba(108,92,231,0.08); }
+
+  .empty { text-align:center;padding:60px 20px;color:var(--text-secondary); }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>个人动态</h1>
+  <p class="sub">所有与你相关的事件：匹配、回复、状态变更、关注更新。</p>
+
+  <div class="stats-bar">
+    <div class="stat"><div class="num green">2</div><div class="label">活跃需求</div></div>
+    <div class="stat"><div class="num amber">3</div><div class="label">待处理匹配</div></div>
+    <div class="stat"><div class="num blue">4</div><div class="label">关注的专区</div></div>
+    <div class="stat"><div class="num">12</div><div class="label">总互动</div></div>
+    <div class="stat"><div class="num red">1</div><div class="label">即将过期</div></div>
+  </div>
+
+  <div class="filter-bar">
+    <span class="filter-btn active" onclick="filterTimeline('all')">全部</span>
+    <span class="filter-btn" onclick="filterTimeline('match')">匹配</span>
+    <span class="filter-btn" onclick="filterTimeline('reply')">回复</span>
+    <span class="filter-btn" onclick="filterTimeline('status')">状态变更</span>
+    <span class="filter-btn" onclick="filterTimeline('follow')">关注更新</span>
+  </div>
+
+  <div class="timeline" id="timeline"></div>
+</div>
+
+<script>
+const events = [
+  { type:"match", time:"10分钟前", body:"你的需求「800°C高温管道检测传感器」收到新匹配：XX传感器研究所（得分 0.87）", link:"查看详情", tag:"new", tagLabel:"新" },
+  { type:"match", time:"2小时前", body:"你的需求「低温等离子体灭菌设备」收到新匹配：YY医疗科技（得分 0.72）", link:"查看详情" },
+  { type:"alert", time:"5小时前", body:"匹配「XX传感器研究所」的L3信息确认请求已在12小时前发出，48小时内未回复将自动拒绝", link:"立即确认", tag:"urgent", tagLabel:"紧急" },
+  { type:"reply", time:"3小时前", body:"你的论坛帖子「高温传感器材料选型讨论」收到新回复：\"建议尝试PZT-5H系列，工作温度可达600°C，更高温度可考虑铋层状结构...\"", link:"查看帖子" },
+  { type:"status", time:"昨天", body:"你关注的子需求「管道裂缝声波信号处理算法」状态变更为「匹配中」，已有2家提交方案", link:"查看需求链" },
+  { type:"follow", time:"昨天", body:"你关注的「AI蛋白质折叠加速算法」有新进展：子需求「GPU集群调度」已发布", link:"查看子需求" },
+  { type:"reply", time:"昨天", body:"你在「碳纤维轻量化车身」下的讨论收到了回复：\"我们团队有类似项目经验，已完成3款车型的碳纤维结构设计...\"", link:"查看讨论" },
+  { type:"status", time:"6月4日", body:"你的需求「碳纤维复合材料轻量化」状态从「开放」变更为「匹配中」", link:"查看详情" },
+  { type:"match", time:"6月3日", body:"你的需求「碳纤维复合材料轻量化」收到匹配：ZZ材料科技（得分 0.68）", link:"查看详情" },
+  { type:"follow", time:"6月3日", body:"AI专区新增需求：「大规模GPU集群蛋白质折叠推理调度」— 与你的关注领域相关", link:"查看需求" },
+  { type:"status", time:"6月2日", body:"你关注的「AI蛋白质折叠加速算法」状态从「开放」变更为「解决中」", link:"查看进展" },
+  { type:"reply", time:"6月1日", body:"你的广场需求「800°C高温传感器」下有新讨论：\"建议将工作温度需求拆分为两个阶段，先验证600°C...\"", link:"查看讨论" },
+];
+
+let filter = "all";
+function filterTimeline(f) {
+  filter = f;
+  document.querySelectorAll(".filter-btn").forEach(b=>b.classList.toggle("active",b.textContent===["全部","匹配","回复","状态变更","关注更新"][["all","match","reply","status","follow"].indexOf(f)]));
+  renderTimeline();
+}
+
+function renderTimeline() {
+  const filtered = filter==="all" ? events : events.filter(e=>e.type===filter);
+  const types = {match:"t-entry match", reply:"t-entry reply", status:"t-entry status", alert:"t-entry alert", follow:"t-entry follow"};
+
+  document.getElementById("timeline").innerHTML = filtered.map(e => `
+    <div class="${types[e.type]||'t-entry'}">
+      <div class="time">${e.time}</div>
+      <div class="t-body">${e.body}${e.tag?`<span class="t-tag ${e.tag==='urgent'?'t-tag-urgent':'t-tag-new'}">${e.tagLabel}</span>`:''}</div>
+      <span class="t-link" onclick="alert('${e.link}')">${e.link} →</span>
+    </div>
+  `).join('');
+}
+
+renderTimeline();
+</script>
+</body>
+</html>
