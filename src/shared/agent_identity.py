@@ -74,6 +74,7 @@ class AgentRegistry:
         # 内存存储（生产环境用数据库）
         self._agents: dict[str, AgentIdentity] = {}
         self._human_agents: dict[str, list[str]] = {}  # human_id → [agent_id, ...]
+        self._email_to_human: dict[str, dict] = {}  # email → {human_id, password_hash}
 
     def register(
         self,
