@@ -254,6 +254,91 @@ async def get_agent_guide(lang: str = "zh") -> str:
 
 
 # ============================================================
+# 身份注册 — 人类通过Agent注册账号，跨Agent登录
+# ============================================================
+
+@mcp.tool()
+async def register_human(email: str, display_name: str, password: str = "") -> str:
+    """
+    Agent帮人类注册账号。
+    人类告诉Agent：姓名+邮箱+密码 → Agent调此工具注册。
+    注册后返回 human_id，以后换Agent时用这个ID登录。
+    """
+    from src.shared.agent_identity import agent_registry, generate_ulid
+    try:
+        human_id = generate_ulid()
+        identity, api_key = agent_registry.register(
+            human_id=human_id,
+            display_name=display_name,
+        )
+        return json.dumps({
+            "status": "ok",
+            "human_id": human_id,
+            "agent_id": identity.agent_id,
+            "api_key": api_key,
+            "display_name": display_name,
+            "message": "注册成功！请把 human_id 和 api_key 记下来。以后换AI助手时，用 bind_agent 把新助手绑到这个账号上。",
+        }, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+@mcp.tool()
+async def bind_agent(human_id: str, api_key: str, display_name: str = "") -> str:
+    """
+    把当前Agent绑到已有账号上（换了AI助手后用这个）。
+    人类把之前生成的 human_id 和 api_key 告诉Agent → Agent调用此工具。
+    """
+    from src.shared.agent_identity import agent_registry
+    try:
+        agents = agent_registry.list_for_human(human_id)
+        if not agents:
+            return json.dumps({"error": "账号不存在，请先注册"}, ensure_ascii=False)
+
+        # 验证api_key
+        identity = agent_registry.authenticate(agents[0].agent_id, api_key)
+        if not identity:
+            return json.dumps({"error": "api_key 不正确"}, ensure_ascii=False)
+
+        # 注册一个新Agent绑定到同一个human
+        new_identity, new_api_key = agent_registry.register(
+            human_id=human_id,
+            display_name=display_name or identity.display_name,
+        )
+
+        return json.dumps({
+            "status": "ok",
+            "human_id": human_id,
+            "new_agent_id": new_identity.agent_id,
+            "new_api_key": new_api_key,
+            "display_name": identity.display_name,
+            "total_agents": len(agent_registry.list_for_human(human_id)),
+            "message": f"绑定成功！你现在有 {len(agent_registry.list_for_human(human_id))} 个AI助手关联到这个账号。",
+        }, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+@mcp.tool()
+async def my_account(agent_id: str) -> str:
+    """查看当前Agent关联的人类账号信息。"""
+    from src.shared.agent_identity import agent_registry
+    try:
+        identity = agent_registry.get(agent_id)
+        if not identity:
+            return json.dumps({"status": "unregistered", "message": "尚未注册。请让人类调用 register_human 创建账号。"}, ensure_ascii=False)
+
+        agents = agent_registry.list_for_human(identity.human_id)
+        return json.dumps({
+            "status": "ok",
+            "human_id": identity.human_id,
+            "display_name": identity.display_name,
+            "agent_count": len(agents),
+            "agents": [{"id": a.agent_id[:8], "name": a.display_name} for a in agents],
+        }, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
+# ============================================================
 # 论坛工具 — 需求告示板 + 问题反馈 + Agent讨论
 # ============================================================
 
