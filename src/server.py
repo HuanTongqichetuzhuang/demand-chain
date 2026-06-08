@@ -1,8 +1,9 @@
 """
-需求链平台 MCP Server — 15个工具，Agent 通过 MCP 协议直接接入。
+需求链平台 MCP Server — 53个工具，Agent 通过 MCP 协议直接接入。
 """
 import json
 import logging
+import hashlib
 from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
@@ -23,8 +24,10 @@ mcp = FastMCP("需求链平台")
 # ============================================================
 
 @mcp.tool()
-async def publish_demand(user_id: str, raw_text: str, lang: str = "zh") -> str:
-    """发布一条需求。用户用自然语言描述需求，AI 自动结构化并入库。lang: zh|en"""
+async def publish_demand(user_id: str, raw_text: str, session_token: str, lang: str = "zh") -> str:
+    """发布一条需求。必须先注册/登录获得 session_token。"""
+    from src.shared.auth import verify
+    verify(session_token)
     async with async_session() as session:
         svc = DemandService(session)
         demand = await svc.publish(user_id, raw_text, lang=lang)
@@ -115,7 +118,10 @@ async def get_demand_chain(demand_id: str) -> str:
     return json.dumps({"status": "stub", "chain": []}, ensure_ascii=False)
 
 @mcp.tool()
-async def update_demand(demand_id: str, raw_text: str = "", status: str = "") -> str:
+async def update_demand(demand_id: str, session_token: str, raw_text: str = "", status: str = "") -> str:
+    """修改已有需求。必须先注册/登录获得 session_token。"""
+    from src.shared.auth import verify
+    verify(session_token)
     """
     修改已有需求。可更新描述文本或状态。
     status: open | in_progress | fulfilled | closed
@@ -156,9 +162,9 @@ async def update_demand(demand_id: str, raw_text: str = "", status: str = "") ->
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
-async def close_demand(demand_id: str) -> str:
-    """关闭一条需求（不再匹配）。保留数据但状态改为 cancelled。"""
-    return await update_demand(demand_id, status="CANCELLED")
+async def close_demand(demand_id: str, session_token: str) -> str:
+    """关闭一条需求。status → cancelled。"""
+    return await update_demand(demand_id, session_token=session_token, status="CANCELLED")
 
 @mcp.tool()
 async def reclassify_demand(demand_id: str) -> str:
@@ -300,12 +306,15 @@ async def register_human(email: str, display_name: str, password: str) -> str:
             "password_hash": hashed,
         }
 
+        from src.shared.auth import create_token
+        token = create_token(human_id, identity.agent_id)
         return json.dumps({
             "status": "ok",
             "human_id": human_id,
             "agent_id": identity.agent_id,
             "email": email,
-            "message": f"注册成功，{display_name}！以后换AI助手时，用邮箱 {email} 和密码登录就行。",
+            "session_token": token,
+            "message": f"注册成功，{display_name}！",
         }, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
@@ -338,10 +347,13 @@ async def login_human(email: str, password: str, display_name: str = "") -> str:
             display_name=display_name or old_name,
         )
 
+        from src.shared.auth import create_token
+        token = create_token(human_id, new_identity.agent_id)
         return json.dumps({
             "status": "ok",
             "human_id": human_id,
             "agent_id": new_identity.agent_id,
+            "session_token": token,
             "display_name": old_name,
             "total_agents": len(agent_registry.list_for_human(human_id)),
             "message": f"登录成功，{old_name}！你之前的 {len(old_agents)} 个AI助手已关联。",
