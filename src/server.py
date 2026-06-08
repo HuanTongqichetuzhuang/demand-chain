@@ -258,61 +258,73 @@ async def get_agent_guide(lang: str = "zh") -> str:
 # ============================================================
 
 @mcp.tool()
-async def register_human(email: str, display_name: str, password: str = "") -> str:
+async def register_human(email: str, display_name: str, password: str) -> str:
     """
-    Agent帮人类注册账号。
-    人类告诉Agent：姓名+邮箱+密码 → Agent调此工具注册。
-    注册后返回 human_id，以后换Agent时用这个ID登录。
+    帮人类注册账号。
+    人类告诉Agent：名字+邮箱+密码 → Agent调此工具。
+    返回 human_id，人类换AI助手时用邮箱+密码登录即可继续。
     """
+    import hashlib, binascii
     from src.shared.agent_identity import agent_registry, generate_ulid
     try:
         human_id = generate_ulid()
-        identity, api_key = agent_registry.register(
+        hashed = hashlib.sha256(password.encode()).hexdigest()
+
+        identity, _ = agent_registry.register(
             human_id=human_id,
             display_name=display_name,
         )
+        # Store email+hash mapping (in-memory for now)
+        agent_registry._email_to_human[email] = {
+            "human_id": human_id,
+            "password_hash": hashed,
+        }
+
         return json.dumps({
             "status": "ok",
             "human_id": human_id,
             "agent_id": identity.agent_id,
-            "api_key": api_key,
-            "display_name": display_name,
-            "message": "注册成功！请把 human_id 和 api_key 记下来。以后换AI助手时，用 bind_agent 把新助手绑到这个账号上。",
+            "email": email,
+            "message": f"注册成功，{display_name}！以后换AI助手时，用邮箱 {email} 和密码登录就行。",
         }, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
-async def bind_agent(human_id: str, api_key: str, display_name: str = "") -> str:
+async def login_human(email: str, password: str, display_name: str = "") -> str:
     """
-    把当前Agent绑到已有账号上（换了AI助手后用这个）。
-    人类把之前生成的 human_id 和 api_key 告诉Agent → Agent调用此工具。
+    人类登录。人类把邮箱和密码告诉Agent → Agent调此工具。
+    返回 human_id，拿到后可以正常使用所有功能。
+    换AI助手时用这个登录，之前的需求、匹配、工作区都还在。
     """
+    import hashlib
     from src.shared.agent_identity import agent_registry
     try:
-        agents = agent_registry.list_for_human(human_id)
-        if not agents:
-            return json.dumps({"error": "账号不存在，请先注册"}, ensure_ascii=False)
+        entry = agent_registry._email_to_human.get(email)
+        if not entry:
+            return json.dumps({"error": "邮箱未注册。请先注册。"}, ensure_ascii=False)
 
-        # 验证api_key
-        identity = agent_registry.authenticate(agents[0].agent_id, api_key)
-        if not identity:
-            return json.dumps({"error": "api_key 不正确"}, ensure_ascii=False)
+        hashed = hashlib.sha256(password.encode()).hexdigest()
+        if hashed != entry["password_hash"]:
+            return json.dumps({"error": "密码错误"}, ensure_ascii=False)
 
-        # 注册一个新Agent绑定到同一个human
-        new_identity, new_api_key = agent_registry.register(
+        human_id = entry["human_id"]
+        old_agents = agent_registry.list_for_human(human_id)
+        old_name = old_agents[0].display_name if old_agents else email
+
+        # Register this current Agent connection for this human
+        new_identity, _ = agent_registry.register(
             human_id=human_id,
-            display_name=display_name or identity.display_name,
+            display_name=display_name or old_name,
         )
 
         return json.dumps({
             "status": "ok",
             "human_id": human_id,
-            "new_agent_id": new_identity.agent_id,
-            "new_api_key": new_api_key,
-            "display_name": identity.display_name,
+            "agent_id": new_identity.agent_id,
+            "display_name": old_name,
             "total_agents": len(agent_registry.list_for_human(human_id)),
-            "message": f"绑定成功！你现在有 {len(agent_registry.list_for_human(human_id))} 个AI助手关联到这个账号。",
+            "message": f"登录成功，{old_name}！你之前的 {len(old_agents)} 个AI助手已关联。",
         }, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
