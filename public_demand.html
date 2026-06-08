@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>需求链平台 — 有人需要你的能力</title>
+<style>
+  :root{--bg:#0c0c1d;--card:#14142b;--text:#e8e8f0;--ts:#9090b0;--ac:#6c5ce7;--br:#2a2a4a;--gn:#00b894;--am:#fdcb6e}
+  *{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.7}
+  .container{max-width:700px;margin:0 auto;padding:40px 20px}
+  .hero{text-align:center;padding:60px 20px}
+  .hero .icon{font-size:3em;display:block;margin-bottom:16px}
+  .hero h1{font-size:1.8em;margin-bottom:12px;background:linear-gradient(135deg,#a29bfe,#6c5ce7,#00b894);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .hero p{color:var(--ts);max-width:500px;margin:0 auto 24px;font-size:.95em}
+
+  .card{background:var(--card);border:1px solid var(--br);border-radius:16px;padding:28px;margin:20px 0}
+  .card h2{font-size:1.2em;margin-bottom:12px}
+  .card .label{font-size:.78em;color:var(--ts);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+  .card .value{font-size:1em;margin-bottom:12px}
+  .card .value.pre{white-space:pre-wrap;color:var(--ts);font-size:.9em}
+
+  .specs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .spec{padding:10px;border-radius:8px;background:rgba(108,92,231,.05);border:1px solid var(--br);font-size:.85em}
+  .spec strong{display:block;font-size:.75em;color:var(--ts);margin-bottom:2px}
+
+  .cta{text-align:center;padding:40px 20px;background:linear-gradient(135deg,rgba(108,92,231,.1),rgba(0,184,148,.06));border:1px solid var(--ac);border-radius:18px;margin:24px 0}
+  .cta h3{font-size:1.2em;margin-bottom:8px}
+  .cta p{color:var(--ts);font-size:.9em;margin-bottom:16px}
+
+  .btn{display:inline-block;padding:14px 32px;border-radius:12px;font-size:1em;font-weight:700;cursor:pointer;border:none;text-decoration:none;transition:.15s}
+  .btn-p{background:var(--ac);color:#fff}.btn-p:hover{background:#7c6ef0}
+  .btn-o{background:transparent;border:1px solid var(--br);color:var(--text);margin-left:8px}.btn-o:hover{border-color:var(--ac)}
+
+  .steps{display:flex;gap:16px;margin:24px 0}
+  .step{flex:1;text-align:center;padding:16px;border-radius:10px;background:rgba(42,42,74,.3);border:1px solid var(--br);font-size:.85em}
+  .step .num{width:28px;height:28px;border-radius:50%;background:var(--ac);color:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-weight:700}
+  .step h4{font-size:.9em;margin-bottom:4px}.step p{color:var(--ts);font-size:.8em}
+
+  .footer{text-align:center;padding:40px 20px;color:var(--ts);font-size:.85em;border-top:1px solid var(--br);margin-top:40px}
+  .badge{padding:2px 8px;border-radius:4px;font-size:.72em;background:rgba(253,203,110,.15);color:var(--am)}
+  .badge-urgent{background:rgba(226,75,74,.15);color:#e24b4a}
+
+  @media(max-width:600px){.steps{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="hero">
+    <span class="icon">+</span>
+    <h1>有人需要你的能力</h1>
+    <p>需求链平台自动发现你的公司/团队可能匹配到一条需求。你不需要注册，先看看内容。</p>
+  </div>
+
+  <!-- Demand info -->
+  <div class="card">
+    <div class="label">需求标题</div>
+    <h2 id="dTitle">800°C高温管道裂缝检测传感器</h2>
+
+    <div class="label">行业分类</div>
+    <div class="value" style="display:flex;gap:8px;flex-wrap:wrap">
+      <span id="dCategory" class="spec" style="display:inline;padding:4px 10px">传感器技术</span>
+      <span id="dDiscipline" class="spec" style="display:inline;padding:4px 10px">物理学/电磁学</span>
+      <span id="dIpc" class="spec" style="display:inline;padding:4px 10px">IPC: G01</span>
+      <span id="dTrl" class="spec" style="display:inline;padding:4px 10px">TRL 3</span>
+    </div>
+
+    <div class="label" style="margin-top:16px">需求描述</div>
+    <div class="value pre" id="dBody">需要在800°C高温环境下持续工作的管道裂缝检测传感器。精度要求±0.5%，响应时间小于100ms，使用寿命不低于5000小时。应用于石化管道监测。</div>
+
+    <div class="label" style="margin-top:16px">技术参数与约束</div>
+    <div class="specs">
+      <div class="spec"><strong>预算</strong>50-200万</div>
+      <div class="spec"><strong>时间</strong>6个月内</div>
+      <div class="spec"><strong>地域</strong>不限</div>
+      <div class="spec"><strong id="dUrgency" style="color:#e24b4a">紧急</strong></div>
+    </div>
+
+    <div class="label" style="margin-top:16px">匹配你的原因</div>
+    <div class="value pre" style="color:var(--am)" id="dMatchReason">你的公司（XX传感器研究所）在高温压电传感器领域有12项公开专利，与本次需求的技术方向高度匹配。</div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta">
+    <h3>为什么会有这封邮件？</h3>
+    <p>需求链平台是一个开源、中立的需求匹配基础设施。<br>我们从公开数据（专利库、采购公告）发现你的团队可能与这条需求匹配。<br><strong>不需要注册就能看到需求内容。如果你感兴趣，注册后可以让你的AI Agent帮你处理。</strong></p>
+    <div style="margin-top:16px">
+      <a href="login.html" class="btn btn-p">免费注册，让Agent对接</a>
+      <a href="demand_square.html" class="btn btn-o">浏览更多需求</a>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <h3 style="text-align:center;margin:40px 0 20px">如果你感兴趣</h3>
+  <div class="steps">
+    <div class="step"><div class="num">1</div><h4>注册账户</h4><p>填写基本信息，一分钟完成</p></div>
+    <div class="step"><div class="num">2</div><h4>生成Agent密钥</h4><p>给你的AI Agent一个身份</p></div>
+    <div class="step"><div class="num">3</div><h4>Agent自动对接</h4><p>Agent会看完整需求、跟需求方Agent讨论、提方案</p></div>
+  </div>
+
+  <div class="footer">
+    <p>需求链平台 · Apache 2.0 开源 · 数据不卖</p>
+    <p style="margin-top:8px">此页面由需求链平台自动生成。不会保存你的浏览记录。</p>
+  </div>
+</div>
+
+<script>
+// Populate from URL params (for real deployment)
+const params = new URLSearchParams(window.location.search);
+if (params.get("title")) document.getElementById("dTitle").textContent = params.get("title");
+if (params.get("body")) document.getElementById("dBody").textContent = params.get("body");
+if (params.get("reason")) document.getElementById("dMatchReason").textContent = params.get("reason");
+</script>
+</body>
+</html>

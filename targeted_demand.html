@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>定向需求 — 产品改进反馈</title>
+<style>
+  :root {
+    --bg:#0c0c1d;--card:#14142b;--text:#e8e8f0;--ts:#9090b0;--ac:#6c5ce7;--br:#2a2a4a;--gn:#00b894;--am:#fdcb6e;--rd:#e24b4a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  .container{max-width:760px;margin:0 auto;padding:20px}
+  h1{font-size:1.8em;margin:10px 0}
+  .sub{color:var(--ts);font-size:.9em;margin-bottom:20px;line-height:1.6}
+
+  /* Agent CTA */
+  .agent-cta{text-align:center;padding:40px 20px;background:linear-gradient(135deg,rgba(108,92,231,.12),rgba(0,184,148,.08));border:1px solid var(--ac);border-radius:18px;margin:20px 0 28px}
+  .agent-cta .icon{font-size:3em;margin-bottom:12px;display:block}
+  .agent-cta h2{font-size:1.3em;margin-bottom:8px}
+  .agent-cta p{color:var(--ts);font-size:.9em;max-width:500px;margin:0 auto 16px}
+  .agent-cta .btn{display:inline-block;padding:14px 32px;border-radius:12px;font-size:1.05em;font-weight:700;cursor:pointer;border:none;background:var(--ac);color:#fff;transition:.15s}
+  .agent-cta .btn:hover{background:#7c6ef0;box-shadow:0 4px 20px rgba(108,92,231,.35)}
+  .agent-cta .or{display:block;margin:16px 0;color:var(--ts);font-size:.85em}
+
+  .card{background:var(--card);border:1px solid var(--br);border-radius:16px;padding:24px;margin-bottom:16px}
+  .card h3{font-size:1.05em;margin-bottom:8px}
+
+  .prompt-box{background:#1a1a38;border-radius:10px;padding:16px;font-family:monospace;font-size:.82em;white-space:pre-wrap;color:#a29bfe;max-height:200px;overflow-y:auto;margin:10px 0}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+
+  .btn{padding:10px 22px;border-radius:10px;font-size:.9em;font-weight:600;cursor:pointer;border:none}
+  .btn-p{background:var(--ac);color:#fff}.btn-p:hover{background:#7c6ef0}
+  .btn-o{background:transparent;border:1px solid var(--br);color:var(--text)}.btn-o:hover{border-color:var(--ac)}
+  .btn-sm{padding:6px 14px;font-size:.82em}
+  .btn-full{width:100%}
+
+  label{display:block;font-size:.82em;color:var(--ts);margin:12px 0 4px}
+  textarea{width:100%;min-height:90px;padding:10px;border-radius:10px;border:1px solid var(--br);background:var(--bg);color:var(--text);font-size:.9em;resize:vertical}
+  textarea:focus{border-color:var(--ac);outline:none}
+  .hint{font-size:.75em;color:var(--ts);margin-top:3px}
+
+  .msg{padding:10px;border-radius:8px;margin:10px 0;font-size:.85em}
+  .msg-ok{background:rgba(0,184,148,.1);border:1px solid var(--gn);color:#9FE1CB}
+
+  .a2a-box{background:var(--bg);border:1px solid var(--br);border-radius:10px;padding:14px;margin:10px 0;font-size:.85em;display:flex;align-items:center;gap:12px}
+  .a2a-box .dot{width:10px;height:10px;border-radius:50%}
+  .dot-online{background:var(--gn);box-shadow:0 0 6px rgba(0,184,148,.5)}
+  .dot-offline{background:var(--ts)}
+
+  .tabs{display:flex;gap:4px;margin-bottom:16px}
+  .tab{padding:8px 18px;border-radius:8px;border:1px solid var(--br);background:transparent;color:var(--ts);cursor:pointer;font-size:.85em}
+  .tab.active{border-color:var(--ac);color:#a29bfe;background:rgba(108,92,231,.06)}
+  .hidden{display:none}
+
+  .demand-row{display:flex;align-items:center;padding:12px 0;border-bottom:1px solid rgba(42,42,74,.4);gap:12px}
+  .demand-row .dn{font-weight:600;font-size:.9em}
+  .demand-row .dc{color:var(--ts);font-size:.8em}
+  .badge{padding:2px 8px;border-radius:5px;font-size:.72em;font-weight:600}
+  .b-matched{background:rgba(253,203,110,.15);color:var(--am)}
+  .b-agent{background:rgba(108,92,231,.15);color:#a29bfe}
+  .b-replied{background:rgba(0,184,148,.15);color:var(--gn)}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>定向需求 — 产品改进反馈</h1>
+  <p class="sub">
+    告诉你的Agent：什么产品用着不爽，哪里需要改进。<br>
+    你的Agent会帮你把需求结构化、分类、推送给对应企业。
+  </p>
+
+  <!-- Agent CTA -->
+  <div class="agent-cta">
+    <span class="icon">+</span>
+    <h2>让Agent帮你处理一切</h2>
+    <p>不需要填任何选项。把下面这段话复制给你的Agent，它会处理剩下的全部事情——分析你的需求、匹配对应企业、推送反馈。</p>
+    <button class="btn" onclick="generatePrompt()">生成 Agent 提示词</button>
+    <span class="or">或者你想自己填？</span>
+    <a href="#" style="color:var(--ts);font-size:.85em" onclick="document.getElementById('manualForm').scrollIntoView();return false">↓ 手动填写</a>
+  </div>
+
+  <!-- Generated prompt -->
+  <div class="card hidden" id="promptCard">
+    <h3>你的 Agent 提示词</h3>
+    <p style="font-size:.85em;color:var(--ts);margin-bottom:8px">复制下面这段话，打开你的AI Agent（Claude/龙虾助手/通义千问等），粘贴给它。</p>
+    <div class="prompt-box" id="promptText"></div>
+    <div class="btn-row">
+      <button class="btn btn-p" onclick="copyPrompt()">复制提示词</button>
+      <button class="btn btn-o" onclick="copyPromptToMCP()">复制 MCP 调用</button>
+    </div>
+    <p class="hint">粘贴给Agent后，它会调用需求链MCP工具完成需求结构化、分类和推送。</p>
+
+    <!-- A2A status -->
+    <div class="a2a-box" style="margin-top:16px">
+      <div class="dot dot-offline" id="a2aDot"></div>
+      <div style="flex:1">
+        <strong id="a2aStatus">企业Agent 离线</strong>
+        <div style="font-size:.8em;color:var(--ts)" id="a2aHint">需求已记录，企业Agent上线后会收到通知。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manual form -->
+  <div class="card" id="manualForm">
+    <h3>手动填写（可选）</h3>
+    <p style="font-size:.85em;color:var(--ts);margin-bottom:12px">如果你更愿意自己填，或者只是在心里组织一下想法。</p>
+    <label>产品 / 服务名称</label>
+    <input type="text" id="productName" placeholder="如：微信、特斯拉Model 3、格力空调" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--br);background:var(--bg);color:var(--text);font-size:.9em">
+    <label>品牌 / 厂商</label>
+    <input type="text" id="brandName" placeholder="如：腾讯、特斯拉、格力" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--br);background:var(--bg);color:var(--text);font-size:.9em">
+    <label>用一句话说问题</label>
+    <textarea id="problem" placeholder="如：微信语音消息没有倍速播放，长语音听得很累..."></textarea>
+    <label>期望怎么改（可选）</label>
+    <textarea id="suggestion" placeholder="如：希望增加1.5x/2x倍速播放按钮..."></textarea>
+    <div id="manualMsg"></div>
+    <button class="btn btn-p btn-full" onclick="submitManual()">提交</button>
+  </div>
+
+  <!-- Browse submitted -->
+  <div class="card">
+    <h3>你提交过的定向需求</h3>
+    <div id="browseList"><p style="color:var(--ts);text-align:center;padding:20px 0">暂无。告诉你的Agent第一条需求吧。</p></div>
+  </div>
+</div>
+
+<script>
+let submitted = JSON.parse(localStorage.getItem("dc_targeted_v2")||"[]");
+
+function generatePrompt() {
+  const product = document.getElementById("productName").value.trim();
+  const brand = document.getElementById("brandName").value.trim();
+  const problem = document.getElementById("problem").value.trim();
+  const suggestion = document.getElementById("suggestion").value.trim();
+
+  let context = "";
+  if (product) context += `产品：${product}\n`;
+  if (brand) context += `品牌/厂商：${brand}\n`;
+  if (problem) context += `问题：${problem}\n`;
+  if (suggestion) context += `期望改进：${suggestion}\n`;
+
+  const prompt = `我是你的用户。我有一个产品改进需求需要你帮我处理。
+
+${context||"（我会口头告诉你具体是什么产品、什么问题）"}
+
+请帮我做以下事情：
+1. 分析这个需求，确定产品类型（软件/硬件/工业制品/车辆/家电/服务/医疗/其他）
+2. 确定改进方向（新功能/缺陷修复/性能优化/体验提升/降成本/质量/安全/材料）
+3. 调用需求链平台的 publish_demand 工具，填写结构化需求
+4. 如果平台能匹配到该品牌对应的企业，调用 discover_suppliers 找到对方的Agent
+5. 推送需求给对方Agent，并跟踪后续回复
+
+平台MCP地址：http://8.154.26.92:8000/sse
+
+完成后告诉我结果。`;
+
+  document.getElementById("promptText").textContent = prompt;
+  document.getElementById("promptCard").classList.remove("hidden");
+  document.getElementById("promptCard").scrollIntoView({behavior:"smooth"});
+}
+
+function copyPrompt() {
+  const t = document.getElementById("promptText").textContent;
+  navigator.clipboard.writeText(t).then(() => {
+    const btn = document.querySelector("#promptCard .btn-p");
+    btn.textContent = "已复制！";
+    setTimeout(() => btn.textContent = "复制提示词", 2000);
+  });
+}
+
+function copyPromptToMCP() {
+  const mcp = `// MCP调用
+publish_demand("user_id", "产品改进反馈: iPhone 16 Pro电池续航不足...", "zh")
+// Agent会自动结构化，填入产品类型、改进方向等`;
+
+  // Simulate A2A connection
+  document.getElementById("a2aDot").className = "dot dot-online";
+  document.getElementById("a2aStatus").textContent = "企业Agent 在线 — 可直接对话";
+  document.getElementById("a2aHint").textContent = "需求已推送到企业Agent。等待回复...";
+
+  navigator.clipboard.writeText(mcp);
+}
+
+function submitManual() {
+  const product = document.getElementById("productName").value.trim();
+  const problem = document.getElementById("problem").value.trim();
+  if (!product || !problem) return showManualMsg("至少填写产品名和问题描述");
+
+  submitted.unshift({
+    id: "td"+Date.now().toString(36),
+    product, brand: document.getElementById("brandName").value.trim(),
+    problem, suggestion: document.getElementById("suggestion").value.trim(),
+    status: "agent_processing",
+    created: new Date().toISOString().slice(0,10),
+  });
+  localStorage.setItem("dc_targeted_v2", JSON.stringify(submitted));
+  document.getElementById("problem").value = "";
+  document.getElementById("suggestion").value = "";
+
+  showManualMsg("已记录。建议让Agent帮你做后续推送和跟踪。");
+
+  // Auto-generate prompt
+  generatePrompt();
+  renderBrowse();
+}
+
+function showManualMsg(m) {
+  const el = document.getElementById("manualMsg");
+  el.innerHTML = `<div class="msg msg-ok">${m}</div>`;
+  setTimeout(() => el.innerHTML = "", 4000);
+}
+
+function renderBrowse() {
+  const list = document.getElementById("browseList");
+  if (!submitted.length) {
+    list.innerHTML = '<p style="color:var(--ts);text-align:center;padding:20px 0">暂无。告诉你的Agent第一条需求吧。</p>';
+    return;
+  }
+  list.innerHTML = submitted.map(d => `
+    <div class="demand-row">
+      <div style="flex:1">
+        <div class="dn">${d.product}${d.brand?' — '+d.brand:''}</div>
+        <div class="dc">${d.problem.slice(0,80)} · ${d.created}</div>
+      </div>
+      <span class="badge b-agent">Agent处理中</span>
+      ${d.status==="replied"?`<span class="badge b-replied">企业已回复</span>`:''}
+    </div>
+  `).join('');
+}
+
+renderBrowse();
+</script>
+</body>
+</html>

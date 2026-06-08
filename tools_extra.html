@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>翻译 + 搜索 + 审核</title>
+<style>:root{--bg:#0c0c1d;--card:#14142b;--text:#e8e8f0;--ts:#9090b0;--ac:#6c5ce7;--br:#2a2a4a;--gn:#00b894;--am:#fdcb6e;--rd:#e24b4a}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.container{max-width:900px;margin:0 auto;padding:20px}
+h1{font-size:1.6em;margin:10px 0}.sub{color:var(--ts);font-size:.9em;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--br);border-radius:14px;padding:20px;margin-bottom:16px}
+.card h3{font-size:1.1em;margin-bottom:10px}
+.row{display:flex;gap:12px;flex-wrap:wrap}.col{flex:1;min-width:250px}
+textarea{width:100%;min-height:100px;padding:10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--text);font-size:.9em;resize:vertical}
+textarea:focus{border-color:var(--ac);outline:none}
+.btn{padding:8px 18px;border-radius:8px;font-size:.9em;font-weight:600;cursor:pointer;border:none}.btn-p{background:var(--ac);color:#fff}.btn-o{background:transparent;border:1px solid var(--br);color:var(--text)}.btn-sm{padding:4px 12px;font-size:.8em}
+.bar{display:flex;gap:8px;align-items:center;margin:10px 0;flex-wrap:wrap}
+input,select{padding:8px 12px;border-radius:8px;border:1px solid var(--br);background:var(--card);color:var(--text);font-size:.85em}
+input:focus,select:focus{border-color:var(--ac);outline:none}
+input{flex:1;min-width:150px}
+.save-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(42,42,74,.4)}
+.save-item:last-child{border:none}.save-item .kw{font-weight:600}.save-item .freq{font-size:.78em;color:var(--ts)}
+.verify-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(42,42,74,.4)}
+.verify-row:last-child{border:none}.verify-row .info{flex:1}.verify-row h4{font-size:.95em}
+.verify-row .meta{font-size:.78em;color:var(--ts)}.status{padding:4px 10px;border-radius:6px;font-size:.78em}
+.s-pending{background:rgba(253,203,110,.15);color:var(--am)}.s-verified{background:rgba(0,184,148,.15);color:var(--gn)}.s-rejected{background:rgba(226,75,74,.15);color:var(--rd)}
+.msg{padding:10px;border-radius:8px;margin:10px 0;font-size:.85em}.msg-ok{background:rgba(0,184,148,.1);border:1px solid var(--gn);color:#9FE1CB}
+</style></head>
+<body>
+<div class="container">
+
+  <!-- Translate -->
+  <div class="card">
+    <h3>需求翻译（中英互译）</h3>
+    <p class="sub">打破语言壁垒，让全球供给方都能理解你的需求。</p>
+    <div class="row">
+      <div class="col">
+        <textarea id="zhInput" placeholder="中文需求描述...">需要一个能在800°C高温环境下持续工作的管道裂缝检测传感器。精度要求±0.5%，响应时间小于100ms，使用寿命不低于5000小时。应用于石化管道监测。</textarea>
+        <div class="bar"><button class="btn btn-p" onclick="translateTo('en')">翻译为英文 →</button></div>
+      </div>
+      <div class="col">
+        <textarea id="enOutput" placeholder="English translation will appear here..." readonly></textarea>
+        <div class="bar"><button class="btn btn-o btn-sm" onclick="copyText('enOutput')">复制</button></div>
+      </div>
+    </div>
+    <div class="msg msg-ok" style="display:none" id="transMsg"></div>
+  </div>
+
+  <!-- Saved Searches -->
+  <div class="card">
+    <h3>保存搜索</h3>
+    <p class="sub">保存你的搜索关键词。当有匹配的新需求发布时，自动通知你。</p>
+    <div class="bar">
+      <input type="text" id="searchKeyword" placeholder="搜索关键词，如：传感器 高温 无损检测">
+      <select id="searchFreq"><option value="daily">每日推送</option><option value="weekly">每周推送</option><option value="realtime">实时推送</option></select>
+      <button class="btn btn-p" onclick="saveSearch()">保存</button>
+    </div>
+    <div id="savedSearches"></div>
+    <div id="searchMsg"></div>
+  </div>
+
+  <!-- Capability Review (三层递进) -->
+  <div class="card">
+    <h3>能力审核 — 三层递进验证</h3>
+    <p class="sub">不做裁判，只做公证。平台不判断真假，只记录可查证的事实。</p>
+
+    <!-- Layer 1 -->
+    <div style="border-left:3px solid var(--ac);padding-left:14px;margin:16px 0">
+      <h4 style="font-size:.95em;margin-bottom:4px">第一层：自动化证据可查性验证（机器，即时）</h4>
+      <p style="font-size:.82em;color:var(--ts)">平台自动检查你提供的每项证据是否真实存在，但不判断证据是否充分。</p>
+    </div>
+    <table style="width:100%;font-size:.82em;border-collapse:collapse;margin:8px 0">
+      <tr><th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--br);color:var(--ts)">证据类型</th><th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--br);color:var(--ts)">检查方式</th><th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--br);color:var(--ts)">耗时</th></tr>
+      <tr><td style="padding:3px 8px">专利号 CN2024XXXXXX</td><td style="padding:3px 8px">调专利API验证专利存在+专利权人匹配</td><td style="padding:3px 8px;color:var(--gn)">1秒</td></tr>
+      <tr><td style="padding:3px 8px">论文 DOI</td><td style="padding:3px 8px">调Crossref/arXiv验证论文存在+作者匹配</td><td style="padding:3px 8px;color:var(--gn)">1秒</td></tr>
+      <tr><td style="padding:3px 8px">企业官网</td><td style="padding:3px 8px">检查域名可访问+内容包含声称领域</td><td style="padding:3px 8px;color:var(--gn)">3秒</td></tr>
+      <tr><td style="padding:3px 8px">ISO/国标认证</td><td style="padding:3px 8px">调认证数据库查证</td><td style="padding:3px 8px;color:var(--gn)">1秒</td></tr>
+      <tr><td style="padding:3px 8px">客户案例</td><td style="padding:3px 8px;color:var(--am)">无法自动验证（需社区审阅或交易验证）</td><td style="padding:3px 8px;color:var(--am)">—</td></tr>
+    </table>
+
+    <!-- Example -->
+    <div style="background:#1a1a38;border-radius:8px;padding:14px;margin:12px 0;font-size:.82em">
+      <p style="font-weight:600;margin-bottom:6px">XX传感器研究所 — 证据可查性报告</p>
+      <p style="color:var(--gn);margin:3px 0">✅ 专利 CN20241000001 — 可查证（专利权人匹配）</p>
+      <p style="color:var(--gn);margin:3px 0">✅ ISO 9001:2015 — 可查证（认证有效期内）</p>
+      <p style="color:var(--am);margin:3px 0">❓ 客户案例"国家某重点项目" — 无法自动验证</p>
+      <p style="color:var(--ts);margin:3px 0">⏳ 论文 DOI:10.xxxx — 检查中</p>
+      <p style="color:var(--ts);margin-top:8px">可查证率：2/3 | 信任分：0.2 → 可查证级别</p>
+    </div>
+
+    <!-- Layer 2 -->
+    <div style="border-left:3px solid var(--gn);padding-left:14px;margin:20px 0 12px">
+      <h4 style="font-size:.95em;margin-bottom:4px">第二层：社区审阅（用户做，众包验证）</h4>
+      <p style="font-size:.82em;color:var(--ts)">任何已注册用户可认可某项能力或举报不实。认可越多，可信度越高。</p>
+    </div>
+    <div id="verifyList"></div>
+
+    <!-- Layer 3 -->
+    <div style="border-left:3px solid var(--am);padding-left:14px;margin:20px 0 12px">
+      <h4 style="font-size:.95em;margin-bottom:4px">第三层：交易验证（数据做，自动累积）</h4>
+      <p style="font-size:.82em;color:var(--ts)">每成功完成一次匹配+对方好评 → 信任分递增。这是最强验证。</p>
+    </div>
+    <div style="background:#1a1a38;border-radius:8px;padding:12px;font-size:.78em;margin-bottom:12px">
+      <p>信任分递进：0.0（自述）→ 0.2（证据可查证）→ 0.5（社区认可>10人）→ 0.7（完成5次匹配）→ 0.95（20次匹配零争议）</p>
+    </div>
+
+    <div class="bar">
+      <button class="btn btn-p btn-sm" onclick="startVerification()">开始证据可查性验证</button>
+      <button class="btn btn-o btn-sm" onclick="endorseRandom()">认可最近的能力</button>
+    </div>
+    <div id="verifyMsg"></div>
+  </div>
+
+</div>
+<script>
+// === Translate ===
+function translateTo(lang){
+  const zh=document.getElementById("zhInput").value;
+  const mock={en:"We need a pipe crack detection sensor capable of continuous operation in a high-temperature environment of 800°C. Accuracy requirement: ±0.5%, response time less than 100ms, service life no less than 5,000 hours. Application: petrochemical pipeline monitoring."};
+  document.getElementById("enOutput").value=mock.en;
+  showTransMsg("已翻译为英文")
+}
+function copyText(id){const t=document.getElementById(id);t.select();document.execCommand("copy")}
+function showTransMsg(m){const el=document.getElementById("transMsg");el.style.display="block";el.textContent=m;setTimeout(()=>el.style.display="none",2000)}
+
+// === Saved Searches ===
+let searches=JSON.parse(localStorage.getItem("dc_saved_searches")||'[{"kw":"传感器 高温","freq":"daily","new":2},{"kw":"AI 蛋白质折叠","freq":"realtime","new":0}]');
+function renderSearches(){
+  document.getElementById("savedSearches").innerHTML=searches.map((s,i)=>`
+    <div class="save-item">
+      <div><span class="kw">${s.kw}</span> <span class="freq">${s.freq==="daily"?"每日":s.freq==="weekly"?"每周":"实时"}</span></div>
+      <div>${s.new>0?`<span style="color:var(--gn);font-size:.85em">${s.new} 条新结果</span>`:''}<button class="btn btn-o btn-sm" onclick="delSearch(${i})" style="margin-left:8px">x</button></div>
+    </div>
+  `).join('')}
+}
+function saveSearch(){const kw=document.getElementById("searchKeyword").value.trim(),fr=document.getElementById("searchFreq").value;if(!kw)return;
+  searches.push({kw,fr,new:0});localStorage.setItem("dc_saved_searches",JSON.stringify(searches));document.getElementById("searchKeyword").value="";renderSearches();showSearchMsg("已保存。有新需求时会通知你。")}
+function delSearch(i){searches.splice(i,1);localStorage.setItem("dc_saved_searches",JSON.stringify(searches));renderSearches()}
+function showSearchMsg(m){const el=document.getElementById("searchMsg");el.innerHTML=`<div class="msg msg-ok">${m}</div>`;setTimeout(()=>el.innerHTML="",3000)}
+renderSearches()
+
+// === Capability Review — Three-layer ===
+let verifies=[
+  {n:"XX传感器研究所",trust:0.85,evidence:2,endorsed:12,trades:8,s:"community_verified"},
+  {n:"先进材料科技",trust:0.65,evidence:3,endorsed:5,trades:3,s:"evidence_checked"},
+  {n:"AI药物筛选实验室",trust:0.35,evidence:2,endorsed:0,trades:1,s:"evidence_checked"},
+  {n:"量子传感初创团队",trust:0.05,evidence:0,endorsed:0,trades:0,s:"self_claimed"},
+];
+const smap2={
+  community_verified:'<span class="status s-verified">社区认证 · 8次成功匹配</span>',
+  evidence_checked:'<span class="status s-verified">证据可查证</span>',
+  self_claimed:'<span class="status s-pending">自述（待验证）</span>',
+};
+
+function renderVerify(){
+  document.getElementById("verifyList").innerHTML=verifies.map(v=>`
+    <div class="verify-row">
+      <div class="info">
+        <h4>${v.n} <span style="color:var(--ts);font-weight:400;font-size:.85em">信任分 ${v.trust.toFixed(2)}</span></h4>
+        <div class="meta">✅ ${v.evidence}项可查证 · 👥 ${v.endorsed}人认可 · 📦 ${v.trades}次成功匹配</div>
+      </div>
+      ${smap2[v.s]}
+    </div>
+  `).join('');
+}
+
+function startVerification(){
+  if(verifies.some(v=>v.n==="我的能力画像（验证中）")) return;
+  verifies.unshift({n:"我的能力画像（验证中）",trust:0.0,evidence:0,endorsed:0,trades:0,s:"self_claimed"});
+  renderVerify();
+  document.getElementById("verifyMsg").innerHTML='<div class="msg msg-ok">证据可查性验证已启动。你的专利、论文、认证将自动逐一检查。检查完成后报告将展示在你的画像下。</div>';
+}
+
+function endorseRandom(){
+  const notFull=verifies.filter(v=>v.trust<0.9&&v.n!=="我的能力画像（验证中）");
+  if(notFull.length){const v=notFull[0];v.endorsed+=1;if(v.endorsed>=10&&v.trust<0.5)v.trust=0.5;renderVerify();document.getElementById("verifyMsg").innerHTML='<div class="msg msg-ok">已认可「'+v.n+'」。该能力收到'+v.endorsed+'人认可。</div>';}
+}
+renderVerify()
+</script>
+</body>
+</html>

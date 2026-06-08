@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>需求链平台 — 登录</title>
+<style>
+  :root {
+    --bg: #0c0c1d; --card-bg: #14142b; --text: #e8e8f0;
+    --text-secondary: #9090b0; --accent: #6c5ce7; --border: #2a2a4a;
+    --green: #00b894; --red: #e24b4a; --amber: #fdcb6e;
+  }
+  * { margin:0;padding:0;box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .container { max-width: 640px; margin: 0 auto; padding: 40px 20px; }
+
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 28px; margin: 20px 0; }
+  .card h2 { font-size: 1.3em; margin-bottom: 16px; }
+  .card p { color: var(--text-secondary); font-size: 0.9em; margin-bottom: 16px; }
+
+  label { display: block; font-size: 0.85em; color: var(--text-secondary); margin: 14px 0 4px; }
+  input, select, textarea {
+    width: 100%; padding: 10px 14px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+    font-size: 0.95em;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); outline: none; }
+  textarea { min-height: 80px; resize: vertical; }
+
+  .btn { padding: 10px 24px; border-radius: 10px; font-size: 0.95em; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+  .btn-primary { background: var(--accent); color: #fff; width: 100%; }
+  .btn-primary:hover { background: #7c6ef0; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--accent); color: #a29bfe; }
+  .btn-small { padding: 6px 14px; font-size: 0.85em; }
+
+  .key-box { background: #1a1a38; border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin: 12px 0; }
+  .key-box code { color: #a29bfe; font-size: 1em; word-break: break-all; }
+  .key-box .warn { color: var(--amber); font-size: 0.8em; margin-top: 8px; }
+
+  .guide-step { border-left: 3px solid var(--accent); padding-left: 14px; margin: 14px 0; }
+  .guide-step .step-num { font-weight: 700; color: #a29bfe; font-size: 0.85em; }
+  .guide-step p { margin: 4px 0 0; font-size: 0.9em; color: var(--text-secondary); }
+  .guide-step code { background: #1a1a38; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; color: #a29bfe; }
+
+  .copy-area { display: flex; gap: 8px; align-items: stretch; }
+  .copy-area textarea { flex: 1; font-family: monospace; font-size: 0.8em; min-height: 60px; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+  .tab { padding: 8px 20px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 0.9em; }
+  .tab.active { border-color: var(--accent); color: #a29bfe; background: rgba(108,92,231,0.08); }
+
+  .hidden { display: none; }
+  .msg { padding: 10px; border-radius: 8px; margin: 12px 0; font-size: 0.85em; }
+  .msg-error { background: rgba(226,75,74,0.1); border: 1px solid var(--red); color: #f7c1c1; }
+  .msg-success { background: rgba(0,184,148,0.1); border: 1px solid var(--green); color: #9FE1CB; }
+
+  .lang-bar { display: flex; justify-content: flex-end; gap: 6px; padding: 10px 0; }
+  .lang-btn { padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); font-size: 0.8em; cursor: pointer; }
+  .lang-btn.active { border-color: var(--accent); color: #a29bfe; }
+
+  .logout { float: right; font-size: 0.85em; color: var(--text-secondary); cursor: pointer; }
+  .logout:hover { color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="lang-bar">
+    <button class="lang-btn active" onclick="switchLang('zh')">中文</button>
+    <button class="lang-btn" onclick="switchLang('en')">English</button>
+  </div>
+
+  <div style="text-align:center;margin-bottom:30px;">
+    <h1 style="font-size:1.8em;margin-bottom:4px">需求链平台</h1>
+    <p style="color:var(--text-secondary);font-size:0.9em">登录后填写基本信息，然后让你的Agent帮你做复杂的事</p>
+  </div>
+
+  <!-- ====== LOGIN SECTION ====== -->
+  <div id="sectionLogin" class="card">
+    <div class="tabs">
+      <button class="tab active" onclick="showLoginTab('login')" id="tabLogin">登录</button>
+      <button class="tab" onclick="showLoginTab('register')" id="tabRegister">注册</button>
+    </div>
+
+    <!-- Login form -->
+    <div id="formLogin">
+      <label>邮箱</label>
+      <input type="email" id="loginEmail" placeholder="your@email.com">
+      <label>密码</label>
+      <input type="password" id="loginPassword" placeholder="至少6位">
+      <div id="loginMsg"></div>
+      <button class="btn btn-primary" onclick="doLogin()" style="margin-top:16px">登录</button>
+      <p style="text-align:center;margin-top:12px;font-size:.82em"><a href="#" style="color:var(--ts)" onclick="showReset()">忘记密码？</a></p>
+    </div>
+
+    <!-- Register form -->
+    <div id="formRegister" class="hidden">
+      <label>邮箱</label>
+      <input type="email" id="regEmail" placeholder="your@email.com">
+      <label>密码</label>
+      <input type="password" id="regPassword" placeholder="至少6位">
+      <label>确认密码</label>
+      <input type="password" id="regPassword2" placeholder="再输一次">
+      <div id="regMsg"></div>
+      <button class="btn btn-primary" onclick="doRegister()" style="margin-top:16px">注册</button>
+    </div>
+  </div>
+
+  <!-- ====== PROFILE SECTION ====== -->
+  <div id="sectionProfile" class="card hidden">
+    <span class="logout" onclick="doLogout()">退出</span>
+    <h2>基本信息</h2>
+    <p>填完这些基础信息后，更多复杂的内容交给你的Agent处理。</p>
+
+    <label>姓名 / 企业名称 *</label>
+    <input type="text" id="pfName" placeholder="你的真实姓名或企业全称">
+
+    <label>角色 *</label>
+    <select id="pfRole">
+      <option value="">请选择</option>
+      <option value="individual">个人发明家 / 独立研究者</option>
+      <option value="team">小团队 / 工作室</option>
+      <option value="company">企业 / 公司</option>
+      <option value="research">科研机构 / 大学实验室</option>
+      <option value="government">政府部门</option>
+    </select>
+
+    <label>国家/地区 *</label>
+    <input type="text" id="pfCountry" placeholder="例如：中国">
+
+    <label>你是来做什么的？</label>
+    <select id="pfPurpose">
+      <option value="demand">我有需求，想找人解决</option>
+      <option value="supply">我有能力，想接需求</option>
+      <option value="both">两者都有</option>
+    </select>
+
+    <label>微信通知（可选）</label>
+    <input type="text" id="pfWechatKey" placeholder="去 sct.ftqq.com 注册拿 SendKey">
+
+    <div id="profileMsg"></div>
+    <button class="btn btn-primary" onclick="saveProfile()" style="margin-top:16px">保存</button>
+  </div>
+
+  <!-- ====== AGENT GUIDE SECTION ====== -->
+  <div id="sectionAgent" class="card hidden">
+    <h2>生成 Agent 密钥</h2>
+    <p>这是你的Agent接入平台所需的身份凭证。<strong>仅显示一次，请立即保存。</strong></p>
+
+    <div class="key-box" id="keyBox" style="display:none">
+      <div style="font-size:0.8em;color:var(--text-secondary);margin-bottom:4px">Agent ID</div>
+      <code id="agentId">—</code>
+      <div style="font-size:0.8em;color:var(--text-secondary);margin:10px 0 4px">API Key（只显示这一次）</div>
+      <code id="apiKey">—</code>
+      <div class="warn">请立即复制保存！此密钥不会再次显示。</div>
+    </div>
+    <button class="btn btn-primary" id="genKeyBtn" onclick="generateAgentKey()">生成 Agent 密钥</button>
+
+    <div id="guideSteps" style="display:none;margin-top:20px">
+      <h2 style="margin-top:28px">告诉你的Agent怎么做</h2>
+      <p>把下面这段话复制给你的Agent，它就知道该怎么办了：</p>
+
+      <div class="copy-area">
+        <textarea id="agentPrompt" readonly></textarea>
+        <button class="btn btn-outline btn-small" onclick="copyPrompt()">复制</button>
+      </div>
+
+      <div class="guide-step">
+        <div class="step-num">第1步</div>
+        <p>打开你的 AI Agent（Claude Desktop / 龙虾助手 / 通义千问 等）</p>
+      </div>
+      <div class="guide-step">
+        <div class="step-num">第2步</div>
+        <p>在Agent的MCP设置中添加：<br><code>http://8.154.26.92:8000/sse</code></p>
+      </div>
+      <div class="guide-step">
+        <div class="step-num">第3步</div>
+        <p>把上面复制的提示词粘贴给Agent——它就知道你是谁、该问什么问题、怎么帮你了。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = "http://8.154.26.92:8000";
+let currentUser = null;
+
+// ====== Auth ======
+function showLoginTab(t) {
+  document.getElementById("tabLogin").classList.toggle("active", t==="login");
+  document.getElementById("tabRegister").classList.toggle("active", t==="register");
+  document.getElementById("formLogin").classList.toggle("hidden", t!=="login");
+  document.getElementById("formRegister").classList.toggle("hidden", t!=="register");
+}
+
+function doLogin() {
+  const email = document.getElementById("loginEmail").value.trim();
+  const pwd = document.getElementById("loginPassword").value;
+  if (!email || pwd.length<6) { showMsg("loginMsg","请填写邮箱和密码（6位以上）","error"); return; }
+
+  const users = JSON.parse(localStorage.getItem("dc_users")||"{}");
+  const u = users[email];
+  if (!u || u.password !== btoa(pwd)) { showMsg("loginMsg","邮箱或密码错误","error"); return; }
+
+  currentUser = { email, ...u.profile };
+  localStorage.setItem("dc_session", JSON.stringify(currentUser));
+  showProfile();
+}
+
+function doRegister() {
+  const email = document.getElementById("regEmail").value.trim();
+  const pwd = document.getElementById("regPassword").value;
+  const pwd2 = document.getElementById("regPassword2").value;
+  if (!email) { showMsg("regMsg","请填写邮箱","error"); return; }
+  if (pwd.length<6) { showMsg("regMsg","密码至少6位","error"); return; }
+  if (pwd !== pwd2) { showMsg("regMsg","两次密码不一致","error"); return; }
+
+  const users = JSON.parse(localStorage.getItem("dc_users")||"{}");
+  if (users[email]) { showMsg("regMsg","该邮箱已注册","error"); return; }
+
+  users[email] = { password: btoa(pwd), profile: {} };
+  localStorage.setItem("dc_users", JSON.stringify(users));
+  currentUser = { email, profile: {} };
+  localStorage.setItem("dc_session", JSON.stringify(currentUser));
+  showMsg("regMsg","注册成功！","success");
+  setTimeout(showProfile, 800);
+}
+
+function doLogout() {
+  localStorage.removeItem("dc_session");
+  currentUser = null;
+  location.reload();
+}
+
+function showReset() {
+  const email = document.getElementById("loginEmail").value.trim() || prompt("请输入你的注册邮箱");
+  if (!email) return;
+  const users = JSON.parse(localStorage.getItem("dc_users")||"{}");
+  if (!users[email]) { showMsg("loginMsg","该邮箱未注册","error"); return; }
+  const np = prompt("请输入新密码（至少6位）");
+  if (!np || np.length<6) return;
+  users[email].password = btoa(np);
+  localStorage.setItem("dc_users", JSON.stringify(users));
+  showMsg("loginMsg","密码已重置，请用新密码登录","success");
+}
+
+// ====== Profile ======
+function showProfile() {
+  document.getElementById("sectionLogin").classList.add("hidden");
+  document.getElementById("sectionProfile").classList.remove("hidden");
+  document.getElementById("sectionAgent").classList.remove("hidden");
+
+  if (currentUser.name) document.getElementById("pfName").value = currentUser.name||"";
+  if (currentUser.role) document.getElementById("pfRole").value = currentUser.role||"";
+  if (currentUser.country) document.getElementById("pfCountry").value = currentUser.country||"";
+  if (currentUser.purpose) document.getElementById("pfPurpose").value = currentUser.purpose||"";
+  if (currentUser.wechat_key) document.getElementById("pfWechatKey").value = currentUser.wechat_key||"";
+
+  if (currentUser.agent_id) {
+    document.getElementById("keyBox").style.display = "block";
+    document.getElementById("agentId").textContent = currentUser.agent_id;
+    document.getElementById("apiKey").textContent = "[已隐藏 — 仅首次生成时显示]";
+    document.getElementById("genKeyBtn").style.display = "none";
+    document.getElementById("guideSteps").style.display = "block";
+    updateAgentPrompt();
+  }
+}
+
+function saveProfile() {
+  currentUser.name = document.getElementById("pfName").value.trim();
+  currentUser.role = document.getElementById("pfRole").value;
+  currentUser.country = document.getElementById("pfCountry").value.trim();
+  currentUser.purpose = document.getElementById("pfPurpose").value;
+  currentUser.wechat_key = document.getElementById("pfWechatKey").value.trim();
+
+  localStorage.setItem("dc_session", JSON.stringify(currentUser));
+  const users = JSON.parse(localStorage.getItem("dc_users")||"{}");
+  if (users[currentUser.email]) {
+    users[currentUser.email].profile = {
+      name: currentUser.name, role: currentUser.role,
+      country: currentUser.country, purpose: currentUser.purpose,
+      wechat_key: currentUser.wechat_key,
+      agent_id: currentUser.agent_id,
+    };
+    localStorage.setItem("dc_users", JSON.stringify(users));
+  }
+  showMsg("profileMsg","基本信息已保存","success");
+}
+
+function generateAgentKey() {
+  if (!currentUser.name || !currentUser.role || !currentUser.country) {
+    showMsg("profileMsg","请先填写姓名、角色和国家","error");
+    return;
+  }
+  const id = "dc_" + Math.random().toString(36).substring(2,10).toUpperCase();
+  const key = "dc_" + btoa(Math.random().toString()).substring(0,40);
+
+  currentUser.agent_id = id;
+  currentUser.api_key = key;
+  localStorage.setItem("dc_session", JSON.stringify(currentUser));
+
+  document.getElementById("keyBox").style.display = "block";
+  document.getElementById("agentId").textContent = id;
+  document.getElementById("apiKey").textContent = key;
+  document.getElementById("genKeyBtn").style.display = "none";
+  document.getElementById("guideSteps").style.display = "block";
+
+  updateAgentPrompt();
+  saveProfileToStore();
+}
+
+function saveProfileToStore() {
+  const users = JSON.parse(localStorage.getItem("dc_users")||"{}");
+  if (users[currentUser.email]) {
+    users[currentUser.email].profile = {
+      name: currentUser.name, role: currentUser.role,
+      country: currentUser.country, purpose: currentUser.purpose,
+      wechat_key: currentUser.wechat_key,
+      agent_id: currentUser.agent_id,
+    };
+    localStorage.setItem("dc_users", JSON.stringify(users));
+  }
+}
+
+function updateAgentPrompt() {
+  const prompt = `我是${currentUser.name}的AI助手。他在需求链平台的Agent ID是${currentUser.agent_id||'(请先生成)'}。
+
+我需要先帮他完成这些事：
+1. 确认身份信息：姓名=${currentUser.name}，角色=${currentUser.role||'未填'}，国家=${currentUser.country||'未填'}
+2. 根据他的角色（${currentUser.purpose==='demand'?'需求方':currentUser.purpose==='supply'?'供给方':'未知'}），帮他发布需求或注册能力画像
+3. 配置通知方式：${currentUser.wechat_key?'微信已配置':'未配置通知'}
+
+请阅读平台Agent接入指南（调用get_agent_guide），然后按指南里的22个问题清单逐条确认信息，帮他完成接入。`;
+  document.getElementById("agentPrompt").value = prompt;
+}
+
+function copyPrompt() {
+  const t = document.getElementById("agentPrompt");
+  t.select(); document.execCommand("copy");
+  const btn = document.querySelector(".copy-area .btn-outline");
+  btn.textContent = "已复制"; btn.style.color="var(--green)";
+  setTimeout(()=>{btn.textContent="复制";btn.style.color="";},2000);
+}
+
+// ====== i18n ======
+function switchLang(l) {
+  document.querySelectorAll(".lang-btn").forEach(b=>b.classList.toggle("active",b.dataset?.lang===l));
+}
+function showMsg(id,text,type) {
+  const el = document.getElementById(id);
+  el.innerHTML = `<div class="msg msg-${type}">${text}</div>`;
+  setTimeout(()=>{el.innerHTML="";}, 4000);
+}
+
+// Init
+const saved = localStorage.getItem("dc_session");
+if (saved) {
+  currentUser = JSON.parse(saved);
+  showProfile();
+}
+</script>
+</body>
+</html>

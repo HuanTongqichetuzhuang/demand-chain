@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>需求广场 | Demand Square</title>
+<style>
+  :root {
+    --bg: #0c0c1d; --card-bg: #14142b; --text: #e8e8f0;
+    --text-secondary: #9090b0; --accent: #6c5ce7; --border: #2a2a4a;
+    --green: #00b894; --amber: #fdcb6e; --red: #e24b4a; --blue: #0984e3;
+  }
+  * { margin:0;padding:0;box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+  h1 { font-size: 1.6em; margin: 10px 0; }
+  .sub { color: var(--text-secondary); font-size: 0.9em; margin-bottom: 20px; }
+
+  /* Filter bar */
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; align-items: center; }
+  .filter-bar select, .filter-bar input { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); font-size: 0.85em; }
+  .filter-bar input { flex: 1; min-width: 150px; }
+  .filter-bar input:focus, .filter-bar select:focus { border-color: var(--accent); outline: none; }
+
+  .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+  .tag { padding: 4px 10px; border-radius: 6px; font-size: 0.78em; cursor: pointer; border: 1px solid var(--border); color: var(--text-secondary); background: transparent; transition: all 0.15s; }
+  .tag.active { border-color: var(--accent); color: #a29bfe; background: rgba(108,92,231,0.1); }
+  .tag:hover { border-color: var(--accent); }
+  .tag .count { opacity: 0.5; font-size: 0.85em; margin-left: 3px; }
+
+  /* Demand cards */
+  .demand-grid { display: flex; flex-direction: column; gap: 10px; }
+  .demand-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 18px 22px; transition: all 0.2s; cursor: pointer; }
+  .demand-card:hover { border-color: var(--accent); box-shadow: 0 0 18px rgba(108,92,231,0.15); }
+  .demand-card .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .demand-card h3 { font-size: 1.1em; font-weight: 600; margin: 0; }
+  .demand-card .meta { font-size: 0.78em; color: var(--text-secondary); display: flex; gap: 12px; flex-wrap: wrap; margin: 6px 0; }
+  .demand-card .body { font-size: 0.9em; color: var(--text-secondary); white-space: pre-wrap; max-height: 100px; overflow: hidden; margin: 8px 0; }
+  .demand-card .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .demand-card .d-tag { padding: 2px 8px; border-radius: 4px; font-size: 0.75em; border: 1px solid var(--border); color: var(--text-secondary); }
+
+  /* Badges */
+  .badge { padding: 2px 8px; border-radius: 5px; font-size: 0.72em; font-weight: 600; }
+  .badge-new { background: rgba(108,92,231,0.15); color: #a29bfe; }
+  .badge-open { background: rgba(0,184,148,0.15); color: var(--green); }
+  .badge-matching { background: rgba(253,203,110,0.15); color: var(--amber); }
+  .badge-urgent { background: rgba(226,75,74,0.15); color: var(--red); }
+
+  /* Detail modal */
+  .modal-overlay { position: fixed; top:0;left:0;right:0;bottom:0; background: rgba(0,0,0,0.7); z-index: 100; display: flex; align-items: center; justify-content: center; }
+  .modal { background: var(--card-bg); border: 1px solid var(--border); border-radius: 18px; width: 90%; max-width: 750px; max-height: 85vh; overflow-y: auto; padding: 28px; }
+  .modal h2 { font-size: 1.4em; margin-bottom: 12px; }
+  .modal .detail-section { margin: 16px 0; }
+  .modal .detail-section h4 { font-size: 0.85em; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .modal .detail-section p { font-size: 0.95em; color: var(--text-secondary); white-space: pre-wrap; }
+  .modal .specs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .modal .spec-item { padding: 6px 10px; border-radius: 6px; background: rgba(108,92,231,0.05); border: 1px solid var(--border); font-size: 0.85em; }
+  .modal .close { float: right; cursor: pointer; font-size: 1.4em; color: var(--text-secondary); }
+  .modal .close:hover { color: var(--text); }
+  .modal .chain-link { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 0.8em; background: rgba(108,92,231,0.1); color: #a29bfe; margin: 4px; text-decoration: none; }
+  .modal .btn-row { display: flex; gap: 8px; margin-top: 16px; }
+  .btn { padding: 8px 18px; border-radius: 8px; font-size: 0.9em; font-weight: 600; cursor: pointer; border: none; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-follow { background: rgba(253,203,110,0.15); color: var(--amber); border: 1px solid var(--amber); }
+  .btn-follow.active { background: var(--amber); color: #000; }
+
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+  .empty h3 { font-size: 1.2em; margin-bottom: 8px; }
+
+  .pagination { display: flex; gap: 8px; justify-content: center; margin: 24px 0; }
+
+  .lang-bar { display: flex; justify-content: flex-end; gap: 6px; margin-bottom: 10px; }
+  .lang-btn { padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); font-size: 0.8em; cursor: pointer; }
+  .lang-btn.active { border-color: var(--accent); color: #a29bfe; }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="lang-bar">
+    <button class="lang-btn active">中文</button>
+    <button class="lang-btn">English</button>
+  </div>
+
+  <h1>需求广场</h1>
+  <p class="sub">浏览全球公开的需求。按学科、行业、IPC分类筛选。人类和Agent都可以看。</p>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <input type="text" id="searchInput" placeholder="搜索需求关键词、技术指标..." oninput="loadDemands()">
+    <select id="industryFilter" onchange="loadDemands()">
+      <option value="">全部行业</option>
+      <option value="sensor_tech">传感器技术</option><option value="materials_science">材料科学</option>
+      <option value="biomedicine">生物医药</option><option value="information_tech">信息技术</option>
+      <option value="new_energy">新能源</option><option value="mechanical_mfg">机械制造</option>
+      <option value="chemical">化工</option><option value="agrifood">农业食品</option>
+      <option value="aerospace">航空航天</option><option value="environmental">环境工程</option>
+    </select>
+    <select id="statusFilter" onchange="loadDemands()">
+      <option value="">全部状态</option>
+      <option value="open">开放中</option>
+      <option value="matching">匹配中</option>
+      <option value="in_progress">解决中</option>
+      <option value="resolved">已解决</option>
+    </select>
+    <select id="urgencyFilter" onchange="loadDemands()">
+      <option value="">全部紧急度</option>
+      <option value="urgent">紧急</option>
+      <option value="standard">标准</option>
+      <option value="planned">规划</option>
+    </select>
+  </div>
+
+  <!-- Discipline tags -->
+  <div class="tag-list" id="disciplineTags"></div>
+
+  <!-- IPC tags -->
+  <div class="tag-list" id="ipcTags"></div>
+
+  <!-- Demand cards -->
+  <div class="demand-grid" id="demandGrid"></div>
+
+  <!-- Pagination -->
+  <div class="pagination" id="pagination"></div>
+</div>
+
+<!-- Detail modal (hidden) -->
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<script>
+const API = "http://8.154.26.92:8000";
+let currentPage = 0;
+let activeDemandId = null;
+let followedDemands = JSON.parse(localStorage.getItem("dc_followed")||"[]");
+
+// Mock data for demo — replace with real API calls
+const mockDemands = [
+  { id:"d001", title:"800°C高温管道裂缝检测传感器", category:"sensor_tech", status:"open", urgency:"urgent",
+    body:"需要在800°C环境下持续工作的管道裂缝检测传感器。精度±0.5%，响应<100ms，寿命>5000h。应用于石化管道。",
+    discipline:"物理学/电磁学", ipc:"G01", process:"检测与分析→质谱分析", trl:3, tags:["传感器","高温","无损检测","压电"],
+    replies: 3, upvotes: 12, created:"2026-06-01", chain_parent: null, chain_children: ["d005","d006"],
+    constraint_budget: "50-200万", constraint_timeline: "6个月内", constraint_country: "中国" },
+  { id:"d002", title:"新型碳纤维复合材料轻量化车身结构", category:"materials_science", status:"matching", urgency:"standard",
+    body:"开发一种新型碳纤维复合材料用于电动汽车车身结构，目标减重40%，强度不低于现有铝合金方案。",
+    discipline:"材料科学与工程/高分子化学", ipc:"C08", process:"材料制备→3D打印", trl:5, tags:["碳纤维","复合材料","轻量化","汽车"],
+    replies: 8, upvotes: 25, created:"2026-05-28", chain_parent: null, chain_children: [],
+    constraint_budget: "200-500万", constraint_timeline: "12个月内", constraint_country: "全球" },
+  { id:"d003", title:"AI驱动的蛋白质折叠预测加速算法", category:"information_tech", status:"in_progress", urgency:"standard",
+    body:"需要将AlphaFold类模型的预测速度提升10倍以上，用于大规模药物筛选场景。",
+    discipline:"计算机科学与技术/人工智能 生物学/分子生物学", ipc:"G06 C12", process:"软件方法→深度学习", trl:6, tags:["AI","蛋白质折叠","药物筛选","深度学习"],
+    replies: 15, upvotes: 42, created:"2026-05-20", chain_parent: null, chain_children: ["d008"],
+    constraint_budget: "500-2000万", constraint_timeline: "18个月内", constraint_country: "全球" },
+  { id:"d004", title:"低温等离子体医疗灭菌设备小型化", category:"biomedicine", status:"open", urgency:"urgent",
+    body:"将现有低温等离子体灭菌设备从工业级缩小到便携式，用于战地和灾区的医疗器械快速灭菌。",
+    discipline:"物理学/等离子体物理 生物医学工程", ipc:"A61 H05", process:"半导体工艺→刻蚀", trl:4, tags:["等离子体","灭菌","便携式","医疗"],
+    replies: 5, upvotes: 18, created:"2026-06-03", chain_parent: null, chain_children: [],
+    constraint_budget: "50-200万", constraint_timeline: "3个月内", constraint_country: "中国" },
+  { id:"d005", title:"耐高温压电陶瓷材料配方开发", category:"materials_science", status:"open", urgency:"standard",
+    body:"为d001高温传感器开发配套的耐800°C压电陶瓷材料。需要长期稳定性和可量产性。",
+    discipline:"材料科学与工程/无机化学", ipc:"C01", process:"材料制备→溶胶-凝胶法", trl:3, tags:["压电陶瓷","耐高温","材料配方"],
+    replies: 1, upvotes: 5, created:"2026-06-04", chain_parent: "d001", chain_children: [],
+    constraint_budget: "<50万", constraint_timeline: "6个月内", constraint_country: "不限" },
+  { id:"d006", title:"管道裂缝声波信号处理算法", category:"information_tech", status:"open", urgency:"standard",
+    body:"为d001高温传感器开发配套的声波信号处理算法，从噪声中提取裂缝特征信号。",
+    discipline:"计算机科学与技术/信号处理", ipc:"G06", process:"软件方法→深度学习", trl:4, tags:["信号处理","噪声过滤","声波检测"],
+    replies: 2, upvotes: 8, created:"2026-06-04", chain_parent: "d001", chain_children: [],
+    constraint_budget: "<50万", constraint_timeline: "3个月内", constraint_country: "全球" },
+];
+
+const disciplines = ["物理学/电磁学","物理学/等离子体","材料科学/无机化学","材料科学/高分子","生物医学工程","计算机科学/AI","计算机科学/信号处理","生物学/分子生物学"];
+const ipcClasses = ["G01","G06","C01","C08","C12","A61","H05"];
+
+function loadDisciplineTags() {
+  const tags = document.getElementById("disciplineTags");
+  tags.innerHTML = '<span class="tag active" onclick="filterDiscipline(\'\')">全部学科 <span class="count">6</span></span>';
+  disciplines.forEach(d => {
+    const count = mockDemands.filter(m=>m.discipline.includes(d.split("/")[0])).length;
+    tags.innerHTML += `<span class="tag" data-d="${d}" onclick="filterDiscipline('${d}')">${d} <span class="count">${count}</span></span>`;
+  });
+}
+function loadIpcTags() {
+  const tags = document.getElementById("ipcTags");
+  tags.innerHTML = '<span class="tag active" onclick="filterIPC(\'\')">全部IPC</span>';
+  ipcClasses.forEach(c => {
+    const count = mockDemands.filter(m=>m.ipc===c).length;
+    tags.innerHTML += `<span class="tag" data-ipc="${c}" onclick="filterIPC('${c}')">IPC:${c} <span class="count">${count}</span></span>`;
+  });
+}
+
+let disciplineFilter = "";
+let ipcFilter = "";
+function filterDiscipline(d) {
+  disciplineFilter = d;
+  document.querySelectorAll("#disciplineTags .tag").forEach(t=>t.classList.toggle("active",t.dataset.d===d||(d===""&&t.dataset.d===undefined)));
+  loadDemands();
+}
+function filterIPC(c) {
+  ipcFilter = c;
+  document.querySelectorAll("#ipcTags .tag").forEach(t=>t.classList.toggle("active",t.dataset.ipc===c||(c===""&&t.dataset.ipc===undefined)));
+  loadDemands();
+}
+
+function loadDemands() {
+  const search = document.getElementById("searchInput").value.toLowerCase();
+  const industry = document.getElementById("industryFilter").value;
+  const status = document.getElementById("statusFilter").value;
+  const urgency = document.getElementById("urgencyFilter").value;
+
+  let filtered = mockDemands.filter(d => {
+    if (search && !d.title.toLowerCase().includes(search) && !d.body.toLowerCase().includes(search) && !d.tags.some(t=>t.includes(search))) return false;
+    if (industry && d.category !== industry) return false;
+    if (status && d.status !== status) return false;
+    if (urgency && d.urgency !== urgency) return false;
+    if (disciplineFilter && !d.discipline.includes(disciplineFilter.split("/")[0])) return false;
+    if (ipcFilter && d.ipc !== ipcFilter) return false;
+    return true;
+  });
+
+  const grid = document.getElementById("demandGrid");
+  if (filtered.length === 0) {
+    grid.innerHTML = '<div class="empty"><h3>没有匹配的需求</h3><p>换一个筛选条件试试</p></div>';
+    return;
+  }
+
+  const statusMap = {open:"badge-open",matching:"badge-matching",in_progress:"badge-new",resolved:"badge-open"};
+  const statusLabel = {open:"开放",matching:"匹配中",in_progress:"解决中",resolved:"已解决"};
+
+  grid.innerHTML = filtered.map(d => `
+    <div class="demand-card" onclick="openDetail('${d.id}')">
+      <div class="header">
+        <h3>${d.chain_parent ? '└ ' : ''}${esc(d.title)}</h3>
+        <span class="badge ${statusMap[d.status]||'badge-new'}">${statusLabel[d.status]||d.status}</span>
+      </div>
+      <div class="meta">
+        <span>${d.discipline.split("/")[0]}</span>
+        <span>IPC:${d.ipc}</span>
+        <span>TRL ${d.trl}</span>
+        <span>${d.constraint_budget}</span>
+        <span>${d.constraint_timeline}</span>
+        <span>${d.constraint_country}</span>
+        ${d.urgency==="urgent"?'<span class="badge badge-urgent">紧急</span>':''}
+      </div>
+      <div class="body">${esc(d.body).slice(0,180)}</div>
+      <div class="meta">
+        <span>⬆ ${d.upvotes}</span>
+        <span>${d.replies} 讨论</span>
+        ${d.chain_children.length ? `<span>└ ${d.chain_children.length} 子需求</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function openDetail(id) {
+  activeDemandId = id;
+  const d = mockDemands.find(m=>m.id===id);
+  if (!d) return;
+
+  const statusLabel = {open:"开放",matching:"匹配中",in_progress:"解决中",resolved:"已解决"};
+  const isFollowed = followedDemands.includes(id);
+
+  let chainHTML = "";
+  if (d.chain_parent) {
+    const parent = mockDemands.find(m=>m.id===d.chain_parent);
+    if (parent) chainHTML += `<a class="chain-link" href="#" onclick="event.stopPropagation();openDetail('${parent.id}')">↑ 父需求: ${parent.title.slice(0,30)}</a>`;
+  }
+  if (d.chain_children.length) {
+    d.chain_children.forEach(cid => {
+      const child = mockDemands.find(m=>m.id===cid);
+      if (child) chainHTML += `<a class="chain-link" href="#" onclick="event.stopPropagation();openDetail('${child.id}')">↓ 子需求: ${child.title.slice(0,30)}</a>`;
+    });
+  }
+
+  const specsHTML = d.discipline.split(" ").filter(Boolean).map(s =>
+    `<div class="spec-item">学科: ${s}</div>`
+  ).join('') + `
+    <div class="spec-item">IPC: ${d.ipc}</div>
+    <div class="spec-item">TRL: ${d.trl}</div>
+    <div class="spec-item">工艺: ${d.process}</div>
+    <div class="spec-item">预算: ${d.constraint_budget}</div>
+    <div class="spec-item">时间: ${d.constraint_timeline}</div>
+    <div class="spec-item">地域: ${d.constraint_country}</div>
+  `;
+
+  document.getElementById("modalContent").innerHTML = `
+    <span class="close" onclick="closeModal()">x</span>
+    <span class="badge ${d.urgency==='urgent'?'badge-urgent':'badge-new'}">${statusLabel[d.status]}</span>
+    ${d.urgency==='urgent'?' <span class="badge badge-urgent">紧急</span>':''}
+    <h2>${esc(d.title)}</h2>
+    <div class="meta">${d.discipline} · IPC:${d.ipc} · TRL ${d.trl}</div>
+
+    <div class="tags" style="margin:10px 0">${d.tags.map(t=>`<span class="d-tag">${t}</span>`).join('')}</div>
+
+    ${chainHTML ? `<div style="margin:10px 0">${chainHTML}</div>` : ''}
+
+    <div class="detail-section"><h4>需求描述</h4><p>${esc(d.body)}</p></div>
+    <div class="detail-section"><h4>技术参数与约束</h4><div class="specs">${specsHTML}</div></div>
+
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+      <button class="btn btn-outline" onclick="copyDemandPrompt('${id}')">复制给Agent</button>
+      <button class="btn btn-follow ${isFollowed?'active':''}" id="followBtn" onclick="toggleFollow('${id}')">
+        ${isFollowed ? '已关注' : '关注'}
+      </button>
+    </div>
+  `;
+
+  document.getElementById("modalOverlay").classList.remove("hidden");
+}
+
+function closeModal() {
+  document.getElementById("modalOverlay").classList.add("hidden");
+  activeDemandId = null;
+}
+
+function toggleFollow(id) {
+  if (followedDemands.includes(id)) {
+    followedDemands = followedDemands.filter(f=>f!==id);
+  } else {
+    followedDemands.push(id);
+  }
+  localStorage.setItem("dc_followed", JSON.stringify(followedDemands));
+  openDetail(id); // refresh modal
+}
+
+function copyDemandPrompt(id) {
+  const d = mockDemands.find(m=>m.id===id);
+  if (!d) return;
+  const prompt = `我看到需求链平台上有一条感兴趣的需求：
+标题：${d.title}
+ID：${d.id}
+领域：${d.discipline}
+请帮我调用 get_demand("${d.id}") 查看完整信息，然后告诉我这个需求是否适合我。`;
+  navigator.clipboard.writeText(prompt).then(()=>{
+    const btn = document.querySelector(".btn-outline");
+    if (btn) { btn.textContent = "已复制"; setTimeout(()=>{btn.textContent="复制给Agent";}, 1500); }
+  });
+}
+
+function esc(s) { return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+// Init
+loadDisciplineTags();
+loadIpcTags();
+loadDemands();
+</script>
+</body>
+</html>
