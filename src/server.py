@@ -88,8 +88,10 @@ async def get_demand(demand_id: str) -> str:
 # ============================================================
 
 @mcp.tool()
-async def register_capability(user_id: str, description: str) -> str:
+async def register_capability(session_token: str, user_id: str, description: str) -> str:
     """注册能力画像。AI 辅助生成结构化 Agent Card。"""
+    from src.shared.auth import verify
+    verify(session_token)
     return json.dumps({"status": "stub", "message": "能力画像注册功能开发中"}, ensure_ascii=False)
 
 @mcp.tool()
@@ -103,12 +105,12 @@ async def get_pending_matches(user_id: str) -> str:
     return json.dumps({"status": "stub", "matches": []}, ensure_ascii=False)
 
 @mcp.tool()
-async def accept_match(match_id: str, action: str, note: str = "") -> str:
+async def accept_match(session_token: str, match_id: str, action: str, note: str = "") -> str:
     """接受/拒绝/延伸匹配。action: accept | reject | extend"""
     return json.dumps({"status": "stub", "match_id": match_id, "action": action}, ensure_ascii=False)
 
 @mcp.tool()
-async def extend_demand(parent_demand_id: str, user_id: str, raw_text: str) -> str:
+async def extend_demand(session_token: str, parent_demand_id: str, user_id: str, raw_text: str) -> str:
     """将一个需求拆分成子需求。子需求回到匹配引擎。"""
     return json.dumps({"status": "stub", "message": "需求拆分功能开发中"}, ensure_ascii=False)
 
@@ -235,8 +237,10 @@ async def get_supplier_detail(supplier_id: str) -> str:
     return json.dumps({"status": "stub"}, ensure_ascii=False)
 
 @mcp.tool()
-async def invite_supplier(supplier_id: str, demand_id: str) -> str:
+async def invite_supplier(session_token: str, supplier_id: str, demand_id: str) -> str:
     """生成供应商注册邀请链接。"""
+    from src.shared.auth import verify
+    verify(session_token)
     return json.dumps({"status": "stub", "invite_url": ""}, ensure_ascii=False)
 
 @mcp.tool()
@@ -404,8 +408,10 @@ async def forum_list_topics(category: str = "", sort: str = "hot", limit: int = 
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
-async def forum_create_topic(agent_id: str, title: str, body: str, category: str = "general", demand_id: str = "") -> str:
+async def forum_create_topic(session_token: str, agent_id: str, title: str, body: str, category: str = "general", demand_id: str = "") -> str:
     """发布一个新话题。"""
+    from src.shared.auth import verify
+    verify(session_token)
     try:
         async with async_session() as session:
             svc = ForumService(session)
@@ -431,8 +437,10 @@ async def forum_get_topic(topic_id: str) -> str:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
-async def forum_reply(agent_id: str, topic_id: str, body: str) -> str:
+async def forum_reply(session_token: str, agent_id: str, topic_id: str, body: str) -> str:
     """回复一个话题。"""
+    from src.shared.auth import verify
+    verify(session_token)
     try:
         async with async_session() as session:
             svc = ForumService(session)
@@ -519,8 +527,10 @@ async def get_session_state(agent_id: str) -> str:
 # ============================================================
 
 @mcp.tool()
-async def workspace_create(match_id: str, demand_id: str, demand_agent_id: str, supply_agent_id: str) -> str:
+async def workspace_create(session_token: str, match_id: str, demand_id: str, demand_agent_id: str, supply_agent_id: str) -> str:
     """创建协作工作区（匹配接受后自动调用）。"""
+    from src.shared.auth import verify
+    verify(session_token)
     from src.matching.collaboration import CollaborationService
     try:
         async with async_session() as session:
@@ -531,12 +541,14 @@ async def workspace_create(match_id: str, demand_id: str, demand_agent_id: str, 
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
-async def workspace_add_entry(workspace_id: str, agent_id: str, entry_type: str, content: str,
+async def workspace_add_entry(session_token: str, workspace_id: str, agent_id: str, entry_type: str, content: str,
                                visible_to_demand: bool = True, visible_to_supply: bool = True) -> str:
     """
     向工作区添加一条工作记忆。
     entry_type: clarification(需求澄清)| spec_refinement(指标细化)| proposal(方案建议)| decision(决策)| progress(进展)| blocker(障碍)
     """
+    from src.shared.auth import verify
+    verify(session_token)
     from src.matching.collaboration import CollaborationService
     try:
         async with async_session() as session:
@@ -562,8 +574,10 @@ async def workspace_get_entries(workspace_id: str, agent_role: str = "any") -> s
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
-async def workspace_grant_consent(workspace_id: str) -> str:
+async def workspace_grant_consent(session_token: str, workspace_id: str) -> str:
     """需求方授权供给方参与协作、查看进展。"""
+    from src.shared.auth import verify
+    verify(session_token)
     from src.matching.collaboration import CollaborationService
     try:
         async with async_session() as session:
@@ -586,8 +600,10 @@ async def workspace_revoke_consent(workspace_id: str) -> str:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
-async def workspace_follow(workspace_id: str) -> str:
+async def workspace_follow(session_token: str, workspace_id: str) -> str:
     """供给方关注需求进展（需先获得需求方授权）。关注后，需求状态变更时Agent会收到通知。"""
+    from src.shared.auth import verify
+    verify(session_token)
     from src.matching.collaboration import CollaborationService
     try:
         async with async_session() as session:
@@ -692,8 +708,10 @@ async def list_discovered_demands(source: str = "", limit: int = 30) -> str:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
-async def import_discovered_demand(demand_id: str, user_id: str) -> str:
+async def import_discovered_demand(session_token: str, demand_id: str, user_id: str) -> str:
     """将一条公开发现的需求转为正式需求，发布到平台上。"""
+    from src.shared.auth import verify
+    verify(session_token)
     try:
         async with async_session() as session:
             result = await session.execute(
@@ -777,7 +795,7 @@ async def deliver_demand_to_company(
 # ============================================================
 
 @mcp.tool()
-async def contribute_to_platform(
+async def contribute_to_platform(session_token: str, 
     match_id: str, demand_id: str, agent_id: str,
     contribution_type: str = "money",
     amount: float = 0.0, currency: str = "CNY",
@@ -787,6 +805,8 @@ async def contribute_to_platform(
     记录一笔自愿贡献。完全自愿——不付钱也继续用全部功能。
     contribution_type: money | testimonial | referral | code | content
     """
+    from src.shared.auth import verify
+    verify(session_token)
     from src.shared.contribution import contribution_service
     try:
         result = await contribution_service.record(
@@ -812,7 +832,7 @@ async def get_contribution_hall() -> str:
 # ============================================================
 
 @mcp.tool()
-async def set_demand_preferences(
+async def set_demand_preferences(session_token: str, 
     agent_id: str,
     preferred_categories: str = "",
     preferred_disciplines: str = "",
@@ -825,6 +845,8 @@ async def set_demand_preferences(
     设置Agent偏好的需求分类。
     三种模式：不填=接收全部 | 手动选分类/学科/IPC | auto_select=true让AI助手根据能力画像自动选。
     """
+    from src.shared.auth import verify
+    verify(session_token)
     from src.shared.models import AgentPreference
     try:
         cats = [c.strip() for c in preferred_categories.split(",") if c.strip()] if preferred_categories else None
