@@ -137,12 +137,13 @@ async def update_demand(demand_id: str, raw_text: str = "", status: str = "") ->
                 changed.append("raw_text")
             if status:
                 status_upper = status.upper().replace(" ", "_")
+                valid_values = [s.name.lower() for s in DemandStatus]
                 try:
-                    demand.status = DemandStatus[status_upper]
-                    changed.append(f"status={status}")
+                    st = DemandStatus[status_upper]
+                    demand.status = st
+                    changed.append(f"status={st.name.lower()}")
                 except KeyError:
-                    valid = [s.name.lower() for s in DemandStatus]
-                    return json.dumps({"error": f"无效状态: {status}。有效值: {valid}"}, ensure_ascii=False)
+                    return json.dumps({"error": f"无效状态: {status}。有效值: {valid_values}"}, ensure_ascii=False)
 
             await session.commit()
             return json.dumps({
