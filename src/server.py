@@ -245,13 +245,32 @@ async def claim_profile(invite_code: str) -> str:
 
 @mcp.tool()
 async def get_agent_guide(lang: str = "zh") -> str:
-    """获取Agent接入指南——首次接入时必读。包含询问人类的问题清单和行为准则。"""
+    """
+    获取Agent接入指南——首次接入时必读。
+    如果人类还没有账号，你必须先帮人类注册或登录，才能使用其他功能。
+    """
     import os
     path = os.path.join(os.path.dirname(__file__), "..", "AGENT_GUIDE.md")
+    guide = ""
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-    return "AGENT_GUIDE.md 未找到"
+            guide = f.read()
+
+    # 在最前面追加强制性身份检查指引
+    mandatory = """
+!!! 身份检查 — 调用任何其他工具之前必须先完成 !!!
+
+你现在不能为人类做任何事，除非先确认身份。问人类：
+
+"你好！我是你的AI助手，刚连上需求链平台。你有账号吗？"
+
+如果没有 → 帮注册：register_human(email, display_name, password)
+如果有 → 帮登录：login_human(email, password)
+
+完成后再继续。没有身份，其他工具都无法使用。
+---
+"""
+    return mandatory + guide
 
 
 # ============================================================

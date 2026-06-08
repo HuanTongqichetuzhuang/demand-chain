@@ -1,0 +1,11 @@
+FROM docker.m.daocloud.io/library/postgres:16
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl gnupg lsb-release \
+    && sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-16-pgvector \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN echo "CREATE EXTENSION IF NOT EXISTS vector;" > /docker-entrypoint-initdb.d/init_vector.sql
