@@ -18,6 +18,7 @@ class DemandStatus(str, enum.Enum):
     MATCHING = "matching"
     IN_PROGRESS = "in_progress"
     RESOLVED = "resolved"
+    CANCELLED = "cancelled"
     UNRESOLVABLE = "unresolvable"
     CLOSED = "closed"
 
