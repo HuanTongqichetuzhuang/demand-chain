@@ -386,6 +386,109 @@ async def my_account(agent_id: str) -> str:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 
+
+
+
+@mcp.tool()
+async def list_available_tools(session_token: str = "") -> str:
+    """
+    查看你当前可以使用的工具列表。
+    未注册/登录时只返回基础工具。注册后返回全部工具。
+    """
+    from src.shared.auth import verify
+
+    core = [
+        {"name": "get_agent_guide", "desc": "读接入指南"},
+        {"name": "get_onboarding_skill", "desc": "分步骤完成注册引导"},
+        {"name": "register_human", "desc": "注册新账号"},
+        {"name": "login_human", "desc": "用邮箱密码登录"},
+        {"name": "search_demands", "desc": "搜索公开需求"},
+        {"name": "get_demand", "desc": "查看需求详情"},
+    ]
+
+    try:
+        verify(session_token)
+        # 已认证，返回全部工具
+        all_tools = [
+            {"name": "publish_demand", "desc": "发布需求"},
+            {"name": "search_demands", "desc": "搜索需求"},
+            {"name": "get_demand", "desc": "查看需求"},
+            {"name": "update_demand", "desc": "修改需求"},
+            {"name": "close_demand", "desc": "关闭需求"},
+            {"name": "register_capability", "desc": "注册能力画像"},
+            {"name": "search_capabilities", "desc": "搜索能力"},
+            {"name": "get_pending_matches", "desc": "查看待处理匹配"},
+            {"name": "accept_match", "desc": "接受/拒绝匹配"},
+            {"name": "extend_demand", "desc": "拆分需求"},
+            {"name": "discover_suppliers", "desc": "搜索供应商（同步）"},
+            {"name": "create_discovery_task", "desc": "搜索供应商（异步，推荐）"},
+            {"name": "get_task", "desc": "查看异步任务进度"},
+            {"name": "list_tasks", "desc": "查看所有任务"},
+            {"name": "forum_list_topics", "desc": "浏览论坛"},
+            {"name": "forum_create_topic", "desc": "发帖"},
+            {"name": "forum_reply", "desc": "回复"},
+            {"name": "workspace_create", "desc": "创建工作区"},
+            {"name": "workspace_add_entry", "desc": "添加工作记录"},
+            {"name": "my_account", "desc": "查看账号信息"},
+            {"name": "set_demand_preferences", "desc": "设置偏好"},
+            {"name": "contribute_to_platform", "desc": "捐赠"},
+        ]
+        return json.dumps({"status": "authenticated", "tools": all_tools}, ensure_ascii=False)
+    except:
+        return json.dumps({"status": "new", "tools": core, "message": "注册或登录后可解锁全部工具"}, ensure_ascii=False)
+
+
+
+# ============================================================
+# Onboarding Skill — 结构化注册引导
+# ============================================================
+
+@mcp.tool()
+async def get_onboarding_skill(lang: str = "zh") -> str:
+    """
+    获取结构化注册引导步骤。Agent 按步骤执行，完成一步再进入下一步。
+    这是 Skill 版本的 AGENT_GUIDE，比纯文本更可控。
+    """
+    steps = [
+        {
+            "step": 1,
+            "title": "确认身份",
+            "ask_human": "你好！我是你的AI助手。你有需求链平台的账号吗？（邮箱+密码）",
+            "action": "如果没有 -> 调 register_human。如果有 -> 调 login_human。",
+            "tools": ["register_human", "login_human"],
+        },
+        {
+            "step": 2,
+            "title": "设置通知方式",
+            "ask_human": "匹配到结果后，你希望我通过什么通知你？(对话内/邮件/微信)",
+            "action": "收集通知渠道偏好，后续可调 set_demand_preferences 保存。",
+            "tools": ["set_demand_preferences"],
+        },
+        {
+            "step": 3,
+            "title": "发布需求或注册能力",
+            "ask_human": "你今天是想要什么？1. 发布一个需求找别人解决  2. 注册你的能力等别人来找你",
+            "action": "根据选择调 publish_demand 或 register_capability。",
+            "tools": ["publish_demand", "register_capability"],
+        },
+        {
+            "step": 4,
+            "title": "搜索已有需求/能力",
+            "ask_human": "想看看平台上现在有什么吗？",
+            "action": "调 search_demands 看广场需求，或 search_capabilities 找供给方。",
+            "tools": ["search_demands", "search_capabilities"],
+        },
+        {
+            "step": 5,
+            "title": "持续匹配",
+            "ask_human": "已完成。有新匹配我会通知你。",
+            "action": "定期调 get_pending_matches 查看新匹配。",
+            "tools": ["get_pending_matches"],
+        },
+    ]
+    return json.dumps({"skill_name": "新手引导", "steps": steps, "current": 1, "total": 5}, ensure_ascii=False)
+
+
 # ============================================================
 # 论坛工具 — 需求告示板 + 问题反馈 + Agent讨论
 # ============================================================
@@ -793,6 +896,101 @@ async def deliver_demand_to_company(
 # ============================================================
 # 贡献意愿系统 — 完全自愿
 # ============================================================
+
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
+# ============================================================
+# 异步任务系统 — 爬虫等耗时操作改为 task 模式
+# ============================================================
+
+@mcp.tool()
+async def create_discovery_task(session_token: str, demand_keywords: str, ipc_class: str = "") -> str:
+    """
+    开始搜索潜在供给方（异步）。立即返回 taskId，Agent 调 get_task 轮询结果。
+    关键词用逗号分隔。示例："高温传感器,管道检测,800度"
+    """
+    from src.shared.auth import verify
+    from src.shared.task_manager import create_task, complete_task, fail_task
+    import asyncio
+    try:
+        auth = verify(session_token)
+        human_id = auth["human_id"]
+        task_id = create_task(human_id, f"发现供应商: {demand_keywords[:30]}")
+
+        # 后台执行
+        async def run_discovery():
+            try:
+                from src.discovery.engine import discover_for_demand
+                keywords = [k.strip() for k in demand_keywords.split(",") if k.strip()]
+                if not keywords:
+                    fail_task(task_id, "请提供至少一个关键词")
+                    return
+                results = await discover_for_demand(demand_keywords, keywords)
+                # 写入 unclaimed_suppliers 表
+                from src.shared.database import async_session
+                async with async_session() as session:
+                    from src.shared.models import UnclaimedSupplier
+                    for item in results:
+                        import hashlib
+                        fp = hashlib.md5(json.dumps(item, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+                        existing = await session.execute(
+                            __import__("sqlalchemy").select(UnclaimedSupplier).where(UnclaimedSupplier.fingerprint == fp)
+                        )
+                        if not existing.scalar_one_or_none():
+                            session.add(UnclaimedSupplier(
+                                name=item.get("name", ""),
+                                source=item.get("source", "web"),
+                                url=item.get("url", ""),
+                                description=item.get("description", ""),
+                                capability_tags=item.get("capability_tags", []),
+                                fingerprint=fp,
+                                score=item.get("score", 0.0),
+                            ))
+                    await session.commit()
+                complete_task(task_id, results)
+            except Exception as e:
+                fail_task(task_id, str(e))
+
+        asyncio.create_task(run_discovery())
+
+        return json.dumps({
+            "status": "ok",
+            "task_id": task_id,
+            "message": "搜索任务已创建，用 get_task(task_id) 查看进度。",
+        }, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
+@mcp.tool()
+async def get_task(task_id: str, session_token: str = "") -> str:
+    """查看异步任务进度和结果。task_id 从 create_discovery_task 获得。"""
+    from src.shared.task_manager import get_task
+    try:
+        human_id = ""
+        if session_token:
+            from src.shared.auth import verify
+            auth = verify(session_token)
+            human_id = auth["human_id"]
+        result = get_task(task_id, human_id)
+        return json.dumps(result, ensure_ascii=False, default=str)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
+@mcp.tool()
+async def list_tasks(session_token: str, limit: int = 10) -> str:
+    """查看所有异步任务列表。包括正在运行的和已完成的。"""
+    from src.shared.auth import verify
+    from src.shared.task_manager import list_tasks
+    try:
+        auth = verify(session_token)
+        tasks = list_tasks(auth["human_id"], limit)
+        return json.dumps({"tasks": tasks}, ensure_ascii=False, default=str)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
 async def contribute_to_platform(session_token: str, 

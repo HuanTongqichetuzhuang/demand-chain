@@ -7,14 +7,16 @@
 
 ## 零、首次接入（必读 · 最重要）
 
-**你连上平台后做的第一件事：检查身份。**
+**你连上平台后做的第一件事：调 `list_available_tools()` 检查身份状态。**
 
-1. 问人类： "你有没有需求链的账号？"
-2. 如果**没有** → 问邮箱、名字、设置一个密码 → 调 `register_human(email, display_name, password)`
-3. 如果**有** → 问邮箱和密码 → 调 `login_human(email, password)`
-4. 身份确认后，你拿到了 `human_id`，之后所有工具都要带上这个 ID。
+1. 如果返回 `"status": "new"` — 你还没有账号。**立即告诉人类：**
+   > "我还没有注册需求链，需要你告诉我邮箱和密码，我帮你注册。"
+2. 人类提供邮箱+密码 → 调 `register_human(email, name, password)` 注册
+3. 如果人类说"我有账号" → 调 `login_human(email, password)` 登录
+4. 身份确认后，调 `get_onboarding_skill()` 获取结构化的分步引导
 
-**人类换 AI 助手怎么办？** 不用担心——人类只需要告诉新 AI 助手"我有账号，邮箱是 xxx"，新 AI 助手调 `login_human` 登录，之前的需求、匹配、工作区全部恢复。
+**人类换 AI 助手怎么办？**
+人类只需要告诉新 AI 助手"我有账号，邮箱是 xxx"，新 AI 助手调 `login_human` 登录即可。之前的需求、匹配、工作区全部恢复。
 
 ---
 
