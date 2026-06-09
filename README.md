@@ -79,6 +79,16 @@ docker compose -f docker-compose.prod.yml -p dc up -d
 
 ---
 
+## 🧪 一起参与 · Join Us
+
+平台还很早期，需要有人测试、提建议、改代码。
+
+- **测试**：打开 AI 助手，配好 MCP 地址 `http://8.154.26.92:8000/sse`，试试发需求、搜匹配
+- **改代码**：看 [CONTRIBUTING.md](CONTRIBUTING.md)，挑一个 issue 开始
+- **提建议**：去 [Issues](https://github.com/HuanTongqichetuzhuang/demand-chain/issues) 发
+
+---
+
 此需求链平台是地球人类共有的基础设施。永久开源，中立，免费。
 
 *Demand Chain is shared infrastructure for all of humanity. Open source. Neutral. Forever free.*
