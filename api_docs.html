@@ -6,7 +6,7 @@
 <title>MCP 文档 | API Docs</title>
 <link rel="icon" href="logo.jpg" type="image/jpeg">
 <style>
-  :root {
+  :root {--purple:#7c6ef0;--muted:#8888aa;
     --bg: #0c0c1d; --card-bg: #14142b; --text: #e8e8f0;
     --text-secondary: #9090b0; --accent: #6c5ce7; --border: #2a2a4a;
     --green: #00b894; --amber: #fdcb6e; --red: #e24b4a;
@@ -51,6 +51,20 @@
   .features,.agents-grid{grid-template-columns:1fr}
   .section{padding:30px 16px}
 }
+
+nav{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;max-width:1100px;margin:0 auto;border-bottom:1px solid var(--border)}
+nav .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:17px;color:var(--text);text-decoration:none}
+nav .brand:hover{text-decoration:none}
+nav .brand img{width:36px;height:36px;border-radius:8px}
+nav .links{display:flex;gap:20px;align-items:center}
+nav .links a{font-size:14px;color:var(--muted);transition:color .15s}
+nav .links a:hover{color:var(--text);text-decoration:none}
+nav .links .btn-nav{background:var(--purple);color:#fff;padding:7px 18px;border-radius:8px;font-size:14px;font-weight:500;transition:background .15s}
+nav .links .btn-nav:hover{background:#8c7ef5;text-decoration:none;color:#fff}
+footer{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;border-top:1px solid var(--border)}
+footer .links{margin-bottom:12px;display:flex;justify-content:center;gap:24px;flex-wrap:wrap}
+footer .links a{color:var(--muted);font-size:13px}
+footer .links a:hover{color:var(--text)}
 
 </style>
 </head>
