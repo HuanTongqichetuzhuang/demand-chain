@@ -905,6 +905,41 @@ async def deliver_demand_to_company(
 # 异步任务系统 — 爬虫等耗时操作改为 task 模式
 # ============================================================
 
+
+@mcp.tool()
+async def firecrawl_search(query: str, source: str = "web", limit: int = 5) -> str:
+    """
+    用 Firecrawl 全网搜索。source: web | patent | procurement | academic。
+    不需要 session_token，公开可用。
+    """
+    from src.adapters.firecrawl_client import get_firecrawl
+    try:
+        fc = get_firecrawl()
+        if source == "patent":
+            results = await fc.search_patents(query, limit)
+        elif source == "procurement":
+            results = await fc.search_procurement(query, limit)
+        elif source == "academic":
+            results = await fc.search_academic(query, limit)
+        else:
+            results = await fc.search_web(query, limit)
+        return json.dumps({"status": "ok", "source": source, "query": query, "results": results}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
+@mcp.tool()
+async def firecrawl_scrape(url: str) -> str:
+    """抓取单页 URL 内容。不需要 session_token。"""
+    from src.adapters.firecrawl_client import get_firecrawl
+    try:
+        fc = get_firecrawl()
+        result = await fc.scrape_url(url)
+        return json.dumps(result, ensure_ascii=False, default=str)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
 @mcp.tool()
 async def create_discovery_task(session_token: str, demand_keywords: str, ipc_class: str = "") -> str:
     """
