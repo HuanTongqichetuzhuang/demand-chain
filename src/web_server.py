@@ -128,6 +128,115 @@ async def api_login(request):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
+
+async def api_forum_create(request):
+    """POST /api/forum/topics/create — 创建帖子"""
+    from src.shared.database import async_session
+    from src.shared.models import ForumTopic
+    from uuid import uuid4
+    try:
+        body = await request.json()
+        title = body.get("title", "").strip()
+        content_text = body.get("body", "").strip()
+        category = body.get("category", "general").strip()
+        author_id = body.get("author_id", "web_user")
+        
+        if not title or len(title) < 2:
+            return JSONResponse({"error": "标题太短"}, status_code=400)
+        
+        async with async_session() as session:
+            topic = ForumTopic(
+                id=str(uuid4()),
+                title=title,
+                body=content_text,
+                category=category,
+                agent_id=author_id,
+                upvotes=0,
+            )
+            session.add(topic)
+            await session.commit()
+            return JSONResponse({"status": "ok", "topic_id": topic.id})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+async def api_forum_reply_post(request):
+    """POST /api/forum/topics/{topic_id}/reply — 回复帖子"""
+    from src.shared.database import async_session
+    from src.shared.models import ForumTopic, ForumReply
+    from uuid import uuid4
+    topic_id = request.path_params.get("topic_id", "")
+    try:
+        body = await request.json()
+        content_text = body.get("body", "").strip()
+        author_id = body.get("author_id", "web_user")
+        
+        if not content_text:
+            return JSONResponse({"error": "内容为空"}, status_code=400)
+        
+        async with async_session() as session:
+            from sqlalchemy import select
+            result = await session.execute(select(ForumTopic).where(ForumTopic.id == topic_id))
+            topic = result.scalar_one_or_none()
+            if not topic:
+                return JSONResponse({"error": "帖子不存在"}, status_code=404)
+            
+            reply = ForumReply(
+                id=str(uuid4()),
+                topic_id=topic_id,
+                body=content_text,
+                agent_id=author_id,
+            )
+            session.add(reply)
+            pass  # replies auto-tracked via relationship
+            await session.commit()
+            return JSONResponse({"status": "ok", "reply_id": reply.id})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+async def api_forum_vote_post(request):
+    """POST /api/forum/topics/{topic_id}/vote — 投票"""
+    from src.shared.database import async_session
+    from src.shared.models import ForumTopic
+    topic_id = request.path_params.get("topic_id", "")
+    try:
+        body = await request.json()
+        direction = body.get("direction", "up")
+        async with async_session() as session:
+            from sqlalchemy import select
+            result = await session.execute(select(ForumTopic).where(ForumTopic.id == topic_id))
+            t = result.scalar_one_or_none()
+            if t:
+                if direction == "up":
+                    t.upvotes = (t.upvotes or 0) + 1
+                else:
+                    t.upvotes = max(0, (t.upvotes or 0) - 1)
+                await session.commit()
+                return JSONResponse({"status": "ok", "vote_count": t.upvotes})
+        return JSONResponse({"error": "not found"}, status_code=404)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+async def api_forum_replies(request):
+    """GET /api/forum/topics/{topic_id}/replies — 获取回复"""
+    from src.shared.database import async_session
+    from src.shared.models import ForumReply
+    topic_id = request.path_params.get("topic_id", "")
+    try:
+        async with async_session() as session:
+            from sqlalchemy import select
+            result = await session.execute(
+                select(ForumReply).where(ForumReply.topic_id == topic_id).order_by(ForumReply.created_at.asc()).limit(100)
+            )
+            replies = result.scalars().all()
+            return JSONResponse([{
+                "id": r.id,
+                "content": r.body,
+                "author_id": r.agent_id,
+                "created_at": r.created_at.isoformat() if r.created_at else "",
+            } for r in replies])
+    except Exception as e:
+        return JSONResponse({"error": str(e), "replies": []}, status_code=500)
+
 # ============================================================
 # REST API — 论坛、需求等数据接口
 # ============================================================
@@ -146,11 +255,11 @@ async def api_forum_topics(request):
             return JSONResponse([{
                 "id": t.id,
                 "title": t.title,
-                "content": t.content[:200] if t.content else "",
+                "content": t.body[:200] if t.body else "",
                 "category": t.category,
-                "author_id": t.author_id,
-                "vote_count": t.vote_count or 0,
-                "reply_count": t.reply_count or 0,
+                "author_id": t.agent_id,
+                "vote_count": t.upvotes or 0,
+                "reply_count": len(t.replies) if t.replies else 0,
                 "created_at": t.created_at.isoformat() if t.created_at else "",
             } for t in topics])
     except Exception as e:
@@ -187,11 +296,11 @@ async def api_forum_topic_detail(request):
             return JSONResponse({
                 "id": t.id,
                 "title": t.title,
-                "content": t.content,
+                "content": t.body,
                 "category": t.category,
-                "author_id": t.author_id,
-                "vote_count": t.vote_count or 0,
-                "reply_count": t.reply_count or 0,
+                "author_id": t.agent_id,
+                "vote_count": t.upvotes or 0,
+                "reply_count": len(t.replies) if t.replies else 0,
                 "created_at": t.created_at.isoformat() if t.created_at else "",
             })
     except Exception as e:
@@ -211,11 +320,11 @@ async def api_forum_vote(request):
             t = result.scalar_one_or_none()
             if t:
                 if direction == "up":
-                    t.vote_count = (t.vote_count or 0) + 1
+                    t.upvotes = (t.upvotes or 0) + 1
                 else:
-                    t.vote_count = max(0, (t.vote_count or 0) - 1)
+                    t.upvotes = max(0, (t.upvotes or 0) - 1)
                 await session.commit()
-                return JSONResponse({"status": "ok", "vote_count": t.vote_count})
+                return JSONResponse({"status": "ok", "vote_count": t.upvotes})
         return JSONResponse({"error": "not found"}, status_code=404)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -263,9 +372,12 @@ routes = [
     Route("/api/register", api_register, methods=["POST"]),
     Route("/api/login", api_login, methods=["POST"]),
     Route("/api/forum/categories", api_forum_categories),
+    Route("/api/forum/topics/create", api_forum_create, methods=["POST"]),
     Route("/api/forum/topics", api_forum_topics),
     Route("/api/forum/topics/{topic_id}", api_forum_topic_detail),
-    Route("/api/forum/topics/{topic_id}/vote", api_forum_vote, methods=["POST"]),
+    Route("/api/forum/topics/{topic_id}/vote", api_forum_vote_post, methods=["POST"]),
+    Route("/api/forum/topics/{topic_id}/reply", api_forum_reply_post, methods=["POST"]),
+    Route("/api/forum/topics/{topic_id}/replies", api_forum_replies),
     Route("/api/demands", api_demand_list),
     # Catch-all static
     Route("/{path:path}", static_file),
