@@ -114,17 +114,18 @@ footer .links a:hover{color:var(--text)}
 </div>
 
 <div id="sectionProfile" class="card hidden">
-<h2>注册成功！</h2>
+<span class="logout" style="float:right;font-size:.85em;color:var(--ts);cursor:pointer" onclick="doLogout()">退出</span>
+<h2 id="profileTitle">需求链平台</h2>
 <p id="profileEmail" style="color:var(--ts)"></p>
 <div class="key-box">
 <label style="color:var(--ts);font-size:.85em">你的 API 密钥（给 AI 助手用的）</label>
 <code id="apiKeyDisplay"></code>
-<div class="warn">这是唯一一次展示！请复制保存。这个密钥让你的 AI 助手以你的身份操作平台。</div>
+<div class="warn" id="apiKeyWarn">这个密钥让你的 AI 助手以你的身份操作平台</div>
 <div class="copy-area" style="display:flex;gap:8px;margin-top:12px">
 <button class="btn btn-primary" style="width:auto;flex:1" onclick="copyApiKey()">复制密钥</button>
 </div>
 </div>
-<div style="margin-top:20px">
+<div id="agentPromptSection" style="margin-top:20px">
 <h3 style="font-size:1em;margin-bottom:12px">给你的 AI 助手</h3>
 <div class="key-box">
 <code id="agentPrompt"></code>
@@ -133,7 +134,15 @@ footer .links a:hover{color:var(--text)}
 <button class="btn btn-primary" style="width:auto;flex:1" onclick="copyAgentPrompt()">复制给 AI 助手</button>
 </div>
 </div>
-<button class="btn btn-outline" onclick="doLogout()" style="margin-top:20px;width:100%">退出</button>
+<div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
+<h3 style="font-size:.95em;margin-bottom:12px">快捷入口</h3>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<a href="demand_square.html" style="display:block;background:rgba(108,92,231,.08);border:1px solid var(--border);border-radius:10px;padding:14px;text-decoration:none;color:var(--text);font-size:.9em">需求广场<br><span style="font-size:.78em;color:var(--ts)">浏览66条公开需求</span></a>
+<a href="forum.html" style="display:block;background:rgba(108,92,231,.08);border:1px solid var(--border);border-radius:10px;padding:14px;text-decoration:none;color:var(--text);font-size:.9em">论坛<br><span style="font-size:.78em;color:var(--ts)">讨论技术问题</span></a>
+<a href="docs/tutorial.html" style="display:block;background:rgba(108,92,231,.08);border:1px solid var(--border);border-radius:10px;padding:14px;text-decoration:none;color:var(--text);font-size:.9em">教程<br><span style="font-size:.78em;color:var(--ts)">5分钟上手</span></a>
+<a href="/" style="display:block;background:rgba(108,92,231,.08);border:1px solid var(--border);border-radius:10px;padding:14px;text-decoration:none;color:var(--text);font-size:.9em">首页<br><span style="font-size:.78em;color:var(--ts)">平台介绍</span></a>
+</div>
+</div>
 </div>
 </div>
 
@@ -174,12 +183,21 @@ const el = document.getElementById(id);
 el.innerHTML = '<div class="msg msg-'+type+'">'+text+'</div>';
 }
 
-function showProfile(email, apiKey) {
+function showProfile(email, apiKey, name, isRegister) {
 document.getElementById("sectionLogin").classList.add("hidden");
 document.getElementById("sectionProfile").classList.remove("hidden");
+if (isRegister) {
+document.getElementById("profileTitle").textContent = "注册成功！" + (name ? " " + name : "");
+document.getElementById("apiKeyWarn").classList.remove("hidden");
+document.getElementById("agentPromptSection").classList.remove("hidden");
+} else {
+document.getElementById("profileTitle").textContent = "欢迎回来" + (name ? "，" + name : "");
+document.getElementById("apiKeyWarn").classList.add("hidden");
+document.getElementById("agentPromptSection").classList.add("hidden");
+}
 document.getElementById("profileEmail").textContent = "邮箱: " + email;
-document.getElementById("apiKeyDisplay").textContent = apiKey;
-document.getElementById("agentPrompt").textContent = "我的需求链平台账号已就绪。API密钥："+apiKey+"。请用这个密钥帮我发布需求和搜索匹配。MCP地址：http://8.154.26.92:8000/sse";
+document.getElementById("apiKeyDisplay").textContent = apiKey || "";
+document.getElementById("agentPrompt").textContent = "我的需求链平台账号已就绪。API密钥："+(apiKey||"")+"。请用这个密钥帮我发布需求和搜索匹配。MCP地址：http://8.154.26.92:8000/sse";
 }
 
 function copyApiKey() {
@@ -201,7 +219,7 @@ showMsg("loginMsg","正在连接平台...","success");
 fetch(API_BASE+"/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password:pwd})})
 .then(r=>r.json()).then(d=>{
 if (d.error) { showMsg("loginMsg",d.error,"error"); return; }
-showProfile(email, d.api_key||d.session_token||"");
+showProfile(email, d.api_key||d.session_token||"", d.name||"", false);
 }).catch(e=>showMsg("loginMsg","无法连接服务器","error"));
 }
 
@@ -223,7 +241,7 @@ fetch(API_BASE+"/api/register",{method:"POST",headers:{"Content-Type":"applicati
 .then(r=>r.json()).then(d=>{
 if (d.error) { showMsg("regMsg",d.error,"error"); return; }
 showMsg("regMsg","注册成功！","success");
-showProfile(email, d.api_key||d.session_token||"");
+showProfile(email, d.api_key||d.session_token||"", d.name||"", false);
 }).catch(e=>showMsg("regMsg","无法连接服务器","error"));
 }
 
