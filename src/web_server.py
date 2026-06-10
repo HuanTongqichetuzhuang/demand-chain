@@ -384,6 +384,58 @@ async def api_suppliers(request):
     except Exception as e:
         return JSONResponse({'error':str(e)}, status_code=500)
 
+
+async def api_auto_demand(request):
+    """POST /api/auto-demand — 自动添加需求（爬虫用）"""
+    from src.shared.database import async_session
+    from src.shared.models import Demand, DemandStatus
+    from uuid import uuid4
+    try:
+        body = await request.json()
+        raw_text = body.get("raw_text", "")
+        category = body.get("category", "其他")
+        email = body.get("email", "crawler")
+        if not raw_text:
+            return JSONResponse({"error": "empty"}, status_code=400)
+        async with async_session() as session:
+            demand = Demand(
+                id=str(uuid4()),
+                user_id=email,
+                raw_text=raw_text,
+                category=category,
+                status=DemandStatus.OPEN,
+                visibility="PUBLIC",
+            )
+            session.add(demand)
+            await session.commit()
+            return JSONResponse({"status": "ok", "id": demand.id})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+async def api_auto_supplier(request):
+    """POST /api/auto-supplier — 自动添加供应商（爬虫用）"""
+    from src.shared.database import async_session
+    from src.shared.models import CapabilityProfile
+    from uuid import uuid4
+    try:
+        body = await request.json()
+        async with async_session() as session:
+            profile = CapabilityProfile(
+                id=str(uuid4()),
+                user_id=body.get("email", "crawler"),
+                profile_type=body.get("profile_type", "COMPANY"),
+                country=body.get("country", ""),
+                trust_score=body.get("trust_score", 0.5),
+                is_claimed=False,
+                verified=False,
+                agent_card_json=body.get("agent_card", {}),
+            )
+            session.add(profile)
+            await session.commit()
+            return JSONResponse({"status": "ok", "id": profile.id})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 # ============================================================
 # REST API — 论坛、需求等数据接口
 # ============================================================
@@ -521,6 +573,8 @@ routes = [
     Route("/api/user/avatar", api_user_avatar, methods=["POST"]),
     Route("/api/user/password", api_user_password, methods=["PUT"]),
     Route("/api/user/stats", api_user_stats),
+    Route("/api/auto-demand", api_auto_demand, methods=["POST"]),
+    Route("/api/auto-supplier", api_auto_supplier, methods=["POST"]),
     Route("/api/suppliers", api_suppliers),
     Route("/api/register", api_register, methods=["POST"]),
     Route("/api/login", api_login, methods=["POST"]),
