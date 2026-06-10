@@ -354,6 +354,36 @@ async def api_forum_replies(request):
     except Exception as e:
         return JSONResponse({"error": str(e), "replies": []}, status_code=500)
 
+
+async def api_suppliers(request):
+    """GET /api/suppliers — 获取公开供应商资料"""
+    from src.shared.database import async_session
+    from src.shared.models import CapabilityProfile
+    from sqlalchemy import select
+    try:
+        async with async_session() as session:
+            result = await session.execute(select(CapabilityProfile).order_by(CapabilityProfile.created_at.desc()).limit(100))
+            profiles = result.scalars().all()
+            return JSONResponse([{
+                'id': p.id,
+                'user_id': p.user_id,
+                'profile_type': p.profile_type,
+                'country': p.country,
+                'trust_score': p.trust_score,
+                'is_claimed': p.is_claimed,
+                'verified': p.verified,
+                'name': p.agent_card_json.get('name',''),
+                'description': p.agent_card_json.get('description',''),
+                'skills': p.agent_card_json.get('skills',[]),
+                'category': p.agent_card_json.get('category',''),
+                'industry': p.agent_card_json.get('industry',''),
+                'discipline': p.agent_card_json.get('discipline',''),
+                'trl': p.agent_card_json.get('trl',0),
+                'url': p.agent_card_json.get('url',''),
+            } for p in profiles])
+    except Exception as e:
+        return JSONResponse({'error':str(e)}, status_code=500)
+
 # ============================================================
 # REST API — 论坛、需求等数据接口
 # ============================================================
@@ -491,6 +521,7 @@ routes = [
     Route("/api/user/avatar", api_user_avatar, methods=["POST"]),
     Route("/api/user/password", api_user_password, methods=["PUT"]),
     Route("/api/user/stats", api_user_stats),
+    Route("/api/suppliers", api_suppliers),
     Route("/api/register", api_register, methods=["POST"]),
     Route("/api/login", api_login, methods=["POST"]),
     Route("/api/forum/categories", api_forum_categories),

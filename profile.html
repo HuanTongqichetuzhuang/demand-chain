@@ -57,7 +57,7 @@ nav .links .user-info img{width:28px;height:28px;border-radius:50%}
   <a class="brand" href="/"><img src="logo.jpg" alt="">需求链平台</a>
   <div class="links" id="navLinks">
     <a href="demand_square.html">需求广场</a>
-    <a href="forum.html">论坛</a>
+    <a href="suppliers.html">供应商</a><a href="forum.html">论坛</a>
     <a href="docs/tutorial.html">教程</a>
     <a href="login.html" class="btn-nav" id="navLoginBtn">登录</a>
   </div>
@@ -180,7 +180,7 @@ function updateNav(name, avatar) {
   const links = document.getElementById("navLinks");
   links.innerHTML = 
     '<a href="demand_square.html">需求广场</a>'+
-    '<a href="forum.html">论坛</a>'+
+    '<a href="suppliers.html">供应商</a><a href="forum.html">论坛</a>'+
     '<a href="docs/tutorial.html">教程</a>'+
     '<a href="profile.html" class="user-info">'+
       (avatar ? '<img src="'+avatar+'">' : '')+
