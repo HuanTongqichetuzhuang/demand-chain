@@ -43,6 +43,123 @@ async def static_file(request):
     return JSONResponse({"error": "not found"}, status_code=404)
 
 
+
+# ============================================================
+# User Profile API
+# ============================================================
+
+async def api_user_profile_get(request):
+    """GET /api/user/profile — 获取用户资料"""
+    from src.shared.database import async_session
+    from src.shared.models import User
+    from sqlalchemy import select
+    try:
+        email = request.query_params.get("email", "")
+        async with async_session() as session:
+            result = await session.execute(select(User).where(User.email == email))
+            u = result.scalar_one_or_none()
+            if not u:
+                return JSONResponse({"error": "not found"}, status_code=404)
+            return JSONResponse({
+                "email": u.email,
+                "display_name": u.display_name,
+                "country": u.country,
+                "avatar": getattr(u, "avatar", None),
+                "bio": getattr(u, "bio", None),
+            })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+async def api_user_profile_update(request):
+    """PUT /api/user/profile — 更新用户资料"""
+    from src.shared.database import async_session
+    from src.shared.models import User
+    from sqlalchemy import select
+    try:
+        body = await request.json()
+        email = body.get("email","")
+        async with async_session() as session:
+            result = await session.execute(select(User).where(User.email == email))
+            u = result.scalar_one_or_none()
+            if not u:
+                return JSONResponse({"error": "not found"}, status_code=404)
+            u.display_name = body.get("display_name", u.display_name)
+            u.country = body.get("country", u.country)
+            if hasattr(u, "bio"):
+                u.bio = body.get("bio", u.bio)
+            await session.commit()
+            return JSONResponse({"status": "ok"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+async def api_user_avatar(request):
+    """POST /api/user/avatar — 上传头像"""
+    from src.shared.database import async_session
+    from src.shared.models import User
+    from sqlalchemy import select
+    try:
+        body = await request.json()
+        email = body.get("email","")
+        avatar_data = body.get("avatar","")
+        async with async_session() as session:
+            result = await session.execute(select(User).where(User.email == email))
+            u = result.scalar_one_or_none()
+            if not u:
+                return JSONResponse({"error": "not found"}, status_code=404)
+            u.avatar = avatar_data  # stored as base64 data URI
+            await session.commit()
+            return JSONResponse({"status": "ok"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+async def api_user_password(request):
+    """PUT /api/user/password — 修改密码"""
+    import hashlib
+    from src.shared.database import async_session
+    from src.shared.models import User
+    from sqlalchemy import select
+    try:
+        body = await request.json()
+        email = body.get("email","")
+        old_pwd = body.get("old_password","")
+        new_pwd = body.get("new_password","")
+        if len(new_pwd) < 6:
+            return JSONResponse({"error": "新密码至少6位"}, status_code=400)
+        async with async_session() as session:
+            result = await session.execute(select(User).where(User.email == email))
+            u = result.scalar_one_or_none()
+            if not u:
+                return JSONResponse({"error": "not found"}, status_code=404)
+            old_hash = hashlib.sha256(old_pwd.encode()).hexdigest()
+            if old_hash != u.password_hash:
+                return JSONResponse({"error": "旧密码错误"}, status_code=401)
+            u.password_hash = hashlib.sha256(new_pwd.encode()).hexdigest()
+            await session.commit()
+            return JSONResponse({"status": "ok"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+async def api_user_stats(request):
+    """GET /api/user/stats — 用户统计"""
+    from src.shared.database import async_session
+    from src.shared.models import Demand, ForumTopic, ForumReply
+    from sqlalchemy import select
+    try:
+        email = request.query_params.get("email", "")
+        async with async_session() as session:
+            # Count demands by this user
+            from src.shared.models import User
+            r = await session.execute(select(User).where(User.email == email))
+            u = r.scalar_one_or_none()
+            if not u:
+                return JSONResponse({"demands":0,"topics":0,"replies":0})
+            d_count = (await session.execute(select(func.count()).select_from(Demand).where(Demand.user_id == u.human_id))).scalar()
+            t_count = (await session.execute(select(func.count()).select_from(ForumTopic).where(ForumTopic.agent_id.ilike('%'+email+'%')))).scalar()
+            r_count = (await session.execute(select(func.count()).select_from(ForumReply).where(ForumReply.agent_id.ilike('%'+email+'%')))).scalar()
+            return JSONResponse({"demands": d_count or 0, "topics": t_count or 0, "replies": r_count or 0})
+    except Exception as e:
+        return JSONResponse({"demands":0,"topics":0,"replies":0,"error":str(e)})
+
 # ============================================================
 # Auth API
 # ============================================================
@@ -369,6 +486,11 @@ routes = [
     Route("/tools_extra.html", tools_extra),
     Route("/docs/tutorial.html", tutorial),
     # API Routes
+    Route("/api/user/profile", api_user_profile_get),
+    Route("/api/user/profile", api_user_profile_update, methods=["PUT"]),
+    Route("/api/user/avatar", api_user_avatar, methods=["POST"]),
+    Route("/api/user/password", api_user_password, methods=["PUT"]),
+    Route("/api/user/stats", api_user_stats),
     Route("/api/register", api_register, methods=["POST"]),
     Route("/api/login", api_login, methods=["POST"]),
     Route("/api/forum/categories", api_forum_categories),

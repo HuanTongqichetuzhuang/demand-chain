@@ -215,11 +215,11 @@ const email = document.getElementById("loginEmail").value.trim();
 const pwd = document.getElementById("loginPassword").value;
 if (!email||pwd.length<6) { showMsg("loginMsg","请填写邮箱和密码","error"); return; }
 showMsg("loginMsg","正在连接平台...","success");
-// Login via API
 fetch(API_BASE+"/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password:pwd})})
 .then(r=>r.json()).then(d=>{
 if (d.error) { showMsg("loginMsg",d.error,"error"); return; }
-showProfile(email, d.api_key||d.session_token||"", d.name||"", false);
+localStorage.setItem("dc_session", JSON.stringify({email:email, name:d.name||"", api_key:d.api_key||""}));
+window.location.href = "profile.html";
 }).catch(e=>showMsg("loginMsg","无法连接服务器","error"));
 }
 
