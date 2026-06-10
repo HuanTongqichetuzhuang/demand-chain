@@ -116,6 +116,28 @@ SOURCES = {
         "extractor": "grant_search",
         "label": "Grants.gov美国联邦资助",
     },
+    # === 供应商 / 公司来源 ===
+    "startus_ccus": {
+        "enabled": True,
+        "url": "https://www.startus-insights.com/innovators-guide/carbon-capture-utilization-storage-startups/",
+        "type": "supplier",
+        "extractor": "startus_ccus",
+        "label": "碳捕集初创企业",
+    },
+    "energy_startups_hydrogen": {
+        "enabled": True,
+        "url": "https://www.energystartups.org/top/hydrogen-fuel/",
+        "type": "supplier",
+        "extractor": "generic_links",
+        "label": "氢能初创企业",
+    },
+    "climate_tech_2026": {
+        "enabled": True,
+        "url": "https://www.rankred.com/climate-tech-startups/",
+        "type": "supplier",
+        "extractor": "rankred",
+        "label": "气候科技初创企业2026",
+    },
 }
 
 
@@ -202,12 +224,150 @@ EXTRACTORS = {
     "xprize": lambda html, src: extract_demands_from_xprize(html),
     "darpa": lambda html, src: extract_demands_from_darpa(html),
     "grant_search": lambda html, src: extract_demands_from_grant_search(html),
+    # Supplier extractors
+    "startus_ccus": lambda html, src: extract_suppliers_startus(html, src),
+    "rankred": lambda html, src: extract_suppliers_rankred(html, src),
 }
 
 CRAWL_SPECIAL = {
     "usa_gov": crawl_usa_gov,
     "xprize": crawl_xprize,
 }
+
+
+# ============================================================
+# Supplier Crawlers
+# ============================================================
+
+def extract_suppliers_startus(html, src_key):
+    """Extract supplier companies from StartUs Insights lists."""
+    suppliers = []
+    # Pattern: company names in headings or strong tags with descriptions in paragraphs
+    companies = re.findall(r'<strong[^>]*>([^<]+)</strong>\s*</h\d>\s*<p[^>]*>([^<]+)</p>', html)
+    if not companies:
+        # Try another pattern
+        companies = re.findall(r'<h\d[^>]*>[^<]*<strong[^>]*>([^<]+)</strong>[^<]*</h\d>\s*<p[^>]*>([^<]+)</p>', html)
+    if not companies:
+        # JSON-LD or structured data
+        json_blocks = re.findall(r'<script type="application/ld\+json">({.*?})</script>', html, re.DOTALL)
+        for block in json_blocks:
+            try:
+                data = json.loads(block)
+                if isinstance(data, dict) and "itemListElement" in data:
+                    for item in data["itemListElement"]:
+                        name = item.get("item", {}).get("name", "") if isinstance(item, dict) else ""
+                        desc = item.get("item", {}).get("description", "") if isinstance(item, dict) else ""
+                        if name:
+                            suppliers.append({"name": name, "description": desc, "source": "StartUs Insights"})
+            except: pass
+    if not companies:
+        # Fallback: extract from YAML/JSON embedded in page
+        return fallback_json_extract(html, src_key)
+    
+    for name, desc in companies:
+        name = name.strip()
+        if len(name) > 2 and len(name) < 100:
+            suppliers.append({"name": name, "description": desc.strip(), "source": SOURCES[src_key]["label"]})
+    return suppliers
+
+def extract_suppliers_rankred(html, src_key):
+    """Extract supplier companies from RankRed list articles."""
+    suppliers = []
+    # Pattern: headings followed by paragraphs
+    headings = re.findall(r'<h\d[^>]*>(\d+)\.\s*([^<]+)</h\d>', html)
+    for num, name in headings:
+        name = name.strip()
+        if len(name) > 3 and len(name) < 120:
+            suppliers.append({"name": name, "description": "", "source": SOURCES[src_key]["label"]})
+    return suppliers
+
+def fallback_json_extract(html, src_key):
+    """Try to extract company data from JSON-LD or embedded JSON."""
+    suppliers = []
+    patterns = [
+        r'"company_name"\s*:\s*"([^"]+)"\s*,\s*"description"\s*:\s*"([^"]+)"',
+        r'"name"\s*:\s*"([^"]+)"\s*,\s*"description"\s*:\s*"([^"]+)"',
+    ]
+    for pat in patterns:
+        matches = re.findall(pat, html)
+        for name, desc in matches:
+            suppliers.append({"name": name, "description": desc, "source": SOURCES[src_key]["label"]})
+        if suppliers:
+            break
+    return suppliers
+
+
+def crawl_supplier_source(src_key):
+    """Crawl a supplier source and collect profiles."""
+    src = SOURCES[src_key]
+    label = src.get("label", src_key)
+    print(f"\n--- [供应商] {label} ---")
+    
+    html = fetch_url(src["url"])
+    if not html:
+        return []
+    
+    extractor_key = src.get("extractor", "generic_links")
+    extractor = EXTRACTORS.get(extractor_key)
+    if not extractor:
+        print(f"  [WARN] No extractor for {extractor_key}")
+        return []
+    
+    suppliers = extractor(html, src_key)
+    print(f"  Found {len(suppliers)} companies")
+    
+    for s in suppliers:
+        s["category"] = classify(s.get("description", "") + " " + s.get("name", ""))
+        print(f"  [{s['category']}] {s['name'][:40]}...")
+    
+    return suppliers
+
+
+def seed_suppliers_to_db(suppliers):
+    """Write suppliers to database directly."""
+    import asyncio
+    from sqlalchemy import select
+    from src.shared.database import async_session
+    from src.shared.models import CapabilityProfile
+    from uuid import uuid4
+
+    async def _do():
+        async with async_session() as session:
+            count = 0
+            for s in suppliers:
+                # Check if already exists by name
+                result = await session.execute(
+                    select(CapabilityProfile).where(CapabilityProfile.agent_card_json["name"].as_string() == s["name"])
+                )
+                if result.scalar_one_or_none():
+                    print(f"  SKIP: {s['name'][:30]}... (already exists)")
+                    continue
+
+                profile = CapabilityProfile(
+                    id=str(uuid4()),
+                    user_id="crawler",
+                    profile_type="COMPANY",
+                    country="",
+                    trust_score=0.5,
+                    is_claimed=False,
+                    verified=False,
+                    agent_card_json={
+                        "name": s["name"],
+                        "description": s.get("description", ""),
+                        "skills": [],
+                        "category": s.get("category", "其他"),
+                        "industry": s.get("category", "其他"),
+                        "discipline": "",
+                        "trl": 0,
+                        "url": s.get("url", ""),
+                    },
+                )
+                session.add(profile)
+                count += 1
+            await session.commit()
+            print(f"  Inserted {count} new supplier profiles")
+
+    asyncio.run(_do())
 
 
 def seed_demands_to_db(demands):
@@ -286,23 +446,36 @@ def run():
     print()
 
     all_demands = []
-    source_keys = list(SOURCES.keys())
+    all_suppliers = []
 
-    for src_key in source_keys:
+    for src_key in list(SOURCES.keys()):
         try:
-            demands = crawl_source(src_key)
-            all_demands.extend(demands)
+            src_type = SOURCES[src_key].get("type", "demand")
+            if src_type == "supplier":
+                items = crawl_supplier_source(src_key)
+                all_suppliers.extend(items)
+            else:
+                items = crawl_source(src_key)
+                all_demands.extend(items)
         except Exception as e:
             print(f"  [ERROR] {src_key} crawl failed: {e}")
             import traceback; traceback.print_exc()
 
-    print(f"\n=== Total demands collected: {len(all_demands)} ===")
+    print(f"\n=== Summary ===")
+    print(f"  Demands collected: {len(all_demands)}")
+    print(f"  Suppliers collected: {len(all_suppliers)}")
 
     if all_demands:
         try:
             seed_demands_to_db(all_demands)
         except Exception as e:
             print(f"  [ERROR] DB seeding failed: {e}")
+
+    if all_suppliers:
+        try:
+            seed_suppliers_to_db(all_suppliers)
+        except Exception as e:
+            print(f"  [ERROR] Supplier DB seeding failed: {e}")
 
     print("\nDone.")
 
