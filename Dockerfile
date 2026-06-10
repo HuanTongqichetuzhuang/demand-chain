@@ -13,6 +13,8 @@ COPY src/ ./src/
 COPY prompts/ ./prompts/
 COPY i18n/ ./i18n/
 COPY AGENT_GUIDE.md ./
+COPY *.html ./
+COPY docs/ ./docs/
 
 EXPOSE 8000
 
