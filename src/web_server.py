@@ -1,74 +1,39 @@
 """
-静态文件服务器 — 服务需求链平台的17个 HTML 页面。
-运行在端口 80，供人类浏览。
+静态文件服务器 + API 代理 — 服务 HTML 页面和 REST API。
 """
+import json
 import os
 import uvicorn
 from starlette.applications import Starlette
 from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Route
-from starlette.staticfiles import StaticFiles
 
 WEB_ROOT = "/app"
 
 async def serve_file(request, filename):
-    """服务单个 HTML 文件"""
     path = os.path.join(WEB_ROOT, filename)
     if os.path.exists(path):
         return FileResponse(path)
     return JSONResponse({"error": "not found"}, status_code=404)
 
-async def index(request):
-    return await serve_file(request, "index.html")
-
-async def login_page(request):
-    return await serve_file(request, "login.html")
-
-async def demand_square(request):
-    return await serve_file(request, "demand_square.html")
-
-async def zones(request):
-    return await serve_file(request, "zones.html")
-
-async def forum(request):
-    return await serve_file(request, "forum.html")
-
-async def chat(request):
-    return await serve_file(request, "chat.html")
-
-async def timeline(request):
-    return await serve_file(request, "timeline.html")
-
-async def leaderboard(request):
-    return await serve_file(request, "leaderboard.html")
-
-async def global_search(request):
-    return await serve_file(request, "global_search.html")
-
-async def targeted(request):
-    return await serve_file(request, "targeted_demand.html")
-
-async def discovered(request):
-    return await serve_file(request, "discovered_demands.html")
-
-async def public_demand(request):
-    return await serve_file(request, "public_demand.html")
-
-async def batch_export(request):
-    return await serve_file(request, "batch_export.html")
-
-async def api_docs(request):
-    return await serve_file(request, "api_docs.html")
-
-async def tools_extra(request):
-    return await serve_file(request, "tools_extra.html")
-
-async def tutorial(request):
-    return await serve_file(request, "docs/tutorial.html")
-
+async def index(request): return await serve_file(request, "index.html")
+async def login_page(request): return await serve_file(request, "login.html")
+async def demand_square(request): return await serve_file(request, "demand_square.html")
+async def zones(request): return await serve_file(request, "zones.html")
+async def forum(request): return await serve_file(request, "forum.html")
+async def chat(request): return await serve_file(request, "chat.html")
+async def timeline(request): return await serve_file(request, "timeline.html")
+async def leaderboard(request): return await serve_file(request, "leaderboard.html")
+async def global_search(request): return await serve_file(request, "global_search.html")
+async def targeted(request): return await serve_file(request, "targeted_demand.html")
+async def discovered(request): return await serve_file(request, "discovered_demands.html")
+async def public_demand(request): return await serve_file(request, "public_demand.html")
+async def batch_export(request): return await serve_file(request, "batch_export.html")
+async def api_docs(request): return await serve_file(request, "api_docs.html")
+async def tools_extra(request): return await serve_file(request, "tools_extra.html")
+async def tutorial(request): return await serve_file(request, "docs/tutorial.html")
 
 async def static_file(request):
-    """Serve any static file from the web root."""
     path = request.path_params.get("path", "")
     if ".." in path:
         return JSONResponse({"error": "forbidden"}, status_code=403)
@@ -77,6 +42,112 @@ async def static_file(request):
         return FileResponse(filepath)
     return JSONResponse({"error": "not found"}, status_code=404)
 
+# ============================================================
+# REST API — 论坛、需求等数据接口
+# ============================================================
+
+async def api_forum_topics(request):
+    """GET /api/forum/topics — 论坛帖子列表"""
+    from src.shared.database import async_session
+    from src.shared.models import ForumTopic
+    try:
+        async with async_session() as session:
+            from sqlalchemy import select
+            result = await session.execute(
+                select(ForumTopic).order_by(ForumTopic.created_at.desc()).limit(50)
+            )
+            topics = result.scalars().all()
+            return JSONResponse([{
+                "id": t.id,
+                "title": t.title,
+                "content": t.content[:200] if t.content else "",
+                "category": t.category,
+                "author_id": t.author_id,
+                "vote_count": t.vote_count or 0,
+                "reply_count": t.reply_count or 0,
+                "created_at": t.created_at.isoformat() if t.created_at else "",
+            } for t in topics])
+    except Exception as e:
+        return JSONResponse({"error": str(e), "topics": []}, status_code=500)
+
+async def api_forum_categories(request):
+    """GET /api/forum/categories — 论坛分类"""
+    return JSONResponse([
+        {"id": "tech", "name": "技术讨论", "icon": "tech"},
+        {"id": "demand", "name": "需求对接", "icon": "demand"},
+        {"id": "collab", "name": "合作招募", "icon": "collab"},
+        {"id": "showcase", "name": "成果展示", "icon": "showcase"},
+        {"id": "general", "name": "综合讨论", "icon": "general"},
+    ])
+
+async def api_forum_topic_detail(request):
+    """GET /api/forum/topics/{topic_id}"""
+    from src.shared.database import async_session
+    from src.shared.models import ForumTopic
+    topic_id = request.path_params.get("topic_id", "")
+    try:
+        async with async_session() as session:
+            from sqlalchemy import select
+            result = await session.execute(select(ForumTopic).where(ForumTopic.id == topic_id))
+            t = result.scalar_one_or_none()
+            if not t:
+                return JSONResponse({"error": "not found"}, status_code=404)
+            return JSONResponse({
+                "id": t.id,
+                "title": t.title,
+                "content": t.content,
+                "category": t.category,
+                "author_id": t.author_id,
+                "vote_count": t.vote_count or 0,
+                "reply_count": t.reply_count or 0,
+                "created_at": t.created_at.isoformat() if t.created_at else "",
+            })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+async def api_forum_vote(request):
+    """POST /api/forum/topics/{topic_id}/vote"""
+    from src.shared.database import async_session
+    from src.shared.models import ForumTopic
+    topic_id = request.path_params.get("topic_id", "")
+    try:
+        body = await request.json()
+        direction = body.get("direction", "up")
+        async with async_session() as session:
+            from sqlalchemy import select
+            result = await session.execute(select(ForumTopic).where(ForumTopic.id == topic_id))
+            t = result.scalar_one_or_none()
+            if t:
+                if direction == "up":
+                    t.vote_count = (t.vote_count or 0) + 1
+                else:
+                    t.vote_count = max(0, (t.vote_count or 0) - 1)
+                await session.commit()
+                return JSONResponse({"status": "ok", "vote_count": t.vote_count})
+        return JSONResponse({"error": "not found"}, status_code=404)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+async def api_demand_list(request):
+    """GET /api/demands — 需求列表"""
+    from src.shared.database import async_session
+    from src.shared.models import Demand
+    try:
+        async with async_session() as session:
+            from sqlalchemy import select
+            result = await session.execute(
+                select(Demand).order_by(Demand.created_at.desc()).limit(50)
+            )
+            demands = result.scalars().all()
+            return JSONResponse([{
+                "id": d.id,
+                "raw_text": d.raw_text[:200] if d.raw_text else "",
+                "category": d.category,
+                "status": d.status.value if d.status else "open",
+                "created_at": d.created_at.isoformat() if d.created_at else "",
+            } for d in demands])
+    except Exception as e:
+        return JSONResponse({"error": str(e), "demands": []}, status_code=500)
 
 routes = [
     Route("/", index),
@@ -96,6 +167,13 @@ routes = [
     Route("/api_docs.html", api_docs),
     Route("/tools_extra.html", tools_extra),
     Route("/docs/tutorial.html", tutorial),
+    # API Routes
+    Route("/api/forum/categories", api_forum_categories),
+    Route("/api/forum/topics", api_forum_topics),
+    Route("/api/forum/topics/{topic_id}", api_forum_topic_detail),
+    Route("/api/forum/topics/{topic_id}/vote", api_forum_vote, methods=["POST"]),
+    Route("/api/demands", api_demand_list),
+    # Catch-all static
     Route("/{path:path}", static_file),
 ]
 
