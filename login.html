@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>需求链平台 — 注册 / 登录</title>
+<link rel="icon" href="logo.jpg" type="image/jpeg">
 <style>
 :root{--bg:#0c0c1d;--card-bg:#14142b;--text:#e8e8f0;--ts:#9090b0;--accent:#6c5ce7;--border:#2a2a4a;--green:#00b894;--red:#e24b4a;--amber:#fdcb6e}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -49,13 +50,15 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 </div>
 
 <div id="formLogin">
+<form action="#" onsubmit="doLogin();return false">
 <label>邮箱</label><input type="email" id="loginEmail" placeholder="your@email.com">
 <label>密码</label><input type="password" id="loginPassword" placeholder="至少6位">
 <div id="loginMsg"></div>
 <button class="btn btn-primary" onclick="doLogin()" style="margin-top:16px">登录</button>
-</div>
+</form></div>
 
 <div id="formRegister" class="hidden">
+<form action="#" onsubmit="doRegister();return false">
 <label>姓名 / 昵称</label><input type="text" id="regName" placeholder="你的名字">
 <label>邮箱</label><input type="email" id="regEmail" placeholder="your@email.com">
 <label>国家 / 地区</label>
@@ -68,6 +71,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 </div>
 <div id="regMsg"></div>
 <button class="btn btn-primary" onclick="doRegister()" style="margin-top:16px">注册</button>
+</form>
 </div>
 </div>
 
