@@ -16,6 +16,7 @@ COPY AGENT_GUIDE.md ./
 COPY *.html ./
 COPY *.jpg ./
 COPY *.png ./
+COPY *.js ./
 COPY docs/ ./docs/
 
 EXPOSE 8000
