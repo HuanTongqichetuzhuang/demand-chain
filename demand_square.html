@@ -135,200 +135,95 @@
 
 <script>
 const API = "";
-let currentPage = 0;
+let allDemands = [];
+let disciplineFilter = "";
 let activeDemandId = null;
 let followedDemands = JSON.parse(localStorage.getItem("dc_followed")||"[]");
 
-// Real API data
-let allDemands = [];
 async function fetchDemands() {
   try {
-    const resp = await fetch(API + "/api/demands");
+    var resp = await fetch(API + "/api/demands");
     allDemands = await resp.json();
     loadDemands();
-    // Build filter tags from actual data
     buildFilters();
   } catch(e) {
-    console.error("Failed to fetch demands:", e);
-    document.getElementById("demandGrid").innerHTML = "<p style='color:var(--text-secondary);text-align:center;padding:40px'>无法加载需求数据，请检查网络连接</p>";
+    console.error(e);
+    document.getElementById("demandGrid").innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px">无法加载数据，请刷新重试</p>';
   }
 }
 
-const disciplines = ["物理学/电磁学","物理学/等离子体","材料科学/无机化学","材料科学/高分子","生物医学工程","计算机科学/AI","计算机科学/信号处理","生物学/分子生物学"];
-const ipcClasses = ["G01","G06","C01","C08","C12","A61","H05"];
-
-function loadDisciplineTags() {
-  const tags = document.getElementById("disciplineTags");
-  tags.innerHTML = '<span class="tag active" onclick="filterDiscipline(\'\')">全部学科 <span class="count">6</span></span>';
-  disciplines.forEach(d => {
-    const count = mockDemands.filter(m=>m.discipline.includes(d.split("/")[0])).length;
-    tags.innerHTML += `<span class="tag" data-d="${d}" onclick="filterDiscipline('${d}')">${d} <span class="count">${count}</span></span>`;
-  });
-}
-function loadIpcTags() {
-  const tags = document.getElementById("ipcTags");
-  tags.innerHTML = '<span class="tag active" onclick="filterIPC(\'\')">全部IPC</span>';
-  ipcClasses.forEach(c => {
-    const count = mockDemands.filter(m=>m.ipc===c).length;
-    tags.innerHTML += `<span class="tag" data-ipc="${c}" onclick="filterIPC('${c}')">IPC:${c} <span class="count">${count}</span></span>`;
+function buildFilters() {
+  var cats = [];
+  allDemands.forEach(function(d) { if (d.category && d.status === "open" && cats.indexOf(d.category) < 0) cats.push(d.category); });
+  var tags = document.getElementById("disciplineTags");
+  var openCount = allDemands.filter(function(d){ return d.status === "open"; }).length;
+  tags.innerHTML = '<span class="tag active" onclick="filterCategory(\'\')">全部 <span class="count">' + openCount + '</span></span>';
+  cats.forEach(function(c) {
+    var cnt = allDemands.filter(function(d){ return d.category === c && d.status === "open"; }).length;
+    tags.innerHTML += '<span class="tag" onclick="filterCategory(\''+ c.replace(/'/g,"\'") +'\')">'+ c +' <span class="count">'+ cnt +'</span></span>';
   });
 }
 
-let disciplineFilter = "";
-let ipcFilter = "";
-function filterDiscipline(d) {
-  disciplineFilter = d;
-  document.querySelectorAll("#disciplineTags .tag").forEach(t=>t.classList.toggle("active",t.dataset.d===d||(d===""&&t.dataset.d===undefined)));
+function filterCategory(c) {
+  disciplineFilter = c;
+  var allTags = document.querySelectorAll("#disciplineTags .tag");
+  allTags.forEach(function(t) { t.classList.remove("active"); });
+  allTags.forEach(function(t) { if (t.textContent.trim().startsWith(c || "全部")) t.classList.add("active"); });
   loadDemands();
 }
-function filterIPC(c) {
-  ipcFilter = c;
-  document.querySelectorAll("#ipcTags .tag").forEach(t=>t.classList.toggle("active",t.dataset.ipc===c||(c===""&&t.dataset.ipc===undefined)));
-  loadDemands();
-}
+
+function esc(s) { return String(s||"").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
 function loadDemands() {
-  const search = document.getElementById("searchInput").value.toLowerCase();
-  const industry = document.getElementById("industryFilter").value;
-  const status = document.getElementById("statusFilter").value;
-  const urgency = document.getElementById("urgencyFilter").value;
-
-  let filtered = mockDemands.filter(d => {
-    if (search && !d.title.toLowerCase().includes(search) && !d.body.toLowerCase().includes(search) && !d.tags.some(t=>t.includes(search))) return false;
-    if (industry && d.category !== industry) return false;
-    if (status && d.status !== status) return false;
-    if (urgency && d.urgency !== urgency) return false;
-    if (disciplineFilter && !d.discipline.includes(disciplineFilter.split("/")[0])) return false;
-    if (ipcFilter && d.ipc !== ipcFilter) return false;
-    return true;
+  var search = (document.getElementById("searchInput")||{}).value || "";
+  var grid = document.getElementById("demandGrid");
+  var data = allDemands.filter(function(d) {
+    if (search && d.raw_text.toLowerCase().indexOf(search.toLowerCase()) < 0 && (d.category||"").toLowerCase().indexOf(search.toLowerCase()) < 0) return false;
+    if (disciplineFilter && d.category !== disciplineFilter) return false;
+    return d.status === "open";
   });
-
-  const grid = document.getElementById("demandGrid");
-  if (filtered.length === 0) {
-    grid.innerHTML = '<div class="empty"><h3>没有匹配的需求</h3><p>换一个筛选条件试试</p></div>';
+  
+  if (data.length === 0) {
+    grid.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px">没有匹配的需求</p>';
     return;
   }
-
-  const statusMap = {open:"badge-open",matching:"badge-matching",in_progress:"badge-new",resolved:"badge-open"};
-  const statusLabel = {open:"开放",matching:"匹配中",in_progress:"解决中",resolved:"已解决"};
-
-  grid.innerHTML = filtered.map(d => `
-    <div class="demand-card" onclick="openDetail('${d.id}')">
-      <div class="header">
-        <h3>${d.chain_parent ? '└ ' : ''}${esc(d.title)}</h3>
-        <span class="badge ${statusMap[d.status]||'badge-new'}">${statusLabel[d.status]||d.status}</span>
-      </div>
-      <div class="meta">
-        <span>${d.discipline.split("/")[0]}</span>
-        <span>IPC:${d.ipc}</span>
-        <span>TRL ${d.trl}</span>
-        <span>${d.constraint_budget}</span>
-        <span>${d.constraint_timeline}</span>
-        <span>${d.constraint_country}</span>
-        ${d.urgency==="urgent"?'<span class="badge badge-urgent">紧急</span>':''}
-      </div>
-      <div class="body">${esc(d.body).slice(0,180)}</div>
-      <div class="meta">
-        <span>⬆ ${d.upvotes}</span>
-        <span>${d.replies} 讨论</span>
-        ${d.chain_children.length ? `<span>└ ${d.chain_children.length} 子需求</span>` : ''}
-      </div>
-    </div>
-  `).join('');
+  
+  grid.innerHTML = data.map(function(d) {
+    var title = esc(d.raw_text);
+    if (title.length > 70) title = title.substring(0,70) + "...";
+    var cat = esc(d.category || "未分类");
+    var date = d.created_at ? new Date(d.created_at).toLocaleDateString() : "";
+    var body = esc(d.raw_text).slice(0,150);
+    return '<div class="demand-card" onclick="openDetail(\''+ d.id.replace(/'/g,"\'") +'\')">'+
+      '<div class="header"><h3>'+ title +'</h3>'+
+      '<span class="badge badge-open">open</span></div>'+
+      '<div class="meta"><span>'+ cat +'</span><span>'+ date +'</span></div>'+
+      '<div class="body">'+ body +'</div></div>';
+  }).join("");
 }
 
 function openDetail(id) {
   activeDemandId = id;
-  const d = mockDemands.find(m=>m.id===id);
+  var d = allDemands.find(function(m){ return m.id === id; });
   if (!d) return;
-
-  const statusLabel = {open:"开放",matching:"匹配中",in_progress:"解决中",resolved:"已解决"};
-  const isFollowed = followedDemands.includes(id);
-
-  let chainHTML = "";
-  if (d.chain_parent) {
-    const parent = mockDemands.find(m=>m.id===d.chain_parent);
-    if (parent) chainHTML += `<a class="chain-link" href="#" onclick="event.stopPropagation();openDetail('${parent.id}')">↑ 父需求: ${parent.title.slice(0,30)}</a>`;
-  }
-  if (d.chain_children.length) {
-    d.chain_children.forEach(cid => {
-      const child = mockDemands.find(m=>m.id===cid);
-      if (child) chainHTML += `<a class="chain-link" href="#" onclick="event.stopPropagation();openDetail('${child.id}')">↓ 子需求: ${child.title.slice(0,30)}</a>`;
-    });
-  }
-
-  const specsHTML = d.discipline.split(" ").filter(Boolean).map(s =>
-    `<div class="spec-item">学科: ${s}</div>`
-  ).join('') + `
-    <div class="spec-item">IPC: ${d.ipc}</div>
-    <div class="spec-item">TRL: ${d.trl}</div>
-    <div class="spec-item">工艺: ${d.process}</div>
-    <div class="spec-item">预算: ${d.constraint_budget}</div>
-    <div class="spec-item">时间: ${d.constraint_timeline}</div>
-    <div class="spec-item">地域: ${d.constraint_country}</div>
-  `;
-
-  document.getElementById("modalContent").innerHTML = `
-    <span class="close" onclick="closeModal()">x</span>
-    <span class="badge ${d.urgency==='urgent'?'badge-urgent':'badge-new'}">${statusLabel[d.status]}</span>
-    ${d.urgency==='urgent'?' <span class="badge badge-urgent">紧急</span>':''}
-    <h2>${esc(d.title)}</h2>
-    <div class="meta">${d.discipline} · IPC:${d.ipc} · TRL ${d.trl}</div>
-
-    <div class="tags" style="margin:10px 0">${d.tags.map(t=>`<span class="d-tag">${t}</span>`).join('')}</div>
-
-    ${chainHTML ? `<div style="margin:10px 0">${chainHTML}</div>` : ''}
-
-    <div class="detail-section"><h4>需求描述</h4><p>${esc(d.body)}</p></div>
-    <div class="detail-section"><h4>技术参数与约束</h4><div class="specs">${specsHTML}</div></div>
-
-    <div class="btn-row">
-      <button class="btn btn-outline" onclick="closeModal()">关闭</button>
-      <button class="btn btn-outline" onclick="copyDemandPrompt('${id}')">复制给Agent</button>
-      <button class="btn btn-follow ${isFollowed?'active':''}" id="followBtn" onclick="toggleFollow('${id}')">
-        ${isFollowed ? '已关注' : '关注'}
-      </button>
-    </div>
-  `;
-
+  document.getElementById("modalTitle").textContent = esc(d.raw_text).substring(0,80);
+  document.getElementById("modalBody").textContent = d.raw_text;
+  document.getElementById("modalMeta").innerHTML = "分类: "+esc(d.category||"未分类")+" | 发布: "+(d.created_at?new Date(d.created_at).toLocaleString():"")+" | ID: "+d.id;
   document.getElementById("modalOverlay").classList.remove("hidden");
 }
 
 function closeModal() {
   document.getElementById("modalOverlay").classList.add("hidden");
-  activeDemandId = null;
-}
-
-function toggleFollow(id) {
-  if (followedDemands.includes(id)) {
-    followedDemands = followedDemands.filter(f=>f!==id);
-  } else {
-    followedDemands.push(id);
-  }
-  localStorage.setItem("dc_followed", JSON.stringify(followedDemands));
-  openDetail(id); // refresh modal
 }
 
 function copyDemandPrompt(id) {
-  const d = mockDemands.find(m=>m.id===id);
+  var d = allDemands.find(function(m){ return m.id === id; });
   if (!d) return;
-  const prompt = `我看到需求链平台上有一条感兴趣的需求：
-标题：${d.title}
-ID：${d.id}
-领域：${d.discipline}
-请帮我调用 get_demand("${d.id}") 查看完整信息，然后告诉我这个需求是否适合我。`;
-  navigator.clipboard.writeText(prompt).then(()=>{
-    const btn = document.querySelector(".btn-outline");
-    if (btn) { btn.textContent = "已复制"; setTimeout(()=>{btn.textContent="复制给Agent";}, 1500); }
-  });
+  var prompt = "我看到需求链平台有一条需求:\n"+d.raw_text.substring(0,60)+"\nID: "+d.id+"\n分类: "+d.category;
+  navigator.clipboard.writeText(prompt).then(function(){ alert("已复制到剪贴板"); });
 }
 
-function esc(s) { return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-
-// Init
-loadDisciplineTags();
-loadIpcTags();
-loadDemands();
+fetchDemands();
 </script>
 </body>
 </html>
