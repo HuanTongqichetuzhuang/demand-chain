@@ -67,6 +67,17 @@ async def tutorial(request):
     return await serve_file(request, "docs/tutorial.html")
 
 
+async def static_file(request):
+    """Serve any static file from the web root."""
+    path = request.path_params.get("path", "")
+    if ".." in path:
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    filepath = os.path.join(WEB_ROOT, path)
+    if os.path.isfile(filepath):
+        return FileResponse(filepath)
+    return JSONResponse({"error": "not found"}, status_code=404)
+
+
 routes = [
     Route("/", index),
     Route("/login.html", login_page),
@@ -85,6 +96,7 @@ routes = [
     Route("/api_docs.html", api_docs),
     Route("/tools_extra.html", tools_extra),
     Route("/docs/tutorial.html", tutorial),
+    Route("/{path:path}", static_file),
 ]
 
 app = Starlette(routes=routes)
