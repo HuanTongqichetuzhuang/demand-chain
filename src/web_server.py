@@ -140,7 +140,7 @@ async def api_forum_topics(request):
         async with async_session() as session:
             from sqlalchemy import select
             result = await session.execute(
-                select(ForumTopic).order_by(ForumTopic.created_at.desc()).limit(50)
+                select(ForumTopic).order_by(ForumTopic.created_at.desc()).limit(200)
             )
             topics = result.scalars().all()
             return JSONResponse([{
@@ -222,7 +222,7 @@ async def api_demand_list(request):
         async with async_session() as session:
             from sqlalchemy import select
             result = await session.execute(
-                select(Demand).order_by(Demand.created_at.desc()).limit(50)
+                select(Demand).order_by(Demand.created_at.desc()).limit(200)
             )
             demands = result.scalars().all()
             return JSONResponse([{
