@@ -48,9 +48,11 @@ async def static_file(request):
 # ============================================================
 
 async def api_register(request):
-    """POST /api/register — 注册新人类用户"""
+    """POST /api/register — 注册新人类用户（数据库持久化）"""
     import hashlib, secrets
-    from src.shared.agent_identity import agent_registry, generate_ulid
+    from src.shared.database import async_session
+    from src.shared.models import User
+    from sqlalchemy import select
     try:
         body = await request.json()
         email = body.get("email","").strip()
@@ -62,63 +64,67 @@ async def api_register(request):
         if not email or not password or len(password) < 6:
             return JSONResponse({"error": "邮箱和密码(至少6位)必填"}, status_code=400)
         
-        # Check if already registered
-        if email in agent_registry._email_to_human:
-            return JSONResponse({"error": "该邮箱已注册"}, status_code=409)
-        
-        human_id = generate_ulid()
-        hashed = hashlib.sha256(password.encode()).hexdigest()
-        
-        agent_registry._email_to_human[email] = {
-            "human_id": human_id,
-            "password_hash": hashed,
-            "name": name,
-            "country": country,
-            "email_notify": email_notify,
-        }
-        
-        # Generate API key for agent use
-        api_key = hashlib.sha256((human_id + secrets.token_urlsafe(16)).encode()).hexdigest()[:32]
-        agent_registry._email_to_human[email]["api_key"] = api_key
-        
-        # Also store api_key -> human mapping
-        agent_registry._api_key_to_human = getattr(agent_registry, "_api_key_to_human", {})
-        agent_registry._api_key_to_human[api_key] = human_id
-        
-        return JSONResponse({
-            "status": "ok",
-            "human_id": human_id,
-            "email": email,
-            "name": name,
-            "api_key": api_key,
-        })
+        async with async_session() as session:
+            # Check if already registered
+            existing = await session.execute(select(User).where(User.email == email))
+            if existing.scalar_one_or_none():
+                return JSONResponse({"error": "该邮箱已注册"}, status_code=409)
+            
+            human_id = secrets.token_hex(16)  # 32 chars
+            hashed = hashlib.sha256(password.encode()).hexdigest()
+            api_key = hashlib.sha256((human_id + secrets.token_urlsafe(16)).encode()).hexdigest()[:32]
+            
+            user = User(
+                human_id=human_id,
+                email=email,
+                display_name=name,
+                password_hash=hashed,
+                country=country,
+                api_key=api_key,
+                email_notify=email_notify,
+            )
+            session.add(user)
+            await session.commit()
+            
+            return JSONResponse({
+                "status": "ok",
+                "human_id": human_id,
+                "email": email,
+                "name": name,
+                "api_key": api_key,
+            })
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
 async def api_login(request):
-    """POST /api/login — 人类登录"""
+    """POST /api/login — 人类登录（数据库验证）"""
     import hashlib
-    from src.shared.agent_identity import agent_registry
+    from src.shared.database import async_session
+    from src.shared.models import User
+    from sqlalchemy import select
     try:
         body = await request.json()
         email = body.get("email","").strip()
         password = body.get("password","")
         
-        entry = agent_registry._email_to_human.get(email)
-        if not entry:
-            return JSONResponse({"error": "邮箱未注册"}, status_code=401)
-        
-        hashed = hashlib.sha256(password.encode()).hexdigest()
-        if hashed != entry.get("password_hash"):
-            return JSONResponse({"error": "密码错误"}, status_code=401)
-        
-        return JSONResponse({
-            "status": "ok",
-            "human_id": entry["human_id"],
-            "email": email,
-            "name": entry.get("name",""),
-            "api_key": entry.get("api_key",""),
-        })
+        async with async_session() as session:
+            result = await session.execute(select(User).where(User.email == email))
+            user = result.scalar_one_or_none()
+            
+            if not user:
+                return JSONResponse({"error": "邮箱未注册"}, status_code=401)
+            
+            hashed = hashlib.sha256(password.encode()).hexdigest()
+            if hashed != user.password_hash:
+                return JSONResponse({"error": "密码错误"}, status_code=401)
+            
+            return JSONResponse({
+                "status": "ok",
+                "human_id": user.human_id,
+                "email": user.email,
+                "name": user.display_name,
+                "api_key": user.api_key or "",
+            })
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 

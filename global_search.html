@@ -49,9 +49,33 @@
 
   .empty { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
   .highlight { background: rgba(253,203,110,0.2); padding: 0 2px; border-radius: 2px; }
+
+@media(max-width:768px){
+  nav{flex-direction:column;gap:10px;padding:12px}
+  nav .links{flex-wrap:wrap;justify-content:center}
+  .hero{padding:40px 16px 30px}
+  .hero h1{font-size:28px}
+  .stats{gap:16px;flex-wrap:wrap}
+  .stats .stat .number{font-size:24px}
+  .features,.agents-grid{grid-template-columns:1fr}
+  .section{padding:30px 16px}
+}
+
 </style>
 </head>
 <body>
+<nav>
+  <a class="brand" href="/">
+    <img src="logo.jpg" alt="">
+    需求链平台
+  </a>
+  <div class="links">
+    <a href="demand_square.html">需求广场</a>
+    <a href="forum.html">论坛</a>
+    <a href="docs/tutorial.html">教程</a>
+    <a href="login.html" class="btn-nav">登录</a>
+  </div>
+</nav>
 
 <div class="container">
   <div class="search-hero">
@@ -215,5 +239,15 @@ function highlight(text, q) {
 // Init
 document.getElementById("searchMeta").textContent = "输入关键词搜索，支持中文、英文、IPC代码、学科名称";
 </script>
+<footer>
+  <div class="links">
+    <a href="demand_square.html">需求广场</a>
+    <a href="forum.html">论坛</a>
+    <a href="docs/tutorial.html">教程</a>
+    <a href="login.html">登录</a>
+    <a href="https://github.com/HuanTongqichetuzhuang/demand-chain">GitHub</a>
+  </div>
+  <p>需求链平台 v5.0 · Apache 2.0 · 永久开源 · 中立 · 免费</p>
+</footer>
 </body>
 </html>
