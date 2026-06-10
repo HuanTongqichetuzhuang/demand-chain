@@ -42,6 +42,86 @@ async def static_file(request):
         return FileResponse(filepath)
     return JSONResponse({"error": "not found"}, status_code=404)
 
+
+# ============================================================
+# Auth API
+# ============================================================
+
+async def api_register(request):
+    """POST /api/register — 注册新人类用户"""
+    import hashlib, secrets
+    from src.shared.agent_identity import agent_registry, generate_ulid
+    try:
+        body = await request.json()
+        email = body.get("email","").strip()
+        name = body.get("name","").strip()
+        password = body.get("password","")
+        country = body.get("country","")
+        email_notify = body.get("email_notify", True)
+        
+        if not email or not password or len(password) < 6:
+            return JSONResponse({"error": "邮箱和密码(至少6位)必填"}, status_code=400)
+        
+        # Check if already registered
+        if email in agent_registry._email_to_human:
+            return JSONResponse({"error": "该邮箱已注册"}, status_code=409)
+        
+        human_id = generate_ulid()
+        hashed = hashlib.sha256(password.encode()).hexdigest()
+        
+        agent_registry._email_to_human[email] = {
+            "human_id": human_id,
+            "password_hash": hashed,
+            "name": name,
+            "country": country,
+            "email_notify": email_notify,
+        }
+        
+        # Generate API key for agent use
+        api_key = hashlib.sha256((human_id + secrets.token_urlsafe(16)).encode()).hexdigest()[:32]
+        agent_registry._email_to_human[email]["api_key"] = api_key
+        
+        # Also store api_key -> human mapping
+        agent_registry._api_key_to_human = getattr(agent_registry, "_api_key_to_human", {})
+        agent_registry._api_key_to_human[api_key] = human_id
+        
+        return JSONResponse({
+            "status": "ok",
+            "human_id": human_id,
+            "email": email,
+            "name": name,
+            "api_key": api_key,
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+async def api_login(request):
+    """POST /api/login — 人类登录"""
+    import hashlib
+    from src.shared.agent_identity import agent_registry
+    try:
+        body = await request.json()
+        email = body.get("email","").strip()
+        password = body.get("password","")
+        
+        entry = agent_registry._email_to_human.get(email)
+        if not entry:
+            return JSONResponse({"error": "邮箱未注册"}, status_code=401)
+        
+        hashed = hashlib.sha256(password.encode()).hexdigest()
+        if hashed != entry.get("password_hash"):
+            return JSONResponse({"error": "密码错误"}, status_code=401)
+        
+        return JSONResponse({
+            "status": "ok",
+            "human_id": entry["human_id"],
+            "email": email,
+            "name": entry.get("name",""),
+            "api_key": entry.get("api_key",""),
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 # ============================================================
 # REST API — 论坛、需求等数据接口
 # ============================================================
@@ -168,6 +248,8 @@ routes = [
     Route("/tools_extra.html", tools_extra),
     Route("/docs/tutorial.html", tutorial),
     # API Routes
+    Route("/api/register", api_register, methods=["POST"]),
+    Route("/api/login", api_login, methods=["POST"]),
     Route("/api/forum/categories", api_forum_categories),
     Route("/api/forum/topics", api_forum_topics),
     Route("/api/forum/topics/{topic_id}", api_forum_topic_detail),
