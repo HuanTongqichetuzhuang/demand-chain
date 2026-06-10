@@ -139,39 +139,20 @@ let currentPage = 0;
 let activeDemandId = null;
 let followedDemands = JSON.parse(localStorage.getItem("dc_followed")||"[]");
 
-// Mock data for demo — replace with real API calls
-const mockDemands = [
-  { id:"d001", title:"800°C高温管道裂缝检测传感器", category:"sensor_tech", status:"open", urgency:"urgent",
-    body:"需要在800°C环境下持续工作的管道裂缝检测传感器。精度±0.5%，响应<100ms，寿命>5000h。应用于石化管道。",
-    discipline:"物理学/电磁学", ipc:"G01", process:"检测与分析→质谱分析", trl:3, tags:["传感器","高温","无损检测","压电"],
-    replies: 3, upvotes: 12, created:"2026-06-01", chain_parent: null, chain_children: ["d005","d006"],
-    constraint_budget: "50-200万", constraint_timeline: "6个月内", constraint_country: "中国" },
-  { id:"d002", title:"新型碳纤维复合材料轻量化车身结构", category:"materials_science", status:"matching", urgency:"standard",
-    body:"开发一种新型碳纤维复合材料用于电动汽车车身结构，目标减重40%，强度不低于现有铝合金方案。",
-    discipline:"材料科学与工程/高分子化学", ipc:"C08", process:"材料制备→3D打印", trl:5, tags:["碳纤维","复合材料","轻量化","汽车"],
-    replies: 8, upvotes: 25, created:"2026-05-28", chain_parent: null, chain_children: [],
-    constraint_budget: "200-500万", constraint_timeline: "12个月内", constraint_country: "全球" },
-  { id:"d003", title:"AI驱动的蛋白质折叠预测加速算法", category:"information_tech", status:"in_progress", urgency:"standard",
-    body:"需要将AlphaFold类模型的预测速度提升10倍以上，用于大规模药物筛选场景。",
-    discipline:"计算机科学与技术/人工智能 生物学/分子生物学", ipc:"G06 C12", process:"软件方法→深度学习", trl:6, tags:["AI","蛋白质折叠","药物筛选","深度学习"],
-    replies: 15, upvotes: 42, created:"2026-05-20", chain_parent: null, chain_children: ["d008"],
-    constraint_budget: "500-2000万", constraint_timeline: "18个月内", constraint_country: "全球" },
-  { id:"d004", title:"低温等离子体医疗灭菌设备小型化", category:"biomedicine", status:"open", urgency:"urgent",
-    body:"将现有低温等离子体灭菌设备从工业级缩小到便携式，用于战地和灾区的医疗器械快速灭菌。",
-    discipline:"物理学/等离子体物理 生物医学工程", ipc:"A61 H05", process:"半导体工艺→刻蚀", trl:4, tags:["等离子体","灭菌","便携式","医疗"],
-    replies: 5, upvotes: 18, created:"2026-06-03", chain_parent: null, chain_children: [],
-    constraint_budget: "50-200万", constraint_timeline: "3个月内", constraint_country: "中国" },
-  { id:"d005", title:"耐高温压电陶瓷材料配方开发", category:"materials_science", status:"open", urgency:"standard",
-    body:"为d001高温传感器开发配套的耐800°C压电陶瓷材料。需要长期稳定性和可量产性。",
-    discipline:"材料科学与工程/无机化学", ipc:"C01", process:"材料制备→溶胶-凝胶法", trl:3, tags:["压电陶瓷","耐高温","材料配方"],
-    replies: 1, upvotes: 5, created:"2026-06-04", chain_parent: "d001", chain_children: [],
-    constraint_budget: "<50万", constraint_timeline: "6个月内", constraint_country: "不限" },
-  { id:"d006", title:"管道裂缝声波信号处理算法", category:"information_tech", status:"open", urgency:"standard",
-    body:"为d001高温传感器开发配套的声波信号处理算法，从噪声中提取裂缝特征信号。",
-    discipline:"计算机科学与技术/信号处理", ipc:"G06", process:"软件方法→深度学习", trl:4, tags:["信号处理","噪声过滤","声波检测"],
-    replies: 2, upvotes: 8, created:"2026-06-04", chain_parent: "d001", chain_children: [],
-    constraint_budget: "<50万", constraint_timeline: "3个月内", constraint_country: "全球" },
-];
+// Real API data
+let allDemands = [];
+async function fetchDemands() {
+  try {
+    const resp = await fetch(API + "/api/demands");
+    allDemands = await resp.json();
+    loadDemands();
+    // Build filter tags from actual data
+    buildFilters();
+  } catch(e) {
+    console.error("Failed to fetch demands:", e);
+    document.getElementById("demandGrid").innerHTML = "<p style='color:var(--text-secondary);text-align:center;padding:40px'>无法加载需求数据，请检查网络连接</p>";
+  }
+}
 
 const disciplines = ["物理学/电磁学","物理学/等离子体","材料科学/无机化学","材料科学/高分子","生物医学工程","计算机科学/AI","计算机科学/信号处理","生物学/分子生物学"];
 const ipcClasses = ["G01","G06","C01","C08","C12","A61","H05"];
