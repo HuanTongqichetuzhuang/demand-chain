@@ -302,18 +302,6 @@ fetchDemands();
   </div>
   <p>需求链平台 v5.0 · Apache 2.0 · 永久开源 · 中立 · 免费</p>
 </footer>
-<script>
-(function(){
-  var u = localStorage.getItem("dc_session");
-  var links = document.getElementById("navLinks");
-  if (u && links) {
-    try { u = JSON.parse(u); } catch(e) { u = null; }
-    if (u && u.email) {
-      links.innerHTML = links.innerHTML.replace(/<a href="login.html"[^>]*>.*?<\/a>/,
-        '<a href="profile.html" class="user-info"><span>'+(u.name||u.email)+'<\/span><\/a>');
-    }
-  }
-})();
-<\/script>
+<script src="/nav.js"></script>
 </body>
 </html>
