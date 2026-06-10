@@ -157,14 +157,20 @@ async def api_forum_topics(request):
         return JSONResponse({"error": str(e), "topics": []}, status_code=500)
 
 async def api_forum_categories(request):
-    """GET /api/forum/categories — 论坛分类"""
-    return JSONResponse([
-        {"id": "tech", "name": "技术讨论", "icon": "tech"},
-        {"id": "demand", "name": "需求对接", "icon": "demand"},
-        {"id": "collab", "name": "合作招募", "icon": "collab"},
-        {"id": "showcase", "name": "成果展示", "icon": "showcase"},
-        {"id": "general", "name": "综合讨论", "icon": "general"},
-    ])
+    """GET /api/forum/categories — 按行业/学科分类"""
+    from src.shared.database import async_session
+    from src.shared.models import Demand, DemandStatus
+    from sqlalchemy import select, func, distinct
+    try:
+        async with async_session() as session:
+            result = await session.execute(
+                select(Demand.category, func.count()).where(Demand.status == DemandStatus.OPEN).group_by(Demand.category).order_by(func.count().desc()).limit(40)
+            )
+            rows = result.all()
+            cats = [{"id": (r[0] or "其他"), "name": (r[0] or "其他"), "count": r[1]} for r in rows]
+            return JSONResponse(cats)
+    except Exception as e:
+        return JSONResponse([{"id": "general", "name": "综合讨论", "count": 0}])
 
 async def api_forum_topic_detail(request):
     """GET /api/forum/topics/{topic_id}"""

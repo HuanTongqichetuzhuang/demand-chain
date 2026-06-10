@@ -127,9 +127,9 @@ async function loadCategories() {
   try {
     const data = await fetchJSON("/api/forum/categories");
     const bar = document.getElementById("categoryBar");
-    bar.innerHTML = '<button class="cat-btn active" data-cat="" onclick="setCategory(\'\')">全部</button>';
+    bar.innerHTML = '<button class="cat-btn active" data-cat="" onclick="setCategory(\'\')">全部 <span class="count">'+data.reduce((s,c)=>s+(c.count||0),0)+'</span></button>';
     data.forEach(c => {
-      bar.innerHTML += `<button class="cat-btn" data-cat="${c.key}" onclick="setCategory('${c.key}')">${c.label} <span class="count">${c.count}</span></button>`;
+      bar.innerHTML += '<button class="cat-btn" data-cat="'+c.id+'" onclick="setCategory(\''+c.id+'\')">'+c.name+' <span class="count">'+(c.count||0)+'</span></button>';
     });
   } catch(e) {}
 }
