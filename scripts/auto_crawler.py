@@ -51,22 +51,70 @@ CATEGORY_KEYWORDS = {
     "智慧城市": ["smart city", "urban", "iot", "智慧城市", "城市", "物联网"],
 }
 
-# Source configuration
+# Source configuration — 可扩展，只需加 URL 和提取器
 SOURCES = {
     "usa_gov": {
         "enabled": True,
         "url": "https://www.usa.gov/find-active-challenge",
         "type": "demand",
+        "extractor": "generic_links",
+        "label": "USA.gov联邦挑战",
     },
     "xprize": {
         "enabled": True,
         "url": "https://www.xprize.org/competitions",
         "type": "demand",
+        "extractor": "xprize",
+        "label": "XPRIZE竞赛",
+    },
+    "nasa": {
+        "enabled": True,
+        "url": "https://www.nasa.gov/prizes-challenges-and-crowdsourcing/",
+        "type": "demand",
+        "extractor": "generic_links",
+        "label": "NASA挑战",
+    },
+    "mit_solve": {
+        "enabled": True,
+        "url": "https://solve.mit.edu/challenges",
+        "type": "demand",
+        "extractor": "generic_links",
+        "label": "MIT Solve",
+    },
+    "darpa": {
+        "enabled": True,
+        "url": "https://www.darpa.mil/",
+        "type": "demand",
+        "extractor": "darpa",
+        "label": "DARPA",
+    },
+    "aerospace_sg": {
+        "enabled": True,
+        "url": "https://open.innovation-challenge.sg/en/challenges/aerospace-open-innovation-challenge-2026",
+        "type": "demand",
+        "extractor": "generic_links",
+        "label": "新加坡航空航天挑战",
     },
     "climate_kic": {
         "enabled": True,
         "url": "https://www.climate-kic.org/get-involved/open-calls/",
         "type": "demand",
+        "extractor": "generic_links",
+        "label": "Climate-KIC",
+    },
+    "nsfc": {
+        "enabled": True,
+        "url": "https://www.nsfc.gov.cn/english/site_1/international/D6/2026/01-20/501.html",
+        "type": "demand",
+        "extractor": "generic_links",
+        "label": "国家自然科学基金委",
+    },
+    "grants_gov": {
+        "enabled": True,
+        "url": "https://simpler.grants.gov/search",
+        "type": "demand",
+        "extractor": "grant_search",
+        "label": "Grants.gov美国联邦资助",
     },
 }
 
@@ -101,98 +149,65 @@ def fetch_url(url, timeout=15):
         return ""
 
 
-def extract_demands_from_usa_gov(html):
-    """Extract demands from USA.gov challenges page."""
+def extract_generic_links(html, base_url, source_label):
+    """Extract links with anchor text from any page."""
     demands = []
-    # Pattern: find challenge links and titles
-    pattern = r'href="(/challenges/[^"]+)"[^>]*>([^<]+)</a>'
+    pattern = r'href="([^"]+)"[^>]*>([^<]{10,200})</a>'
     for match in re.finditer(pattern, html):
         path = match.group(1)
         title = match.group(2).strip()
-        url = "https://www.usa.gov" + path
-        demands.append({
-            "title": title,
-            "source": "USA.gov",
-            "url": url,
-        })
+        # Skip navigation, footer, and other non-content links
+        if any(skip in path for skip in ["#", "javascript", "login", "register", "mailto", "css", "js/"]):
+            continue
+        # Skip short/category links
+        if len(title) < 15:
+            continue
+        # Build absolute URL
+        if path.startswith("http"):
+            url = path
+        elif path.startswith("/"):
+            from urllib.parse import urlparse
+            parsed = urlparse(base_url)
+            url = f"{parsed.scheme}://{parsed.netloc}{path}"
+        else:
+            url = base_url.rstrip("/") + "/" + path.lstrip("/")
+        demands.append({"title": title, "source": source_label, "url": url, "body": title})
     return demands
 
 
-def extract_demands_from_xprize(html):
-    """Extract demands from XPRIZE competitions page."""
+def extract_demands_from_darpa(html):
+    """Extract demands from DARPA main page."""
     demands = []
-    pattern = r'<a[^>]*href="(/competitions/[^"]+)"[^>]*>([^<]+)</a>'
+    # Look for program/challenge descriptions
+    sections = re.findall(r'>([A-Z ]{10,100})</[^>]+>[^<]*([A-Z][a-z].{20,200})', html)
+    for title, desc in sections[:15]:
+        if any(kw in title.lower() for kw in ["program", "challenge", "initiative"]):
+            demands.append({"title": title.strip(), "source": "DARPA", "url": "https://www.darpa.mil/", "body": f"{title.strip()}: {desc.strip()}"})
+    return demands
+
+
+def extract_demands_from_grant_search(html):
+    """Extract demands from Grants.gov search results."""
+    demands = []
+    pattern = r'<a[^>]*href="[^"]*opportunity[^"]*"[^>]*>([^<]+)</a>'
     for match in re.finditer(pattern, html):
-        path = match.group(1)
-        title = match.group(2).strip()
-        url = "https://www.xprize.org" + path
-        if "competitions" in path:
-            demands.append({
-                "title": title,
-                "source": "XPRIZE",
-                "url": url,
-            })
+        title = match.group(1).strip()
+        if len(title) > 20:
+            demands.append({"title": title, "source": "Grants.gov", "url": "https://simpler.grants.gov/search", "body": title})
     return demands
 
 
-def insert_demand(email, raw_text, category, source_url=""):
-    """Insert a demand via the web API."""
-    text = f"{raw_text} 来源：{source_url}" if source_url else raw_text
-    data = json.dumps({
-        "email": email,
-        "raw_text": text,
-        "category": classify(text) if category == "auto" else category,
-        "status": "OPEN",
-    }).encode("utf-8")
-    try:
-        req = urllib.request.Request(
-            f"{API_BASE}/api/auto-demand",
-            data=data,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            result = json.loads(resp.read())
-            print(f"  OK: {result}")
-            return True
-    except Exception as e:
-        print(f"  [WARN] Insert failed: {e}")
-        return False
+EXTRACTORS = {
+    "generic_links": lambda html, src: extract_generic_links(html, SOURCES[src]["url"], SOURCES[src]["label"]),
+    "xprize": lambda html, src: extract_demands_from_xprize(html),
+    "darpa": lambda html, src: extract_demands_from_darpa(html),
+    "grant_search": lambda html, src: extract_demands_from_grant_search(html),
+}
 
-
-def crawl_usa_gov():
-    """Crawl USA.gov federal challenges."""
-    print("\n--- USA.gov Federal Challenges ---")
-    html = fetch_url(SOURCES["usa_gov"]["url"])
-    if not html:
-        return []
-    demands = extract_demands_from_usa_gov(html)
-    print(f"  Found {len(demands)} challenges")
-    for d in demands:
-        # Get detail page for full description
-        detail_html = fetch_url(d["url"])
-        # Extract description: look for text after the title
-        desc_match = re.search(r'<p[^>]*>([^<]{50,300})</p>', detail_html)
-        description = desc_match.group(1) if desc_match else d["title"]
-        d["body"] = f"{d['title']}: {description}"
-        d["category"] = classify(d["title"] + " " + description)
-        print(f"  [{d['category']}] {d['title'][:50]}...")
-    return demands
-
-
-def crawl_xprize():
-    """Crawl XPRIZE competitions."""
-    print("\n--- XPRIZE Competitions ---")
-    html = fetch_url(SOURCES["xprize"]["url"])
-    if not html:
-        return []
-    demands = extract_demands_from_xprize(html)
-    print(f"  Found {len(demands)} competitions")
-    for d in demands:
-        d["body"] = d["title"]
-        d["category"] = classify(d["title"])
-        print(f"  [{d['category']}] {d['title'][:50]}...")
-    return demands
+CRAWL_SPECIAL = {
+    "usa_gov": crawl_usa_gov,
+    "xprize": crawl_xprize,
+}
 
 
 def seed_demands_to_db(demands):
@@ -229,6 +244,41 @@ def seed_demands_to_db(demands):
     asyncio.run(_do())
 
 
+def crawl_source(src_key):
+    """Crawl a single source by key. Uses special crawler if available, else generic extractor."""
+    src = SOURCES[src_key]
+    if not src.get("enabled", True):
+        print(f"  SKIP: {src_key} (disabled)")
+        return []
+    
+    label = src.get("label", src_key)
+    print(f"\n--- {label} ---")
+    
+    # Use special crawler if defined
+    if src_key in CRAWL_SPECIAL:
+        return CRAWL_SPECIAL[src_key]()
+    
+    # Generic extraction
+    html = fetch_url(src["url"])
+    if not html:
+        return []
+    
+    extractor_key = src.get("extractor", "generic_links")
+    extractor = EXTRACTORS.get(extractor_key)
+    if not extractor:
+        print(f"  [WARN] No extractor for {extractor_key}")
+        return []
+    
+    demands = extractor(html, src_key)
+    print(f"  Found {len(demands)} items")
+    
+    for d in demands:
+        d["category"] = classify(d.get("body", "") or d.get("title", ""))
+        print(f"  [{d['category']}] {d['title'][:50]}...")
+    
+    return demands
+
+
 def run():
     """Main entry point."""
     print(f"=== Demand Chain Auto-Crawler ===")
@@ -236,18 +286,15 @@ def run():
     print()
 
     all_demands = []
+    source_keys = list(SOURCES.keys())
 
-    if SOURCES["usa_gov"]["enabled"]:
+    for src_key in source_keys:
         try:
-            all_demands.extend(crawl_usa_gov())
+            demands = crawl_source(src_key)
+            all_demands.extend(demands)
         except Exception as e:
-            print(f"  [ERROR] USA.gov crawl failed: {e}")
-
-    if SOURCES["xprize"]["enabled"]:
-        try:
-            all_demands.extend(crawl_xprize())
-        except Exception as e:
-            print(f"  [ERROR] XPRIZE crawl failed: {e}")
+            print(f"  [ERROR] {src_key} crawl failed: {e}")
+            import traceback; traceback.print_exc()
 
     print(f"\n=== Total demands collected: {len(all_demands)} ===")
 
