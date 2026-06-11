@@ -25,8 +25,7 @@ from datetime import datetime, timezone
 # ============================================================
 # Config
 # ============================================================
-API_BASE = "http://localhost:8080"
-DB_CONN = "postgresql+asyncpg://dc:dc@localhost:5432/demand_chain"
+API_BASE = "http://8.154.26.92:8080"
 
 # Category keyword mapping
 CATEGORY_KEYWORDS = {
@@ -128,7 +127,7 @@ SOURCES = {
         "enabled": True,
         "url": "https://www.energystartups.org/top/hydrogen-fuel/",
         "type": "supplier",
-        "extractor": "generic_links",
+        "extractor": "energy_hydrogen",
         "label": "氢能初创企业",
     },
     "climate_tech_2026": {
@@ -171,19 +170,90 @@ def fetch_url(url, timeout=15):
         return ""
 
 
+# 要跳过的非需求链接关键词（导航、页脚、登录等）
+NAV_SKIP_URL = [
+    "#", "javascript", "login", "register", "mailto", "css", "js/",
+    "signin", "signup", "logout", "account", "password", "forgot",
+    "terms", "privacy", "cookie", "legal", "accessibility",
+    "sitemap", "rss", "feed", "search", "contact", "about",
+    "careers", "press", "newsroom", "media", "investor",
+    "facebook", "twitter", "linkedin", "youtube", "instagram",
+    "share", "print", "pdf", "download", "upload",
+    "branches-of-government", "agency-index", "phone", "usagov-outreach",
+    "feature-articles", "website-usage", "partner-with-us",
+    "report-website", "usa.gov/es", "executive-branch",
+    "federal-agency", "governors", "tribal-governments",
+    "elected-officials", "departments", "budget",
+]
+
+NAV_SKIP_TITLE = [
+    "create an account", "terms of service", "privacy policy",
+    "accessibility", "become a ", "meet the ", "sign in",
+    "login", "register", "copyright", "all rights reserved",
+    "powered by", "website usage", "report a website",
+    "partner with us", "branches of government", "directory of",
+    "feature articles", "follow us", "subscribe", "newsletter",
+    "grand challenges", "areas of impact",
+    # USA.gov / NSFC 等站点特有的导航链接
+    "usagov", "1-844", "call us at", "all topics and services",
+    "about the u.s.", "government agencies", "state government",
+    "local government", "tribal government", "elected official",
+    "federal agency", "site policies", "budget and performance",
+    "the white house", "u.s. house", "u.s. senate",
+    "federal register", "regulations", "constitution",
+    "appendix", "annual report", "synthesis evidence",
+    "international evaluation", "leadership", "at a glance",
+    "guide to programs", "application and review",
+    "faq", "glossary", "disclaimer", "site map",
+    "freedom of information", "foia", "no fear act",
+    "inspector general", "the office of",
+    "get.agorize", "powered by agorize",
+    "about this site", "using this site",
+    "agree to support", "icfcrt",
+]
+
+DEMAND_KEYWORDS = [
+    "challenge", "competition", "prize", "grant", "funding",
+    "solicitation", "request for proposal", "rfp", "call for",
+    "open call", "accelerator", "incubator", "fellowship",
+    "innovation", "research", "development", "prototype",
+    "solution", "solve", "hackathon", "bootcamp", "award",
+    "opportunity", "proposal", "submission", "deadline",
+]
+
+
 def extract_generic_links(html, base_url, source_label):
-    """Extract links with anchor text from any page."""
+    """Extract links with anchor text from any page, filtering out navigation and footer.
+    NOW WITH DEMAND FILTERING: only keep links whose title contains demand/pitch keywords."""
     demands = []
-    pattern = r'href="([^"]+)"[^>]*>([^<]{10,200})</a>'
+    pattern = r'href="([^"]+)"[^>]*>([^<]{15,200})</a>'
     for match in re.finditer(pattern, html):
         path = match.group(1)
         title = match.group(2).strip()
-        # Skip navigation, footer, and other non-content links
-        if any(skip in path for skip in ["#", "javascript", "login", "register", "mailto", "css", "js/"]):
+
+        # Skip navigation / footer URLs
+        if any(skip in path.lower() for skip in NAV_SKIP_URL):
             continue
-        # Skip short/category links
-        if len(title) < 15:
+        # Skip navigation / footer titles
+        title_lower = title.lower()
+        if any(skip in title_lower for skip in NAV_SKIP_TITLE):
             continue
+        # Skip if title looks like a URL
+        if title_lower.startswith("http") or title_lower.startswith("www."):
+            continue
+        # Skip single word or very short titles
+        if len(title) < 18:
+            continue
+        # Skip if no meaningful content words
+        words = title.split()
+        if len(words) < 3:
+            continue
+
+        # ONLY keep items that contain demand-relevant keywords
+        has_demand_kw = any(kw in title_lower for kw in DEMAND_KEYWORDS)
+        if not has_demand_kw:
+            continue
+
         # Build absolute URL
         if path.startswith("http"):
             url = path
@@ -227,12 +297,29 @@ EXTRACTORS = {
     # Supplier extractors
     "startus_ccus": lambda html, src: extract_suppliers_startus(html, src),
     "rankred": lambda html, src: extract_suppliers_rankred(html, src),
+    "energy_hydrogen": lambda html, src: extract_suppliers_energy_hydrogen(html, src),
 }
 
-CRAWL_SPECIAL = {
-    "usa_gov": crawl_usa_gov,
-    "xprize": crawl_xprize,
-}
+# ============================================================
+# XPRIZE-specific extractor
+# ============================================================
+
+def extract_demands_from_xprize(html):
+    """Extract competition titles from XPRIZE page."""
+    demands = []
+    # Look for competition/prize names in h2/h3 tags
+    headings = re.findall(r'<h[23][^>]*>(?:<[^>]+>\s*)*([A-Z][A-Za-z0-9 /\-]{5,80})</h[23]>', html)
+    if not headings:
+        # Try anchor text patterns
+        headings = re.findall(r'>([A-Z][A-Za-z0-9 /\-]{10,80})</a>', html)
+    for title in headings:
+        title = title.strip()
+        if any(kw in title.lower() for kw in ["prize", "challenge", "competition", "xpize", "award"]) or len(title) > 15:
+            demands.append({"title": title, "source": "XPRIZE竞赛", "url": "https://www.xprize.org/competitions", "body": title})
+    return demands
+
+
+CRAWL_SPECIAL = {}
 
 
 # ============================================================
@@ -242,44 +329,93 @@ CRAWL_SPECIAL = {
 def extract_suppliers_startus(html, src_key):
     """Extract supplier companies from StartUs Insights lists."""
     suppliers = []
-    # Pattern: company names in headings or strong tags with descriptions in paragraphs
-    companies = re.findall(r'<strong[^>]*>([^<]+)</strong>\s*</h\d>\s*<p[^>]*>([^<]+)</p>', html)
+    
+    # Pattern 1: <hX><strong>Name</strong></hX><p>Description</p>
+    companies = re.findall(r'<h\d[^>]*>(?:<[^>]+>\s*)*([A-Z][A-Za-z0-9\s&.-]{3,60})(?:\s*<[^>]+>\s*)*</h\d>(?:\s*<(?:p|div)[^>]*>\s*([^<]{20,400}?)\s*</(?:p|div)>)', html, re.DOTALL)
+    
+    # Pattern 2: <strong>Name</strong> followed by a paragraph
     if not companies:
-        # Try another pattern
-        companies = re.findall(r'<h\d[^>]*>[^<]*<strong[^>]*>([^<]+)</strong>[^<]*</h\d>\s*<p[^>]*>([^<]+)</p>', html)
+        companies = re.findall(r'<strong[^>]*>([A-Z][A-Za-z0-9\s&.-]{3,60})</strong>(?:\s*</[^>]+>)?\s*<p[^>]*>([^<]+)</p>', html)
+    
+    # Pattern 3: JSON-LD structured data
     if not companies:
-        # JSON-LD or structured data
         json_blocks = re.findall(r'<script type="application/ld\+json">({.*?})</script>', html, re.DOTALL)
         for block in json_blocks:
             try:
                 data = json.loads(block)
-                if isinstance(data, dict) and "itemListElement" in data:
-                    for item in data["itemListElement"]:
-                        name = item.get("item", {}).get("name", "") if isinstance(item, dict) else ""
-                        desc = item.get("item", {}).get("description", "") if isinstance(item, dict) else ""
-                        if name:
-                            suppliers.append({"name": name, "description": desc, "source": "StartUs Insights"})
-            except: pass
+                items = []
+                if isinstance(data, dict):
+                    items = data.get("itemListElement", data.get("@graph", []))
+                elif isinstance(data, list):
+                    items = data
+                for item in items:
+                    name = ""
+                    if isinstance(item, dict):
+                        name = item.get("item", {}).get("name", "") or item.get("name", "")
+                        desc = item.get("item", {}).get("description", "") or item.get("description", "")
+                    if name and len(name) > 2:
+                        suppliers.append({"name": name.strip(), "description": desc.strip(), "source": SOURCES[src_key]["label"]})
+            except:
+                pass
+        if suppliers:
+            return suppliers
+    
+    # Pattern 4: Look for company-like text in list items
     if not companies:
-        # Fallback: extract from YAML/JSON embedded in page
+        companies = re.findall(r'<li[^>]*>([A-Z][A-Za-z0-9\s&.-]{3,60})</li>', html)
+        companies = [(c, "") for c in companies]
+    
+    # Pattern 5: YAML/JSON embedded fallback
+    if not companies:
         return fallback_json_extract(html, src_key)
     
     for name, desc in companies:
         name = name.strip()
         if len(name) > 2 and len(name) < 100:
-            suppliers.append({"name": name, "description": desc.strip(), "source": SOURCES[src_key]["label"]})
+            # Skip non-company phrases
+            if any(skip in name.lower() for skip in ["top ", "market ", "list of", "category", "country"]):
+                continue
+            suppliers.append({"name": name, "description": desc.strip()[:300], "source": SOURCES[src_key]["label"]})
     return suppliers
 
 def extract_suppliers_rankred(html, src_key):
     """Extract supplier companies from RankRed list articles."""
     suppliers = []
-    # Pattern: headings followed by paragraphs
-    headings = re.findall(r'<h\d[^>]*>(\d+)\.\s*([^<]+)</h\d>', html)
-    for num, name in headings:
-        name = name.strip()
-        if len(name) > 3 and len(name) < 120:
-            suppliers.append({"name": name, "description": "", "source": SOURCES[src_key]["label"]})
+    # Pattern 1: "1. Company Name" in headings
+    headings = re.findall(r'<h\d[^>]*>(\d+)\.?\s*([A-Z][A-Za-z0-9\s&.,-]{3,80})</h\d>', html)
+    if not headings:
+        # Pattern 2: "Company Name" in <strong> inside numbered sections
+        headings = re.findall(r'<strong[^>]*>\d+\.?\s*([A-Z][A-Za-z0-9\s&.,-]{3,80})</strong>', html)
+    if not headings:
+        # Pattern 3: Any heading with a company-like name (capitalized, 2+ words)
+        headings = re.findall(r'<h[23][^>]*>([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)</h[23]>', html)
+        headings = [(h,) for h in headings]
+    for match in headings:
+        name = match[-1].strip()
+        if len(name) > 3 and len(name) < 100:
+            if not any(skip in name.lower() for skip in ["privacy", "terms", "cookie", "contact", "about", "top ", "list of"]):
+                suppliers.append({"name": name, "description": "", "source": SOURCES[src_key]["label"]})
     return suppliers
+
+
+def extract_suppliers_energy_hydrogen(html, src_key):
+    """Extract hydrogen startup companies from EnergyStartups page."""
+    suppliers = set()
+    # Pattern: company names in link text
+    links = re.findall(r'<a[^>]*href="[^"]*"[^>]*>([A-Z][A-Za-z0-9\s&.-]{3,60})</a>', html)
+    for name in links:
+        name = name.strip()
+        name_lower = name.lower()
+        if any(skip in name_lower for skip in [
+            "startups in", "market ", "top 1", "list of", "category",
+            "privacy", "terms ", "sign ", "login", "home", "about",
+            "contact", "blog", "search", "submit",
+        ]):
+            continue
+        if len(name) > 2 and len(name) < 80:
+            suppliers.add(name)
+    return [{"name": n, "description": "", "source": SOURCES[src_key]["label"]} for n in suppliers]
+
 
 def fallback_json_extract(html, src_key):
     """Try to extract company data from JSON-LD or embedded JSON."""
@@ -317,6 +453,9 @@ def crawl_supplier_source(src_key):
     print(f"  Found {len(suppliers)} companies")
     
     for s in suppliers:
+        # Normalize: generic_links returns 'title', supplier extractors return 'name'
+        if "title" in s and "name" not in s:
+            s["name"] = s.pop("title")
         s["category"] = classify(s.get("description", "") + " " + s.get("name", ""))
         print(f"  [{s['category']}] {s['name'][:40]}...")
     
@@ -324,84 +463,88 @@ def crawl_supplier_source(src_key):
 
 
 def seed_suppliers_to_db(suppliers):
-    """Write suppliers to database directly."""
-    import asyncio
-    from sqlalchemy import select
-    from src.shared.database import async_session
-    from src.shared.models import CapabilityProfile
-    from uuid import uuid4
-
-    async def _do():
-        async with async_session() as session:
-            count = 0
-            for s in suppliers:
-                # Check if already exists by name
-                result = await session.execute(
-                    select(CapabilityProfile).where(CapabilityProfile.agent_card_json["name"].as_string() == s["name"])
-                )
-                if result.scalar_one_or_none():
-                    print(f"  SKIP: {s['name'][:30]}... (already exists)")
-                    continue
-
-                profile = CapabilityProfile(
-                    id=str(uuid4()),
-                    user_id="crawler",
-                    profile_type="COMPANY",
-                    country="",
-                    trust_score=0.5,
-                    is_claimed=False,
-                    verified=False,
-                    agent_card_json={
-                        "name": s["name"],
-                        "description": s.get("description", ""),
-                        "skills": [],
-                        "category": s.get("category", "其他"),
-                        "industry": s.get("category", "其他"),
-                        "discipline": "",
-                        "trl": 0,
-                        "url": s.get("url", ""),
-                    },
-                )
-                session.add(profile)
-                count += 1
-            await session.commit()
-            print(f"  Inserted {count} new supplier profiles")
-
-    asyncio.run(_do())
+    """Send suppliers to the server via HTTP API."""
+    count_ok = 0
+    count_skip = 0
+    count_fail = 0
+    for s in suppliers:
+        payload = json.dumps({
+            "email": "crawler",
+            "profile_type": "COMPANY",
+            "country": "",
+            "trust_score": 0.5,
+            "agent_card": {
+                "name": s.get("name", ""),
+                "description": s.get("description", ""),
+                "category": s.get("category", "其他"),
+                "industry": s.get("category", "其他"),
+                "discipline": "",
+                "trl": 0,
+                "url": s.get("url", ""),
+                "skills": [],
+            },
+        }).encode("utf-8")
+        try:
+            req = urllib.request.Request(
+                f"{API_BASE}/api/auto-supplier",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                if resp.status in (200, 201):
+                    count_ok += 1
+                    print(f"  OK: {s.get('name', '')[:40]}...")
+                else:
+                    print(f"  STATUS {resp.status}: {s.get('name', '')[:40]}...")
+        except urllib.error.HTTPError as e:
+            if e.code == 409:
+                count_skip += 1
+                print(f"  SKIP (dup): {s.get('name', '')[:40]}...")
+            else:
+                count_fail += 1
+                print(f"  FAIL {e.code}: {s.get('name', '')[:40]}...")
+        except Exception as e:
+            count_fail += 1
+            print(f"  ERROR: {s.get('name', '')[:30]}... -> {e}")
+    print(f"  Results: {count_ok} inserted, {count_skip} skipped (dup), {count_fail} failed")
 
 
 def seed_demands_to_db(demands):
-    """Write demands to database directly."""
-    import asyncio
-    from sqlalchemy import select
-    from src.shared.database import async_session
-    from src.shared.models import Demand, DemandStatus
-    from uuid import uuid4
-
-    async def _do():
-        async with async_session() as session:
-            count = 0
-            for d in demands:
-                # Check if already exists
-                result = await session.execute(select(Demand).where(Demand.raw_text.contains(d["title"][:30])))
-                if result.scalar_one_or_none():
-                    print(f"  SKIP: {d['title'][:30]}... (already exists)")
-                    continue
-
-                demand = Demand(
-                    id=str(uuid4()),
-                    user_id=d.get("source", "crawler").lower(),
-                    raw_text=d["body"],
-                    category=d["category"],
-                    status=DemandStatus.OPEN,
-                    visibility="PUBLIC",
-                )
-                session.add(demand)
-                count += 1
-            await session.commit()
-            print(f"  Inserted {count} new demands")
-
-    asyncio.run(_do())
+    """Send demands to the server via HTTP API."""
+    count_ok = 0
+    count_skip = 0
+    count_fail = 0
+    for d in demands:
+        payload = json.dumps({
+            "raw_text": d.get("body", d.get("title", "")),
+            "category": d.get("category", "其他"),
+            "email": "crawler",
+        }).encode("utf-8")
+        try:
+            req = urllib.request.Request(
+                f"{API_BASE}/api/auto-demand",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                if resp.status in (200, 201):
+                    count_ok += 1
+                    print(f"  OK: {d.get('title', '')[:40]}...")
+                else:
+                    print(f"  STATUS {resp.status}: {d.get('title', '')[:40]}...")
+        except urllib.error.HTTPError as e:
+            if e.code == 409:
+                count_skip += 1
+                print(f"  SKIP (dup): {d.get('title', '')[:40]}...")
+            else:
+                count_fail += 1
+                print(f"  FAIL {e.code}: {d.get('title', '')[:40]}...")
+        except Exception as e:
+            count_fail += 1
+            print(f"  ERROR: {d.get('title', '')[:30]}... -> {e}")
+    print(f"  Results: {count_ok} inserted, {count_skip} skipped (dup), {count_fail} failed")
 
 
 def crawl_source(src_key):
@@ -476,6 +619,19 @@ def run():
             seed_suppliers_to_db(all_suppliers)
         except Exception as e:
             print(f"  [ERROR] Supplier DB seeding failed: {e}")
+
+    # Save JSON backup
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if all_demands:
+        demands_file = f"crawled_demands_{timestamp}.json"
+        with open(demands_file, "w", encoding="utf-8") as f:
+            json.dump(all_demands, f, ensure_ascii=False, indent=2)
+        print(f"  Demands saved to: {demands_file}")
+    if all_suppliers:
+        suppliers_file = f"crawled_suppliers_{timestamp}.json"
+        with open(suppliers_file, "w", encoding="utf-8") as f:
+            json.dump(all_suppliers, f, ensure_ascii=False, indent=2)
+        print(f"  Suppliers saved to: {suppliers_file}")
 
     print("\nDone.")
 
