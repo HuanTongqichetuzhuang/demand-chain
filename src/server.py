@@ -1245,9 +1245,23 @@ async def generate_outreach_email(demand_title: str, demand_body: str, match_rea
 def run():
     logging.basicConfig(level=logging.INFO)
     logger.info("需求链 MCP Server 启动中 (0.0.0.0:8000)...")
-    mcp.settings.host = "0.0.0.0"
-    mcp.settings.port = 8000
-    mcp.run(transport="sse")
+
+    # Mount HTTP API routes on the same SSE app
+    from src.web_server import api_auto_demand, api_auto_supplier, api_demand_list, api_suppliers
+    from starlette.routing import Route
+
+    app = mcp.sse_app()
+    # Add auto-demand and auto-supplier routes
+    for route_def in [
+        Route("/api/auto-demand", api_auto_demand, methods=["POST"]),
+        Route("/api/auto-supplier", api_auto_supplier, methods=["POST"]),
+        Route("/api/demands", api_demand_list),
+        Route("/api/suppliers", api_suppliers),
+    ]:
+        app.router.routes.insert(0, route_def)
+
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=mcp.settings.port, log_level="info")
 
 
 if __name__ == "__main__":

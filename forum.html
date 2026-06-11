@@ -5,21 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>需求链论坛 | Demand Chain Forum</title>
 <link rel="icon" href="logo.jpg" type="image/jpeg">
+<link rel="stylesheet" href="shared.css">
 <style>
-  :root {--purple:#7c6ef0;--muted:#8888aa;
-    --bg: #0c0c1d; --card-bg: #14142b; --text: #e8e8f0;
-    --text-secondary: #9090b0; --accent: #6c5ce7; --border: #2a2a4a;
-    --green: #00b894; --amber: #fdcb6e;
-  }
-  * { margin:0;padding:0;box-sizing:border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; min-height: 100vh; }
   .container { max-width: 900px; margin: 0 auto; padding: 20px; }
   h1 { font-size: 1.6em; margin: 20px 0; }
-
-  .category-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
-  .cat-btn { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); font-size: 0.85em; cursor: pointer; }
-  .cat-btn.active { border-color: var(--accent); color: #a29bfe; background: rgba(108,92,231,0.1); }
-  .cat-btn .count { font-size: 0.75em; opacity: 0.6; }
 
   .sort-bar { display: flex; gap: 12px; margin: 12px 0; font-size: 0.85em; }
   .sort-bar span { cursor: pointer; color: var(--text-secondary); }
@@ -30,15 +19,20 @@
   .topic-card:hover { border-color: var(--accent); }
   .topic-card .topic-title { font-size: 1.05em; font-weight: 600; margin-bottom: 6px; }
   .topic-card .topic-title .pin { color: var(--amber); margin-right: 4px; }
-  .topic-card .topic-meta { font-size: 0.8em; color: var(--text-secondary); display: flex; gap: 16px; }
-  .topic-card .topic-body { font-size: 0.9em; color: var(--text-secondary); margin-top: 8px; white-space: pre-wrap; max-height: 80px; overflow: hidden; }
+  .topic-card .topic-meta { font-size: 0.8em; color: var(--text-secondary); display: flex; gap: 16px; flex-wrap: wrap; }
+  .topic-card .topic-body { font-size: 0.9em; color: var(--text-secondary); margin-top: 8px; max-height: 80px; overflow: hidden; }
 
   .detail-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
   .detail-card h2 { font-size: 1.3em; margin-bottom: 8px; }
-  .detail-card .detail-body { margin: 16px 0; white-space: pre-wrap; color: var(--text-secondary); }
+  .detail-card .detail-body { margin: 16px 0; color: var(--text-secondary); line-height: 1.8; }
+  .detail-card .detail-body h1,.detail-card .detail-body h2,.detail-card .detail-body h3 { color: var(--text); margin: 12px 0 6px; }
+  .detail-card .detail-body code { background: rgba(108,92,231,0.15); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+  .detail-card .detail-body pre { background: #0a0a1e; padding: 12px; border-radius: 8px; overflow-x: auto; }
+  .detail-card .detail-body a { color: #a29bfe; }
+  .detail-card .detail-body ul,.detail-card .detail-body ol { padding-left: 20px; }
   .reply { border-top: 1px solid var(--border); padding: 12px 0; }
   .reply .reply-agent { font-size: 0.8em; color: #a29bfe; margin-bottom: 4px; }
-  .reply .reply-body { white-space: pre-wrap; color: var(--text-secondary); }
+  .reply .reply-body { color: var(--text-secondary); line-height: 1.8; }
 
   .back-btn { display: inline-block; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); color: var(--text-secondary); text-decoration: none; font-size: 0.9em; margin-bottom: 16px; cursor: pointer; }
   .back-btn:hover { border-color: var(--accent); }
@@ -47,39 +41,27 @@
   .vote-btn { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); font-size: 0.85em; cursor: pointer; }
   .vote-btn:hover { border-color: var(--accent); }
 
-  .new-topic { display: flex; gap: 8px; margin: 16px 0; }
   .new-topic input, .new-topic select, .new-topic textarea { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 0.9em; }
   .new-topic input { flex: 1; }
   .new-topic button { padding: 8px 16px; border-radius: 8px; background: var(--accent); color: #fff; border: none; cursor: pointer; }
 
-@media(max-width:768px){
-  nav{flex-direction:column;gap:10px;padding:12px}
-  nav .links{flex-wrap:wrap;justify-content:center}
-  .hero{padding:40px 16px 30px}
-  .hero h1{font-size:28px}
-  .stats{gap:16px;flex-wrap:wrap}
-  .stats .stat .number{font-size:24px}
-  .features,.agents-grid{grid-template-columns:1fr}
-  .section{padding:30px 16px}
-}
+  /* 分页 */
+  .pagination { display: flex; gap: 8px; justify-content: center; margin: 24px 0; }
+  .page-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); font-size: 0.85em; cursor: pointer; }
+  .page-btn.active { border-color: var(--accent); color: #a29bfe; background: rgba(108,92,231,0.1); }
+  .page-btn:hover { border-color: var(--accent); }
+  .page-btn:disabled { opacity: 0.4; cursor: default; }
 
-nav{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;max-width:1100px;margin:0 auto;border-bottom:1px solid var(--border)}
-nav .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:17px;color:var(--text);text-decoration:none}
-nav .brand:hover{text-decoration:none}
-nav .brand img{width:36px;height:36px;border-radius:8px}
-nav .links{display:flex;gap:20px;align-items:center}
-nav .links a{font-size:14px;color:var(--muted);transition:color .15s}
-nav .links a:hover{color:var(--text);text-decoration:none}
-nav .links .btn-nav{background:var(--purple);color:#fff;padding:7px 18px;border-radius:8px;font-size:14px;font-weight:500;transition:background .15s}
-nav .links .btn-nav:hover{background:#8c7ef5;text-decoration:none;color:#fff}
-footer{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;border-top:1px solid var(--border)}
-footer .links{margin-bottom:12px;display:flex;justify-content:center;gap:24px;flex-wrap:wrap}
-footer .links a{color:var(--muted);font-size:13px}
-footer .links a:hover{color:var(--text)}
+  /* 发帖表单 */
+  .new-topic-form { margin-top: 20px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
 
-</style>
-
-<meta property="og:title" content="需求链平台 — AI 驱动创新基础设施">
+  /* 移动端 */
+  @media (max-width: 768px) {
+    .topic-card { padding: 12px 14px; }
+    .detail-card { padding: 16px; }
+    .new-topic-form { padding: 12px; }
+    h1 { font-size: 1.3em; }
+  }
 <meta property="og:description" content="用 AI 助手自动匹配需求与供应商。注册即用，永久开源。">
 <meta property="og:image" content="https://8.154.26.92:8080/logo.jpg">
 <meta property="og:url" content="https://8.154.26.92:8080/">
@@ -117,6 +99,7 @@ footer .links a:hover{color:var(--text)}
   <div id="content"></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="/forum.js"></script>
 <footer>
   <div class="links">
