@@ -700,6 +700,45 @@ async def api_home_stats(request):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
+async def api_match_email(request):
+    """GET /api/match/{match_id}/email — 生成邮件模板，用户复制后自己发"""
+    from src.shared.database import async_session
+    from src.shared.models import Match, Demand, CapabilityProfile
+    from src.shared.email_templates import email_generator
+    try:
+        match_id = request.path_params.get("match_id", "")
+        async with async_session() as session:
+            from sqlalchemy import select
+            r = await session.execute(select(Match).where(Match.id == match_id))
+            m = r.scalar_one_or_none()
+            if not m:
+                return JSONResponse({"error": "匹配不存在"}, status_code=404)
+
+            r = await session.execute(select(Demand).where(Demand.id == m.demand_id))
+            d = r.scalar_one_or_none()
+            r = await session.execute(select(CapabilityProfile).where(CapabilityProfile.id == m.profile_id))
+            p = r.scalar_one_or_none()
+
+        demand_title = (d.structured_json.get("summary","") if d and d.structured_json else "") or (d.raw_text[:80] if d else "需求")
+        demand_body = d.raw_text[:500] if d else ""
+        supplier_name = p.agent_card_json.get("name","") if p else "供应商"
+        supplier_desc = p.agent_card_json.get("description","")[:200] if p else ""
+        reason = f"我们的AI匹配引擎发现贵方与需求\"{demand_title}\"的匹配度为{m.score:.0%}。贵方在{supplier_desc or supplier_name}方面的能力与此需求高度相关。"
+
+        template = email_generator.generate(
+            demand_title=demand_title,
+            demand_body=demand_body,
+            match_reason=reason,
+            company_name=supplier_name,
+            demand_name="需求方",
+        )
+        template["match_id"] = match_id
+        template["score"] = m.score
+        template["supplier_name"] = supplier_name
+        return JSONResponse(template)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 routes = [
     Route("/", index),
     Route("/login.html", login_page),
@@ -738,6 +777,7 @@ routes = [
     Route("/api/forum/topics/{topic_id}/replies", api_forum_replies),
     Route("/api/demands", api_demand_list),
     Route("/api/matches", api_matches),
+    Route("/api/matches/{match_id}/email", api_match_email),
     Route("/api/home/stats", api_home_stats),
     # Catch-all static
     Route("/{path:path}", static_file),

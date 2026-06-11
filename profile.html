@@ -211,17 +211,47 @@ async function loadMyMatches() {
     var h = '';
     for (var i = 0; i < matches.length; i++) {
       var m = matches[i];
-      h += '<div style="padding:10px 0;border-bottom:1px solid var(--border)">';
+      h += '<div style="padding:10px 0;border-bottom:1px solid var(--border)" id="matchRow_'+m.id+'">';
       h += '<div style="font-weight:600;color:var(--text);margin-bottom:4px">'+esc(m.demand_title||"需求")+'</div>';
-      h += '<div style="display:flex;gap:12px;font-size:.8em">';
+      h += '<div style="display:flex;gap:12px;font-size:.8em;flex-wrap:wrap;align-items:center">';
       h += '<span>→ <strong style="color:var(--green)">'+esc(m.supplier_name||"")+'</strong></span>';
       h += '<span style="color:var(--amber)">匹配度 '+Math.round((m.score||0)*100)+'%</span>';
       h += '<span>'+esc(m.supplier_category||"")+'</span>';
-      h += '</div></div>';
+      h += '<button class="btn btn-outline" style="padding:2px 10px;font-size:.75em;margin-left:auto" onclick="getEmailTemplate(\''+m.id+'\')">📧 联系邮件模板</button>';
+      h += '</div>';
+      h += '<div id="emailTmpl_'+m.id+'" style="display:none;margin-top:12px;background:rgba(108,92,231,.05);border:1px solid var(--border);border-radius:8px;padding:12px"></div>';
+      h += '</div>';
     }
     div.innerHTML = h;
-  } catch(e) { div.innerHTML = '<p style="color:var(--ts)">加载失败</p>'; }
+  } catch(e) { document.getElementById("myMatches").innerHTML = '<p style="color:var(--ts)">加载失败</p>'; }
 }
+
+async function getEmailTemplate(matchId) {
+  var tmplDiv = document.getElementById("emailTmpl_"+matchId);
+  if (tmplDiv.style.display !== 'none') { tmplDiv.style.display = 'none'; return; }
+  tmplDiv.style.display = 'block';
+  tmplDiv.innerHTML = '<div class="skeleton" style="height:60px"></div>';
+  try {
+    var r = await fetch(API + '/api/matches/' + matchId + '/email');
+    var t = await r.json();
+    if (t.error) { tmplDiv.innerHTML = '<p style="color:var(--red)">加载失败: '+t.error+'</p>'; return; }
+    var body = (t.body||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+    tmplDiv.innerHTML =
+      '<div style="font-size:.85em;margin-bottom:8px"><strong>主题:</strong> '+esc(t.subject||'')+'</div>'+
+      '<div style="font-size:.8em;color:var(--ts);line-height:1.8;max-height:300px;overflow-y:auto;background:var(--bg);border-radius:6px;padding:10px;margin-bottom:8px">'+body+'</div>'+
+      '<div style="display:flex;gap:8px">'+
+        '<button class="btn btn-primary" onclick="copyEmailBody(\''+matchId+'\')" style="font-size:.8em;padding:6px 14px">📋 一键复制全文</button>'+
+        '<span style="font-size:.75em;color:var(--ts);align-self:center">复制后粘贴到你的邮箱客户端发送即可</span>'+
+      '</div>'+
+      '<p style="font-size:.7em;color:var(--ts);margin-top:8px">💡 用自己的邮箱发送更可信、不会被拦截。如需平台代发，去通知设置里开启。</p>';
+  } catch(e) { tmplDiv.innerHTML = '<p style="color:var(--red)">加载失败</p>'; }
+}
+
+function copyEmailBody(matchId) {
+  var tmplDiv = document.getElementById("emailTmpl_"+matchId);
+  var text = (tmplDiv.textContent||'').replace(/📋 一键复制全文复制后粘贴到你的邮箱客户端发送即可|💡[^]*/g,'').trim();
+  navigator.clipboard.writeText(text).then(function(){
+    alert('已复制到剪贴板！打开你的邮箱（Gmail/QQ邮箱/Outlook），粘贴即可发送。');
 
 async function saveNotify() {
   var checked = document.getElementById("notifyMatches").checked;
