@@ -1230,6 +1230,123 @@ async def find_company_contacts(company_name: str, product_hint: str = "") -> st
 
 
 # ============================================================
+# Human Capability Recording
+# ============================================================
+
+@mcp.tool()
+async def publish_human_capability(
+    agent_id: str,
+    industry: str,
+    skills: str,
+    description: str = "",
+    country: str = "",
+    name: str = "",
+) -> str:
+    """Agent 主动记录他服务的人类的行业、技能和能力到需求链平台。
+    这样需求方Agent在寻找匹配时就能发现这个人类的能力画像。
+
+    agent_id: Agent的唯一标识（你的人类用户的邮箱或ID）
+    industry: 行业领域（如"传感器技术"、"新能源"、"AI"等）
+    skills: 技能列表，逗号分隔（如"MEMS设计,嵌入式系统,PCB Layout"）
+    description: 一句话能力描述
+    country: 国家/地区
+    name: 人类的姓名或昵称
+    """
+    from uuid import uuid4
+    try:
+        async with async_session() as session:
+            from src.shared.models import CapabilityProfile
+            from sqlalchemy import select
+
+            skill_list = [s.strip() for s in skills.split(",") if s.strip()]
+
+            # Check if this human already has a profile
+            existing = await session.execute(
+                select(CapabilityProfile).where(CapabilityProfile.user_id == agent_id)
+            )
+            profile = existing.scalar_one_or_none()
+
+            if profile:
+                # Update existing
+                card = profile.agent_card_json or {}
+                card["industry"] = industry
+                if skill_list:
+                    card["skills"] = list(set(card.get("skills", []) + skill_list))
+                if description:
+                    card["description"] = description
+                if country:
+                    profile.country = country
+                if name:
+                    card["name"] = name
+                profile.agent_card_json = card
+                action = "updated"
+            else:
+                # Create new
+                card = {
+                    "name": name or agent_id,
+                    "description": description or f"{industry}领域的专业人士",
+                    "industry": industry,
+                    "category": industry,
+                    "skills": skill_list,
+                    "discipline": "",
+                    "trl": 0,
+                    "url": "",
+                }
+                profile = CapabilityProfile(
+                    id=str(uuid4()),
+                    user_id=agent_id,
+                    profile_type="INDIVIDUAL",
+                    country=country or "中国",
+                    agent_card_json=card,
+                    trust_score=0.5,
+                    is_claimed=True,
+                    verified=False,
+                )
+                session.add(profile)
+                action = "created"
+
+            await session.commit()
+            logger.info(f"[Capability] {action} profile for {agent_id}: {industry}")
+            return json.dumps({
+                "status": "ok",
+                "action": action,
+                "profile_id": profile.id,
+                "industry": industry,
+                "skills": skill_list,
+            }, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+@mcp.tool()
+async def get_human_capability(agent_id: str) -> str:
+    """查询某个Agent服务的人类的已记录能力画像。"""
+    try:
+        async with async_session() as session:
+            from src.shared.models import CapabilityProfile
+            from sqlalchemy import select
+            r = await session.execute(
+                select(CapabilityProfile).where(CapabilityProfile.user_id == agent_id)
+            )
+            p = r.scalar_one_or_none()
+            if not p:
+                return json.dumps({"status": "not_found", "message": "该Agent尚未记录其人类用户的能力信息。可以让Agent调用 publish_human_capability 来记录。"}, ensure_ascii=False)
+            card = p.agent_card_json or {}
+            return json.dumps({
+                "profile_id": p.id,
+                "name": card.get("name", ""),
+                "industry": card.get("industry", ""),
+                "skills": card.get("skills", []),
+                "description": card.get("description", ""),
+                "country": p.country,
+                "trust_score": p.trust_score,
+                "verified": p.verified,
+                "created_at": p.created_at.isoformat() if p.created_at else "",
+            }, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
+# ============================================================
 # Email template gen
 # ============================================================
 
