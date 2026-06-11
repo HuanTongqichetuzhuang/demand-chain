@@ -5,28 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>供应商 - 需求链平台</title>
 <link rel="icon" href="logo.jpg" type="image/jpeg">
-<meta property="og:title" content="需求链平台 — 供应商">
-<meta property="og:description" content="20家公开供应商，覆盖传感器、材料、能源、AI、航空航天等">
+<link rel="stylesheet" href="shared.css">
 <style>
-:root{--bg:#0c0c1d;--card-bg:#14142b;--text:#e8e8f0;--ts:#9090b0;--purple:#7c6ef0;--border:#2a2a4a;--green:#00b894;--amber:#fdcb6e}
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-.container{max-width:1100px;margin:0 auto;padding:20px}
 h1{font-size:1.6em;margin:20px 0 4px}
 .sub{color:var(--ts);font-size:.9em;margin-bottom:20px}
-nav{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;max-width:1100px;margin:0 auto;border-bottom:1px solid var(--border)}
-nav .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:17px;color:var(--text);text-decoration:none}
-nav .brand:hover{text-decoration:none}
-nav .brand img{width:36px;height:36px;border-radius:8px;object-fit:cover}
-nav .links{display:flex;gap:20px;align-items:center}
-nav .links a{font-size:14px;color:var(--ts)}
-nav .links a:hover{color:var(--text);text-decoration:none}
-nav .links .btn-nav{background:var(--purple);color:#fff;padding:7px 18px;border-radius:8px;font-size:14px;font-weight:500}
-nav .links .btn-nav:hover{background:#8c7ef5;text-decoration:none}
-.category-bar{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
-.cat-btn{padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--ts);font-size:.85em;cursor:pointer}
-.cat-btn.active{border-color:var(--purple);color:#a29bfe;background:rgba(108,92,231,0.1)}
-.cat-btn .count{font-size:.75em;opacity:.6}
+.row{display:flex;gap:10px;margin:12px 0;flex-wrap:wrap}
 .supplier-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-top:16px}
 .card{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:20px;transition:border-color .2s;position:relative}
 .card:hover{border-color:var(--purple)}
@@ -58,11 +41,19 @@ nav .links .btn-nav:hover{background:#8c7ef5;text-decoration:none}
 <h1>供应商</h1>
 <p class="sub">公开的供应商能力档案。AI助手通过匹配引擎自动为每条需求寻找最佳供应商。</p>
 
+<div class="row">
+  <input class="search-box" id="searchInput" placeholder="搜索供应商名称/描述/技术..." oninput="render()" style="max-width:350px">
+</div>
+
 <div class="category-bar" id="catBar">
   <span class="cat-btn active" onclick="filterCat('')">全部 <span class="count" id="totalCount">0</span></span>
 </div>
 
-<div class="supplier-grid" id="grid"></div>
+<div class="supplier-grid" id="grid">
+  <div class="skeleton-row"><div class="skeleton" style="height:60px"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+  <div class="skeleton-row"><div class="skeleton" style="height:60px"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+  <div class="skeleton-row"><div class="skeleton" style="height:60px"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+</div>
 </div>
 <script src="/nav.js"></script>
 <script>
@@ -70,20 +61,13 @@ var allSuppliers = [];
 var currentCat = "";
 
 async function load() {
-  var r = await fetch("/api/suppliers");
-  allSuppliers = await r.json();
-  
-  // Build category bar
+  var r = await fetch("/api/suppliers"); allSuppliers = await r.json();
   var cats = {};
-  allSuppliers.forEach(function(s) {
-    var c = s.category || "其他";
-    cats[c] = (cats[c] || 0) + 1;
+  allSuppliers.forEach(function(s) { var c = s.category || "_x5176_他"; cats[c] = (cats[c] || 0) + 1; });
+  var bar = document.getElementById("catBar");
+  Object.keys(cats).sort(function(a,b){ return cats[b]-cats[a]; }).forEach(function(c) {
+    bar.innerHTML += '<span class="cat-btn" onclick="filterCat(\''+c.replace(/'/g,"\\'")+'\')">'+c+' <span class="count">'+cats[c]+'</span></span>';
   });
-  var catBar = document.getElementById("catBar");
-  Object.keys(cats).sort().forEach(function(c) {
-    catBar.innerHTML += '<span class="cat-btn" onclick="filterCat(\''+c.replace(/'/g,"\\'")+'\')">'+c+' <span class="count">'+cats[c]+'</span></span>';
-  });
-  
   document.getElementById("totalCount").textContent = allSuppliers.length;
   render();
 }
@@ -99,30 +83,31 @@ function filterCat(c) {
 function esc(s) { return String(s||"").replace(/</g,"&lt;"); }
 
 function render() {
+  var q = (document.getElementById("searchInput").value || "").toLowerCase();
   var filtered = allSuppliers;
   if (currentCat) filtered = filtered.filter(function(s){ return s.category === currentCat; });
-  
+  if (q) filtered = filtered.filter(function(s){
+    return (s.name||"").toLowerCase().indexOf(q)>=0 ||
+           (s.description||"").toLowerCase().indexOf(q)>=0 ||
+           (s.industry||"").toLowerCase().indexOf(q)>=0 ||
+           (s.skills||[]).some(function(sk){ return sk.toLowerCase().indexOf(q)>=0; });
+  });
+  var typeLabel = {"COMPANY":"企业","RESEARCH":"研究机构","INDIVIDUAL":"个人","TEAM":"团队","GOVERNMENT":"政府"};
   var grid = document.getElementById("grid");
   grid.innerHTML = filtered.length === 0
-    ? '<p style="color:var(--ts);text-align:center;padding:40px">暂无供应商</p>'
+    ? '<p style="color:var(--ts);text-align:center;padding:40px;grid-column:1/-1">没有匹配的供应商</p>'
     : filtered.map(function(s) {
         var skills = (s.skills||[]).map(function(t){ return '<span class="tag">'+esc(t)+'</span>'; }).join("");
-        var typeLabel = {"COMPANY":"企业","RESEARCH":"研究机构","INDIVIDUAL":"个人","TEAM":"团队","GOVERNMENT":"政府"};
         var trl = s.trl ? 'TRL '+s.trl : "";
         return '<div class="card">'+
           (s.verified ? '<span class="check">已验证</span>' : '')+
           '<span class="type">'+(typeLabel[s.profile_type]||s.profile_type)+'</span>'+
           '<div class="name">'+esc(s.name)+'</div>'+
-          '<div class="desc">'+esc(s.description)+'</div>'+
+          '<div class="desc">'+esc((s.description||"").substring(0,200))+'</div>'+
           '<div class="tags">'+skills+'</div>'+
-          '<div class="meta">'+
-            '<span class="country">'+esc(s.country||"")+'</span>'+
-            '<span>'+esc(s.industry||"")+'</span>'+
-            (trl ? '<span class="trl">'+trl+'</span>' : '')+
-          '</div>'+
+          '<div class="meta"><span class="country">'+esc(s.country||"")+'</span><span>'+esc(s.industry||"")+'</span>'+(trl?'<span class="trl">'+trl+'</span>':'')+'</div>'+
           (s.url ? '<a href="'+esc(s.url)+'" target="_blank" class="url">'+esc(s.url)+'</a>' : '')+
-        '</div>';
-      }).join("");
+        '</div>'; }).join("");
 }
 
 load();

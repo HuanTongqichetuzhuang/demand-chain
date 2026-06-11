@@ -386,9 +386,10 @@ async def api_suppliers(request):
 
 
 async def api_auto_demand(request):
-    """POST /api/auto-demand — 自动添加需求（爬虫用）"""
+    """POST /api/auto-demand — 自动添加需求（爬虫用），带内容去重"""
     from src.shared.database import async_session
     from src.shared.models import Demand, DemandStatus
+    from sqlalchemy import select
     from uuid import uuid4
     try:
         body = await request.json()
@@ -397,7 +398,16 @@ async def api_auto_demand(request):
         email = body.get("email", "crawler")
         if not raw_text:
             return JSONResponse({"error": "empty"}, status_code=400)
+
+        prefix = raw_text[:100]
         async with async_session() as session:
+            # 去重：用 raw_text 前 100 字符做前缀匹配
+            result = await session.execute(
+                select(Demand.id).where(Demand.raw_text.startswith(prefix)).limit(1)
+            )
+            if result.scalar_one_or_none():
+                return JSONResponse({"status": "dup", "message": "duplicate demand"})
+
             demand = Demand(
                 id=str(uuid4()),
                 user_id=email,
@@ -410,16 +420,34 @@ async def api_auto_demand(request):
             await session.commit()
             return JSONResponse({"status": "ok", "id": demand.id})
     except Exception as e:
+        import logging, traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"api_auto_demand error: {e}\n{traceback.format_exc()}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
 async def api_auto_supplier(request):
-    """POST /api/auto-supplier — 自动添加供应商（爬虫用）"""
+    """POST /api/auto-supplier — 自动添加供应商（爬虫用），带名称去重"""
     from src.shared.database import async_session
     from src.shared.models import CapabilityProfile
+    from sqlalchemy import select
     from uuid import uuid4
     try:
         body = await request.json()
+        agent_card = body.get("agent_card", {})
+        supplier_name = agent_card.get("name", "")
+        if not supplier_name:
+            return JSONResponse({"error": "empty name"}, status_code=400)
+
         async with async_session() as session:
+            # 按名称去重
+            result = await session.execute(
+                select(CapabilityProfile.id).where(
+                    CapabilityProfile.agent_card_json["name"].as_string() == supplier_name
+                ).limit(1)
+            )
+            if result.scalar_one_or_none():
+                return JSONResponse({"status": "dup", "message": "duplicate supplier"})
+
             profile = CapabilityProfile(
                 id=str(uuid4()),
                 user_id=body.get("email", "crawler"),
@@ -428,12 +456,15 @@ async def api_auto_supplier(request):
                 trust_score=body.get("trust_score", 0.5),
                 is_claimed=False,
                 verified=False,
-                agent_card_json=body.get("agent_card", {}),
+                agent_card_json=agent_card,
             )
             session.add(profile)
             await session.commit()
             return JSONResponse({"status": "ok", "id": profile.id})
     except Exception as e:
+        import logging, traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"api_auto_supplier error: {e}\n{traceback.format_exc()}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
 # ============================================================
@@ -441,15 +472,28 @@ async def api_auto_supplier(request):
 # ============================================================
 
 async def api_forum_topics(request):
-    """GET /api/forum/topics — 论坛帖子列表"""
+    """GET /api/forum/topics — 论坛帖子列表，支持排序和分类"""
     from src.shared.database import async_session
     from src.shared.models import ForumTopic
+    from sqlalchemy import select, func, desc
     try:
+        sort = request.query_params.get("sort", "hot")
+        category = request.query_params.get("category", "")
+        limit = int(request.query_params.get("limit", "200"))
+        offset = int(request.query_params.get("offset", "0"))
+
         async with async_session() as session:
-            from sqlalchemy import select
-            result = await session.execute(
-                select(ForumTopic).order_by(ForumTopic.created_at.desc()).limit(200)
-            )
+            query = select(ForumTopic)
+            if category:
+                query = query.where(ForumTopic.category == category)
+            if sort == "new":
+                query = query.order_by(desc(ForumTopic.created_at))
+            elif sort == "top":
+                query = query.order_by(desc(ForumTopic.upvotes))
+            else:  # hot: pinned first, then upvotes
+                query = query.order_by(desc(ForumTopic.is_pinned), desc(ForumTopic.upvotes))
+            query = query.offset(offset).limit(limit)
+            result = await session.execute(query)
             topics = result.scalars().all()
             return JSONResponse([{
                 "id": t.id,
@@ -459,23 +503,33 @@ async def api_forum_topics(request):
                 "author_id": t.agent_id,
                 "vote_count": t.upvotes or 0,
                 "reply_count": len(t.replies) if t.replies else 0,
+                "is_pinned": t.is_pinned,
                 "created_at": t.created_at.isoformat() if t.created_at else "",
             } for t in topics])
     except Exception as e:
         return JSONResponse({"error": str(e), "topics": []}, status_code=500)
 
 async def api_forum_categories(request):
-    """GET /api/forum/categories — 按行业/学科分类"""
+    """GET /api/forum/categories — 论坛分类及帖子数统计"""
     from src.shared.database import async_session
-    from src.shared.models import Demand, DemandStatus
-    from sqlalchemy import select, func, distinct
+    from src.shared.models import ForumTopic
+    from sqlalchemy import select, func
+    from src.forum.service import CATEGORIES
     try:
         async with async_session() as session:
             result = await session.execute(
-                select(Demand.category, func.count()).where(Demand.status == DemandStatus.OPEN).group_by(Demand.category).order_by(func.count().desc()).limit(40)
+                select(ForumTopic.category, func.count(ForumTopic.id))
+                .group_by(ForumTopic.category)
             )
-            rows = result.all()
-            cats = [{"id": (r[0] or "其他"), "name": (r[0] or "其他"), "count": r[1]} for r in rows]
+            db_counts = dict(result.all())
+            # Merge standard categories with actual counts
+            cats = []
+            for key, label in CATEGORIES.items():
+                cats.append({"id": key, "name": label, "count": db_counts.get(key, 0)})
+            # Add any unlisted categories that exist in DB
+            for cat, cnt in db_counts.items():
+                if cat not in CATEGORIES:
+                    cats.append({"id": cat, "name": cat, "count": cnt})
             return JSONResponse(cats)
     except Exception as e:
         return JSONResponse([{"id": "general", "name": "综合讨论", "count": 0}])
@@ -505,49 +559,146 @@ async def api_forum_topic_detail(request):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
-async def api_forum_vote(request):
-    """POST /api/forum/topics/{topic_id}/vote"""
-    from src.shared.database import async_session
-    from src.shared.models import ForumTopic
-    topic_id = request.path_params.get("topic_id", "")
-    try:
-        body = await request.json()
-        direction = body.get("direction", "up")
-        async with async_session() as session:
-            from sqlalchemy import select
-            result = await session.execute(select(ForumTopic).where(ForumTopic.id == topic_id))
-            t = result.scalar_one_or_none()
-            if t:
-                if direction == "up":
-                    t.upvotes = (t.upvotes or 0) + 1
-                else:
-                    t.upvotes = max(0, (t.upvotes or 0) - 1)
-                await session.commit()
-                return JSONResponse({"status": "ok", "vote_count": t.upvotes})
-        return JSONResponse({"error": "not found"}, status_code=404)
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
-
 async def api_demand_list(request):
-    """GET /api/demands — 需求列表"""
+    """GET /api/demands — 需求列表，支持语义搜索"""
     from src.shared.database import async_session
     from src.shared.models import Demand
+    from src.shared.semantic_search import demand_search, TfidfSearch
     try:
+        keyword = request.query_params.get("keyword", "").strip()
+        category = request.query_params.get("category", "")
+        sort = request.query_params.get("sort", "new")
+        limit = int(request.query_params.get("limit", "200"))
+
         async with async_session() as session:
             from sqlalchemy import select
             result = await session.execute(
-                select(Demand).order_by(Demand.created_at.desc()).limit(200)
+                select(Demand).order_by(Demand.created_at.desc()).limit(2000)
             )
-            demands = result.scalars().all()
-            return JSONResponse([{
-                "id": d.id,
-                "raw_text": d.raw_text[:200] if d.raw_text else "",
-                "category": d.category,
-                "status": d.status.value if d.status else "open",
-                "created_at": d.created_at.isoformat() if d.created_at else "",
-            } for d in demands])
+            all_demands = list(result.scalars().all())
+
+        # Build search index if keyword present
+        if keyword:
+            search = TfidfSearch()
+            for d in all_demands:
+                text = (d.raw_text or "") + " " + (d.category or "")
+                if d.search_text:
+                    text += " " + d.search_text
+                if d.structured_json:
+                    s = d.structured_json
+                    text += " " + (s.get("summary", "") or "")
+                    text += " " + " ".join(s.get("tags", []))
+                search.add(d.id, text)
+            search.build_index()
+            scored = search.search(keyword, top_k=limit)
+            id_to_d = {d.id: d for d in all_demands}
+            ranked = [id_to_d[did] for did, score in scored if did in id_to_d]
+            # Append remaining that match by ILIKE
+            seen = {d.id for d in ranked}
+            for d in all_demands:
+                if d.id not in seen and keyword.lower() in (d.raw_text or "").lower():
+                    ranked.append(d)
+            demands = ranked[:limit]
+        elif category:
+            demands = [d for d in all_demands if d.category == category][:limit]
+        else:
+            demands = all_demands[:limit]
+
+        return JSONResponse([{
+            "id": d.id,
+            "raw_text": d.raw_text[:200] if d.raw_text else "",
+            "category": d.category,
+            "status": d.status.value if d.status else "open",
+            "summary": (d.structured_json.get("summary", "") if d.structured_json else ""),
+            "tags": (d.structured_json.get("tags", []) if d.structured_json else []),
+            "created_at": d.created_at.isoformat() if d.created_at else "",
+        } for d in demands])
     except Exception as e:
         return JSONResponse({"error": str(e), "demands": []}, status_code=500)
+
+async def api_matches(request):
+    """GET /api/matches — 匹配结果列表"""
+    from src.shared.database import async_session
+    from src.shared.models import Match, Demand, CapabilityProfile
+    try:
+        demand_id = request.query_params.get("demand_id", "").strip()
+        limit = int(request.query_params.get("limit", "100"))
+
+        async with async_session() as session:
+            from sqlalchemy import select
+            query = select(Match).order_by(Match.score.desc()).limit(limit)
+            if demand_id:
+                query = query.where(Match.demand_id == demand_id)
+            result = await session.execute(query)
+            matches = list(result.scalars().all())
+
+        # Collect parent demand/profile IDs
+        demand_ids = {m.demand_id for m in matches}
+        profile_ids = {m.profile_id for m in matches}
+
+        # Fetch demands and profiles in bulk
+        demand_map = {}
+        profile_map = {}
+        async with async_session() as session:
+            if demand_ids:
+                r = await session.execute(select(Demand).where(Demand.id.in_(demand_ids)))
+                for d in r.scalars(): demand_map[d.id] = d
+            if profile_ids:
+                r = await session.execute(select(CapabilityProfile).where(CapabilityProfile.id.in_(profile_ids)))
+                for p in r.scalars(): profile_map[p.id] = p
+
+        return JSONResponse([{
+            "id": m.id,
+            "demand_id": m.demand_id,
+            "profile_id": m.profile_id,
+            "score": m.score,
+            "status": m.status.value if m.status else "pending",
+            "demand_title": (demand_map.get(m.demand_id).raw_text[:80] if m.demand_id in demand_map else ""),
+            "demand_category": (demand_map.get(m.demand_id).category if m.demand_id in demand_map else ""),
+            "supplier_name": (profile_map.get(m.profile_id).agent_card_json.get("name", "") if m.profile_id in profile_map else ""),
+            "supplier_category": (profile_map.get(m.profile_id).agent_card_json.get("category", "") if m.profile_id in profile_map else ""),
+            "created_at": m.created_at.isoformat() if m.created_at else "",
+        } for m in matches])
+    except Exception as e:
+        return JSONResponse({"error": str(e), "matches": []}, status_code=500)
+
+async def api_home_stats(request):
+    """GET /api/home/stats — 首页实时统计"""
+    from src.shared.database import async_session
+    from src.shared.models import Demand, CapabilityProfile, ForumTopic
+    try:
+        async with async_session() as session:
+            from sqlalchemy import select, desc
+            r = await session.execute(select(Demand).order_by(desc(Demand.created_at)).limit(6))
+            demands = list(r.scalars().all())
+            r = await session.execute(select(CapabilityProfile).order_by(desc(CapabilityProfile.trust_score)).limit(5))
+            suppliers = list(r.scalars().all())
+            r = await session.execute(select(ForumTopic).order_by(desc(ForumTopic.upvotes)).limit(5))
+            topics = list(r.scalars().all())
+
+        return JSONResponse({
+            "latest_demands": [{
+                "id": d.id,
+                "title": (d.structured_json.get("summary","") if d.structured_json else "") or (d.raw_text or "")[:60],
+                "category": d.category,
+                "tags": (d.structured_json.get("tags", []) if d.structured_json else []),
+                "created_at": d.created_at.isoformat() if d.created_at else "",
+            } for d in demands],
+            "top_suppliers": [{
+                "id": p.id,
+                "name": p.agent_card_json.get("name",""),
+                "category": p.agent_card_json.get("category",""),
+                "trust_score": p.trust_score,
+            } for p in suppliers],
+            "hot_topics": [{
+                "id": t.id,
+                "title": t.title,
+                "upvotes": t.upvotes,
+                "reply_count": len(t.replies) if t.replies else 0,
+            } for t in topics],
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 routes = [
     Route("/", index),
@@ -586,6 +737,8 @@ routes = [
     Route("/api/forum/topics/{topic_id}/reply", api_forum_reply_post, methods=["POST"]),
     Route("/api/forum/topics/{topic_id}/replies", api_forum_replies),
     Route("/api/demands", api_demand_list),
+    Route("/api/matches", api_matches),
+    Route("/api/home/stats", api_home_stats),
     # Catch-all static
     Route("/{path:path}", static_file),
 ]

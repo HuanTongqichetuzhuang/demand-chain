@@ -288,6 +288,30 @@ footer .links a:hover{color:var(--text)}
   <a href="https://github.com/HuanTongqichetuzhuang/demand-chain" class="btn-primary">GitHub 仓库</a>
 </div>
 
+<!-- 实时数据 -->
+<div class="section" id="liveData">
+  <div class="inner">
+    <h2>平台实时数据</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;margin-top:32px">
+      <!-- 最新需求 -->
+      <div class="feature-card" id="latestDemandsCard">
+        <h3>📋 最新需求</h3>
+        <div id="latestDemands" style="font-size:14px;color:var(--muted);line-height:2.2"></div>
+      </div>
+      <!-- 热门供应商 -->
+      <div class="feature-card" id="topSuppliersCard">
+        <h3>🏭 热门供应商</h3>
+        <div id="topSuppliers" style="font-size:14px;color:var(--muted);line-height:2.2"></div>
+      </div>
+      <!-- 论坛热帖 -->
+      <div class="feature-card" id="hotTopicsCard">
+        <h3>💬 论坛热帖</h3>
+        <div id="hotTopics" style="font-size:14px;color:var(--muted);line-height:2.2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <footer>
   <div class="links">
     <a href="demand_square.html">需求广场</a>
@@ -313,6 +337,42 @@ function copyMCP(){
     });
   });
 }
+
+// 加载首页实时数据
+(async function loadStats() {
+  try {
+    var r = await fetch("/api/home/stats");
+    var d = await r.json();
+    if (d.error) return;
+
+    // 最新需求
+    var dh = "";
+    for (var i = 0; i < (d.latest_demands||[]).length; i++) {
+      var item = d.latest_demands[i];
+      var t = (item.title||"").substring(0, 50);
+      dh += '<div><a href="demand_square.html" style="color:var(--purple);text-decoration:none">'+esc(t)+'</a> <span style="font-size:11px;opacity:0.5">'+esc(item.category||"")+'</span></div>';
+    }
+    document.getElementById("latestDemands").innerHTML = dh || '<div style="padding:20px;text-align:center">暂无数据</div>';
+
+    // 热门供应商
+    var sh = "";
+    for (var i = 0; i < (d.top_suppliers||[]).length; i++) {
+      var s = d.top_suppliers[i];
+      sh += '<div><a href="suppliers.html" style="color:var(--green);text-decoration:none">'+esc(s.name||"")+'</a> <span style="font-size:11px;opacity:0.5">'+esc(s.category||"")+'</span></div>';
+    }
+    document.getElementById("topSuppliers").innerHTML = sh || '<div style="padding:20px;text-align:center">暂无数据</div>';
+
+    // 论坛热帖
+    var th = "";
+    for (var i = 0; i < (d.hot_topics||[]).length; i++) {
+      var tp = d.hot_topics[i];
+      th += '<div><a href="forum.html" style="color:var(--amber);text-decoration:none">'+esc(tp.title||"")+'</a> <span style="font-size:11px;opacity:0.5">'+ (tp.upvotes||0) +'赞 '+(tp.reply_count||0)+'回复</span></div>';
+    }
+    document.getElementById("hotTopics").innerHTML = th || '<div style="padding:20px;text-align:center">暂无数据</div>';
+  } catch(e) { console.error(e); }
+})();
+
+function esc(s) { return String(s||"").replace(/</g,"&lt;"); }
 </script>
 <script src="/i18n.js"></script>
 </body>

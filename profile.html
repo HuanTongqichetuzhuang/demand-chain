@@ -118,6 +118,27 @@ nav .links .user-info img{width:28px;height:28px;border-radius:50%}
     <div id="pwdMsg"></div>
   </div>
 
+  <!-- 通知设置 -->
+  <div class="card">
+    <h3 style="margin-bottom:16px">通知设置</h3>
+    <div class="checkbox-row" style="margin:12px 0;display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="notifyMatches" checked style="width:auto" onchange="saveNotify()">
+      <label for="notifyMatches" style="margin:0;font-size:.9em">需求匹配时邮件通知我</label>
+    </div>
+    <p style="font-size:.8em;color:var(--ts)">当 AI 匹配引擎为你的需求找到合适的供应商时，自动发送邮件到 {{currentUser.email}}</p>
+    <div id="notifyMsg"></div>
+  </div>
+
+  <!-- 我的匹配 -->
+  <div class="card">
+    <h3 style="margin-bottom:16px">我的匹配</h3>
+    <div id="myMatches" style="color:var(--ts);font-size:.9em">
+      <div class="skeleton" style="height:20px;margin:8px 0"></div>
+      <div class="skeleton" style="height:20px;margin:8px 0;width:60%"></div>
+      <div class="skeleton" style="height:20px;margin:8px 0;width:80%"></div>
+    </div>
+  </div>
+
   <!-- My Activity -->
   <div class="card">
     <h3 style="margin-bottom:16px">我的活动</h3>
@@ -174,6 +195,43 @@ async function loadUserStats() {
     document.getElementById("statDemands").textContent = s.demands || 0;
     document.getElementById("statTopics").textContent = s.topics || 0;
     document.getElementById("statReplies").textContent = s.replies || 0;
+  } catch(e) {}
+  loadMyMatches();
+}
+
+async function loadMyMatches() {
+  try {
+    var r = await fetch(API + "/api/matches?limit=10");
+    var matches = await r.json();
+    var div = document.getElementById("myMatches");
+    if (!matches || !matches.length) {
+      div.innerHTML = '<p style="color:var(--ts);padding:12px">暂无匹配结果。发布需求后 AI 将自动为你匹配合适的供应商。</p>';
+      return;
+    }
+    var h = '';
+    for (var i = 0; i < matches.length; i++) {
+      var m = matches[i];
+      h += '<div style="padding:10px 0;border-bottom:1px solid var(--border)">';
+      h += '<div style="font-weight:600;color:var(--text);margin-bottom:4px">'+esc(m.demand_title||"需求")+'</div>';
+      h += '<div style="display:flex;gap:12px;font-size:.8em">';
+      h += '<span>→ <strong style="color:var(--green)">'+esc(m.supplier_name||"")+'</strong></span>';
+      h += '<span style="color:var(--amber)">匹配度 '+Math.round((m.score||0)*100)+'%</span>';
+      h += '<span>'+esc(m.supplier_category||"")+'</span>';
+      h += '</div></div>';
+    }
+    div.innerHTML = h;
+  } catch(e) { div.innerHTML = '<p style="color:var(--ts)">加载失败</p>'; }
+}
+
+async function saveNotify() {
+  var checked = document.getElementById("notifyMatches").checked;
+  try {
+    await fetch(API + "/api/user/profile", {
+      method: "PUT", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({email:currentUser.email, email_notify:checked})
+    });
+    document.getElementById("notifyMsg").innerHTML = '<div class="msg msg-ok">通知设置已保存</div>';
+    setTimeout(function(){ document.getElementById("notifyMsg").innerHTML = ''; }, 2000);
   } catch(e) {}
 }
 
