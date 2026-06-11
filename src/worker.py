@@ -1,38 +1,45 @@
 """
 Platform Worker — 后台调度引擎。
-每分钟扫描需求库，触发匹配。
+每 15 分钟扫描新入库的 OPEN 需求，触发增量匹配。
 """
 import asyncio
 import logging
 
 from src.shared.config import settings
 from src.shared.database import async_session
-from src.shared.models import Demand, DemandStatus
+from src.shared.models import Demand, DemandStatus, Match
+from sqlalchemy import select, func
 
 logger = logging.getLogger(__name__)
+
+MATCH_INTERVAL = 900  # 15 minutes
 
 
 async def scan_and_match():
     while True:
         try:
             async with async_session() as session:
-                result = await session.execute(
-                    "SELECT count(*) FROM demands WHERE status = 'OPEN'"
+                # Count OPEN demands without existing matches
+                r = await session.execute(
+                    select(func.count(Demand.id)).where(Demand.status == DemandStatus.OPEN)
                 )
-                count = result.scalar()
-                if count and count > 0:
-                    logger.info(f"[Worker] 发现 {count} 条待匹配需求")
-                    await process_open_demands(session, count)
+                open_count = r.scalar() or 0
+
+                if open_count > 0:
+                    logger.info(f"[Worker] {open_count} OPEN demands — running matching engine")
+                    from src.matching.engine import run_matching
+                    result = await run_matching(dry_run=False)
+                    matched = result.get("matched", 0)
+                    total = result.get("total", 0)
+                    logger.info(f"[Worker] Matching done: {matched} candidate(s) across {total} demand(s)")
+                else:
+                    logger.debug(f"[Worker] No OPEN demands to match")
         except Exception as e:
-            logger.error(f"[Worker] 扫描异常: {e}")
-        await asyncio.sleep(settings.worker_interval_seconds)
+            logger.error(f"[Worker] Error: {e}")
+            import traceback
+            traceback.print_exc()
 
-
-async def process_open_demands(session, count: int):
-    """处理待匹配需求 — 当前为桩实现，完整匹配逻辑待开发。"""
-    logger.info(f"[Worker] 匹配引擎已触发，待匹配数={count}")
-    # Phase 1 匹配逻辑：语义相似度 + pgvector
-    # 此处为桩，后续迭代实现
+        await asyncio.sleep(MATCH_INTERVAL)
 
 
 async def main():
@@ -40,7 +47,7 @@ async def main():
         level=getattr(logging, settings.log_level),
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
-    logger.info(f"[Worker] 启动，轮询间隔={settings.worker_interval_seconds}s")
+    logger.info(f"[Worker] Started — matching every {MATCH_INTERVAL}s")
     await scan_and_match()
 
 
