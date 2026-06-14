@@ -10,6 +10,27 @@ from starlette.routing import Route
 
 WEB_ROOT = "/app"
 
+# ============================================================
+# 安全工具函数
+# ============================================================
+
+import re
+
+_EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+
+def _validate_email(email: str) -> bool:
+    """校验邮箱格式"""
+    if not email or len(email) > 254:
+        return False
+    return bool(_EMAIL_RE.match(email))
+
+
+def _sanitize_like(value: str) -> str:
+    """转义 LIKE 模式中的特殊字符 (% 和 _)"""
+    return value.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+
+
 async def serve_file(request, filename):
     path = os.path.join(WEB_ROOT, filename)
     if os.path.exists(path):
@@ -55,6 +76,8 @@ async def api_user_profile_get(request):
     from sqlalchemy import select
     try:
         email = request.query_params.get("email", "")
+        if not _validate_email(email):
+            return JSONResponse({"error": "无效的邮箱格式"}, status_code=400)
         async with async_session() as session:
             result = await session.execute(select(User).where(User.email == email))
             u = result.scalar_one_or_none()
@@ -78,6 +101,8 @@ async def api_user_profile_update(request):
     try:
         body = await request.json()
         email = body.get("email","")
+        if not _validate_email(email):
+            return JSONResponse({"error": "无效的邮箱格式"}, status_code=400)
         async with async_session() as session:
             result = await session.execute(select(User).where(User.email == email))
             u = result.scalar_one_or_none()
@@ -100,7 +125,11 @@ async def api_user_avatar(request):
     try:
         body = await request.json()
         email = body.get("email","")
+        if not _validate_email(email):
+            return JSONResponse({"error": "无效的邮箱格式"}, status_code=400)
         avatar_data = body.get("avatar","")
+        if len(avatar_data) > 512 * 1024:  # 512KB max
+            return JSONResponse({"error": "头像文件过大，最大512KB"}, status_code=400)
         async with async_session() as session:
             result = await session.execute(select(User).where(User.email == email))
             u = result.scalar_one_or_none()
@@ -121,10 +150,14 @@ async def api_user_password(request):
     try:
         body = await request.json()
         email = body.get("email","")
+        if not _validate_email(email):
+            return JSONResponse({"error": "无效的邮箱格式"}, status_code=400)
         old_pwd = body.get("old_password","")
         new_pwd = body.get("new_password","")
         if len(new_pwd) < 6:
             return JSONResponse({"error": "新密码至少6位"}, status_code=400)
+        if len(new_pwd) > 128:
+            return JSONResponse({"error": "新密码过长"}, status_code=400)
         async with async_session() as session:
             result = await session.execute(select(User).where(User.email == email))
             u = result.scalar_one_or_none()
@@ -143,19 +176,22 @@ async def api_user_stats(request):
     """GET /api/user/stats — 用户统计"""
     from src.shared.database import async_session
     from src.shared.models import Demand, ForumTopic, ForumReply
-    from sqlalchemy import select
+    from sqlalchemy import select, func
     try:
         email = request.query_params.get("email", "")
+        if not _validate_email(email):
+            return JSONResponse({"demands":0,"topics":0,"replies":0})
         async with async_session() as session:
-            # Count demands by this user
             from src.shared.models import User
             r = await session.execute(select(User).where(User.email == email))
             u = r.scalar_one_or_none()
             if not u:
                 return JSONResponse({"demands":0,"topics":0,"replies":0})
             d_count = (await session.execute(select(func.count()).select_from(Demand).where(Demand.user_id == u.human_id))).scalar()
-            t_count = (await session.execute(select(func.count()).select_from(ForumTopic).where(ForumTopic.agent_id.ilike('%'+email+'%')))).scalar()
-            r_count = (await session.execute(select(func.count()).select_from(ForumReply).where(ForumReply.agent_id.ilike('%'+email+'%')))).scalar()
+            # 使用参数化绑定替代字符串拼接
+            safe_pattern = f'%{_sanitize_like(email)}%'
+            t_count = (await session.execute(select(func.count()).select_from(ForumTopic).where(ForumTopic.agent_id.ilike(safe_pattern)))).scalar()
+            r_count = (await session.execute(select(func.count()).select_from(ForumReply).where(ForumReply.agent_id.ilike(safe_pattern)))).scalar()
             return JSONResponse({"demands": d_count or 0, "topics": t_count or 0, "replies": r_count or 0})
     except Exception as e:
         return JSONResponse({"demands":0,"topics":0,"replies":0,"error":str(e)})
@@ -180,6 +216,12 @@ async def api_register(request):
         
         if not email or not password or len(password) < 6:
             return JSONResponse({"error": "邮箱和密码(至少6位)必填"}, status_code=400)
+        if not _validate_email(email):
+            return JSONResponse({"error": "邮箱格式不正确"}, status_code=400)
+        if len(password) > 128:
+            return JSONResponse({"error": "密码过长"}, status_code=400)
+        if len(name) > 100:
+            return JSONResponse({"error": "用户名过长"}, status_code=400)
         
         async with async_session() as session:
             # Check if already registered
@@ -222,6 +264,8 @@ async def api_login(request):
     try:
         body = await request.json()
         email = body.get("email","").strip()
+        if not _validate_email(email):
+            return JSONResponse({"error": "邮箱格式不正确"}, status_code=400)
         password = body.get("password","")
         
         async with async_session() as session:
@@ -372,13 +416,15 @@ async def api_suppliers(request):
         async with async_session() as session:
             query = select(CapabilityProfile)
             
-            # 关键词搜索
+            # 关键词搜索（转义 LIKE 特殊字符）
             if keyword:
+                safe_kw = _sanitize_like(keyword)
+                pattern = f'%{safe_kw}%'
                 query = query.where(
-                    CapabilityProfile.agent_card_json['name'].as_string().ilike(f'%{keyword}%') |
-                    CapabilityProfile.agent_card_json['description'].as_string().ilike(f'%{keyword}%') |
-                    CapabilityProfile.agent_card_json['industry'].as_string().ilike(f'%{keyword}%') |
-                    CapabilityProfile.agent_card_json['discipline'].as_string().ilike(f'%{keyword}%')
+                    CapabilityProfile.agent_card_json['name'].as_string().ilike(pattern) |
+                    CapabilityProfile.agent_card_json['description'].as_string().ilike(pattern) |
+                    CapabilityProfile.agent_card_json['industry'].as_string().ilike(pattern) |
+                    CapabilityProfile.agent_card_json['discipline'].as_string().ilike(pattern)
                 )
             
             # 总数
@@ -517,9 +563,15 @@ async def api_forum_topics(request):
     from sqlalchemy import select, func, desc
     try:
         sort = request.query_params.get("sort", "hot")
+        # 只接受预定义的排序方式
+        if sort not in ("hot", "new", "top"):
+            sort = "hot"
         category = request.query_params.get("category", "")
-        limit = int(request.query_params.get("limit", "200"))
-        offset = int(request.query_params.get("offset", "0"))
+        # category 用白名单校验（业务上分类 slug 不含特殊字符）
+        if category and not re.match(r'^[a-zA-Z0-9_\-]{1,50}$', category):
+            category = ""
+        limit = max(1, min(500, int(request.query_params.get("limit", "200"))))
+        offset = max(0, int(request.query_params.get("offset", "0")))
 
         async with async_session() as session:
             query = select(ForumTopic)
@@ -682,13 +734,16 @@ async def api_matches(request):
     from src.shared.models import Match, Demand, CapabilityProfile
     try:
         demand_id = request.query_params.get("demand_id", "").strip()
+        # demand_id 为可选的 UUID 格式过滤，非 UUID 时忽略
         limit = int(request.query_params.get("limit", "100"))
+        import uuid as _uuid
+        valid_demand_id = demand_id if re.match(r'^[a-fA-F0-9\-]{32,36}$', demand_id) else ""
 
         async with async_session() as session:
             from sqlalchemy import select
             query = select(Match).order_by(Match.score.desc()).limit(limit)
-            if demand_id:
-                query = query.where(Match.demand_id == demand_id)
+            if valid_demand_id:
+                query = query.where(Match.demand_id == valid_demand_id)
             result = await session.execute(query)
             matches = list(result.scalars().all())
 
