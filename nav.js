@@ -5,9 +5,34 @@
   if (!document.querySelector('link[href*="shared.css"]')) {
     var link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = '/shared.css?v=2';
+    link.href = '/shared.css?v=3';
     document.head.appendChild(link);
   }
+  // 注入设计变量覆盖（覆盖页面内联 :root 的旧值）
+  var styleOverride = document.createElement('style');
+  styleOverride.textContent = ':root{' +
+    '--bg:#0a0a1a;--card-bg:rgba(20,20,43,0.8);--card-bg-solid:#14142b;' +
+    '--text:#e8e8f0;--ts:#9090b0;--muted:#8888aa;' +
+    '--purple:#7c6ef0;--purple-light:#9b8ff5;--purple-dark:#5a4ed8;' +
+    '--accent:#7c6ef0;' +
+    '--border:rgba(42,42,74,0.6);--border-light:rgba(42,42,74,0.3);' +
+    '--green:#00d4a0;--amber:#f0b429;--red:#e85454;--blue:#4a8cf7;' +
+    '--radius:12px;--radius-sm:8px;--radius-lg:16px;' +
+    '--shadow:0 4px 24px rgba(0,0,0,0.3);' +
+    '--glow-purple:rgba(124,110,240,0.15);' +
+    '--transition:0.25s cubic-bezier(0.4,0,0.2,1);' +
+  '} body{background:var(--bg-gradient)}' +
+  'nav{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(10,10,26,0.7);border-bottom:1px solid var(--border-light)}' +
+  'nav .links a{border-radius:8px;transition:all var(--transition)}' +
+  'nav .links a:hover{background:rgba(124,110,240,0.08)}' +
+  'nav .links .btn-nav{background:linear-gradient(135deg,var(--purple),var(--purple-dark));box-shadow:0 2px 12px var(--glow-purple)}' +
+  '.card{border-radius:16px;transition:all 0.25s ease}.card:hover{box-shadow:0 8px 32px rgba(0,0,0,0.2);transform:translateY(-2px)}' +
+  '.btn-primary{background:linear-gradient(135deg,var(--purple),var(--purple-dark));box-shadow:0 2px 12px var(--glow-purple)}' +
+  '.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 20px var(--glow-purple)}' +
+  '::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}' +
+  '::selection{background:rgba(124,110,240,0.3);color:#fff}';
+  document.head.appendChild(styleOverride);
+
   // 注入装饰性背景光晕
   if (!document.querySelector('.bg-glow')) {
     var div1 = document.createElement('div');
