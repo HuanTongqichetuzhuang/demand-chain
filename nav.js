@@ -1,6 +1,22 @@
-// 需求链平台 - 共享导航脚本 v2（统一全站导航）
+// 需求链平台 - 共享导航脚本 v3（统一全站导航 + 设计注入）
 // 根据登录状态显示/隐藏导航项
 (function(){
+  // 注入 shared.css（若页面未加载）
+  if (!document.querySelector('link[href*="shared.css"]')) {
+    var link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/shared.css?v=2';
+    document.head.appendChild(link);
+  }
+  // 注入装饰性背景光晕
+  if (!document.querySelector('.bg-glow')) {
+    var div1 = document.createElement('div');
+    div1.className = 'bg-glow';
+    document.body.appendChild(div1);
+    var div2 = document.createElement('div');
+    div2.className = 'bg-glow-2';
+    document.body.appendChild(div2);
+  }
   var PAGES = {
     main: [
       { href: "/demand_square.html", label: "需求广场" },
