@@ -14,6 +14,8 @@ from contextlib import asynccontextmanager
 async def lifespan(app):
     from src.shared.database import init_db
     await init_db()
+    # 清理7天未验证的账号
+    await _cleanup_unverified_accounts()
     yield
 
 WEB_ROOT = "/app"
@@ -27,6 +29,27 @@ import re
 _EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
 
+async def _cleanup_unverified_accounts():
+    """清理超过7天未验证邮箱的账号"""
+    from src.shared.database import async_session
+    from src.shared.models import User
+    from sqlalchemy import delete
+    from datetime import datetime, timezone, timedelta
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        async with async_session() as session:
+            result = await session.execute(
+                delete(User).where(User.email_verified == False).where(User.created_at < cutoff)
+            )
+            await session.commit()
+            if result.rowcount:
+                import logging
+                logging.getLogger(__name__).info(f"Cleaned up {result.rowcount} unverified accounts")
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to cleanup unverified accounts: {e}")
+
+
 def _validate_email(email: str) -> bool:
     """校验邮箱格式"""
     if not email or len(email) > 254:
@@ -37,6 +60,52 @@ def _validate_email(email: str) -> bool:
 def _sanitize_like(value: str) -> str:
     """转义 LIKE 模式中的特殊字符 (% 和 _)"""
     return value.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+
+
+# ============================================================
+# 注册限流 (每 IP 每小时 ≤5 次注册)
+# ============================================================
+
+import time as _time
+from collections import defaultdict
+
+_register_attempts: dict[str, list[float]] = defaultdict(list)
+_REGISTER_LIMIT = 5       # 最多 5 次
+_REGISTER_WINDOW = 3600   # 每小时
+
+
+def _check_rate_limit(ip: str) -> tuple[bool, int]:
+    """检查 IP 是否超限。返回 (允许?, 剩余次数)"""
+    now = _time.time()
+    window_start = now - _REGISTER_WINDOW
+    # 清理窗口外的记录
+    _register_attempts[ip] = [t for t in _register_attempts[ip] if t > window_start]
+    attempts = len(_register_attempts[ip])
+    if attempts >= _REGISTER_LIMIT:
+        return False, 0
+    return True, _REGISTER_LIMIT - attempts
+
+
+async def _send_verify_email(email: str, token: str, name: str):
+    """发送邮箱验证邮件"""
+    verify_url = f"/verify-email?token={token}"
+    subject = "验证你的邮箱 — 需求链平台"
+    body = f"""<div style="max-width:560px;margin:0 auto;font-family:sans-serif">
+<h2 style="color:#7c6ef0">欢迎加入需求链平台 🎉</h2>
+<p>你好 {name}，</p>
+<p>请点击下方按钮验证你的邮箱地址：</p>
+<p style="text-align:center;margin:30px 0">
+  <a href="{verify_url}" style="display:inline-block;padding:12px 32px;background:#7c6ef0;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">验证邮箱</a>
+</p>
+<p>或复制以下链接到浏览器：<br><code style="font-size:.85em;color:#9090b0">{verify_url}</code></p>
+<p style="color:#9090b0;font-size:.85em;margin-top:24px">验证链接 48 小时内有效。<br>如非本人操作，请忽略此邮件。</p>
+</div>"""
+    try:
+        from src.shared.notifications import send_email
+        await send_email(to=email, subject=subject, body=body)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to send verify email to {email}: {e}")
 
 
 async def serve_file(request, filename):
@@ -61,6 +130,13 @@ async def batch_export(request): return await serve_file(request, "batch_export.
 async def api_docs(request): return await serve_file(request, "api_docs.html")
 async def tools_extra(request): return await serve_file(request, "tools_extra.html")
 async def tutorial(request): return await serve_file(request, "docs/tutorial.html")
+
+async def verify_email_page(request):
+    """GET /verify-email — 邮箱验证页面"""
+    token = request.query_params.get("token", "")
+    if not token:
+        return JSONResponse({"error": "缺少验证令牌"}, status_code=400)
+    return await serve_file(request, "verify_email.html")
 
 async def static_file(request):
     path = request.path_params.get("path", "")
@@ -239,13 +315,19 @@ async def api_user_stats(request):
 # ============================================================
 
 async def api_register(request):
-    """POST /api/register — 注册新人类用户（数据库持久化）"""
+    """POST /api/register — 注册新人类用户（数据库持久化，含限流+邮箱验证）"""
     import secrets, hashlib
     from passlib.hash import bcrypt
     from src.shared.database import async_session
     from src.shared.models import User
     from sqlalchemy import select
     try:
+        # 限流
+        client_ip = request.client.host if request.client else "unknown"
+        allowed, remaining = _check_rate_limit(client_ip)
+        if not allowed:
+            return JSONResponse({"error": "注册过于频繁，请一小时后重试"}, status_code=429)
+
         body = await request.json()
         email = body.get("email","").strip()
         name = body.get("name","").strip()
@@ -262,6 +344,9 @@ async def api_register(request):
         if len(name) > 100:
             return JSONResponse({"error": "用户名过长"}, status_code=400)
         
+        # 记录此次尝试
+        _register_attempts[client_ip].append(_time.time())
+
         async with async_session() as session:
             # Check if already registered
             existing = await session.execute(select(User).where(User.email == email))
@@ -271,6 +356,7 @@ async def api_register(request):
             human_id = secrets.token_hex(16)  # 32 chars
             hashed = bcrypt.hash(password)
             api_key = hashlib.sha256((human_id + secrets.token_urlsafe(16)).encode()).hexdigest()[:32]
+            verify_token = secrets.token_urlsafe(32)
             
             user = User(
                 human_id=human_id,
@@ -280,22 +366,28 @@ async def api_register(request):
                 country=country,
                 api_key=api_key,
                 email_notify=email_notify,
+                verify_token=verify_token,
+                email_verified=False,
             )
             session.add(user)
             await session.commit()
-            
-            return JSONResponse({
-                "status": "ok",
-                "human_id": human_id,
-                "email": email,
-                "name": name,
-                "api_key": api_key,
-            })
+
+        # 发送验证邮件（异步，不阻塞返回）
+        await _send_verify_email(email, verify_token, name)
+
+        return JSONResponse({
+            "status": "ok",
+            "human_id": human_id,
+            "email": email,
+            "name": name,
+            "api_key": api_key,
+            "message": "注册成功！请查收验证邮件并点击链接激活账号。",
+        })
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
 async def api_login(request):
-    """POST /api/login — 人类登录（数据库验证）"""
+    """POST /api/login — 人类登录（数据库验证，需已验证邮箱）"""
     from passlib.hash import bcrypt
     from src.shared.database import async_session
     from src.shared.models import User
@@ -314,6 +406,9 @@ async def api_login(request):
             if not user:
                 return JSONResponse({"error": "邮箱未注册"}, status_code=401)
             
+            if not user.email_verified:
+                return JSONResponse({"error": "邮箱尚未验证，请查收验证邮件并点击验证链接"}, status_code=401)
+            
             if not bcrypt.verify(password, user.password_hash):
                 return JSONResponse({"error": "密码错误"}, status_code=401)
             
@@ -324,6 +419,38 @@ async def api_login(request):
                 "name": user.display_name,
                 "api_key": user.api_key or "",
             })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_verify_email(request):
+    """GET /api/verify-email — 验证邮箱"""
+    from src.shared.database import async_session
+    from src.shared.models import User
+    from sqlalchemy import select
+    from datetime import datetime, timezone, timedelta
+    try:
+        token = request.query_params.get("token", "").strip()
+        if not token or len(token) < 8:
+            return JSONResponse({"error": "无效的验证链接"}, status_code=400)
+        
+        async with async_session() as session:
+            r = await session.execute(
+                select(User).where(User.verify_token == token)
+            )
+            user = r.scalar_one_or_none()
+            if not user:
+                return JSONResponse({"error": "验证链接无效或已过期"}, status_code=404)
+            
+            # 检查是否 48 小时内
+            if user.created_at and (datetime.now(timezone.utc) - user.created_at) > timedelta(hours=48):
+                return JSONResponse({"error": "验证链接已过期（48小时），请重新注册"}, status_code=410)
+            
+            user.email_verified = True
+            user.verify_token = None
+            await session.commit()
+            
+        return JSONResponse({"status": "ok", "message": "邮箱验证成功！现在可以登录使用全部功能。"})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -910,6 +1037,7 @@ routes = [
     Route("/api_docs.html", api_docs),
     Route("/tools_extra.html", tools_extra),
     Route("/docs/tutorial.html", tutorial),
+    Route("/verify-email", verify_email_page),
     # API Routes
     Route("/api/user/profile", api_user_profile_get),
     Route("/api/user/profile", api_user_profile_update, methods=["PUT"]),
@@ -921,6 +1049,7 @@ routes = [
     Route("/api/suppliers", api_suppliers),
     Route("/api/register", api_register, methods=["POST"]),
     Route("/api/login", api_login, methods=["POST"]),
+    Route("/api/verify-email", api_verify_email),
     Route("/api/forum/categories", api_forum_categories),
     Route("/api/forum/topics/create", api_forum_create, methods=["POST"]),
     Route("/api/forum/topics", api_forum_topics),
