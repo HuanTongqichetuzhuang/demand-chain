@@ -1,9 +1,9 @@
-// 需求链平台 — 统一导航脚本 v4
-// 接管所有页面的导航，无论登录状态，确保全站导航一致
+// 需求链平台 — 统一导航脚本 v5
+// 双重保障：立即执行 + DOM就绪后重试 + 监控DOM变化
 (function() {
   'use strict';
 
-  // 注入 CSS 变量覆盖（若页面内联 :root 用了旧值）
+  // 注入样式（只执行一次）
   if (!document.getElementById('dc-design-inject')) {
     var s = document.createElement('style');
     s.id = 'dc-design-inject';
@@ -20,10 +20,12 @@
       '--glow-purple:rgba(124,110,240,0.15);' +
       '--transition:0.25s cubic-bezier(0.4,0,0.2,1);' +
     '} body{background:var(--bg-gradient)}' +
-    'nav{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:var(--bg-gradient);background:rgba(10,10,26,0.7);border-bottom:1px solid var(--border-light);position:sticky;top:0;z-index:100}' +
-    'nav .links a{border-radius:8px;padding:6px 14px;transition:all 0.25s ease}' +
+    'nav{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(10,10,26,0.7);border-bottom:1px solid var(--border-light);position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:14px 28px;max-width:1140px;margin:0 auto}' +
+    'nav .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;color:var(--text);text-decoration:none}' +
+    'nav .links{display:flex;gap:6px;align-items:center;flex-wrap:wrap}' +
+    'nav .links a{font-size:13.5px;color:var(--ts);padding:6px 14px;border-radius:8px;transition:all 0.25s ease;text-decoration:none}' +
     'nav .links a:hover{background:rgba(124,110,240,0.08);color:var(--text)}' +
-    'nav .links .btn-nav{background:linear-gradient(135deg,var(--purple),var(--purple-dark));box-shadow:0 2px 12px var(--glow-purple);padding:7px 20px;font-weight:600}' +
+    'nav .links .btn-nav{background:linear-gradient(135deg,var(--purple),var(--purple-dark));box-shadow:0 2px 12px var(--glow-purple);padding:7px 20px;font-weight:600;color:#fff!important}' +
     'nav .links .btn-nav:hover{transform:translateY(-1px);box-shadow:0 4px 20px var(--glow-purple)}' +
     '.card{border-radius:16px;transition:all 0.25s ease}.card:hover{box-shadow:0 8px 32px rgba(0,0,0,0.2);transform:translateY(-2px)}' +
     '::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}' +
@@ -31,7 +33,7 @@
     document.head.appendChild(s);
   }
 
-  // 注入背景光晕 + 强制 body 渐变背景（内联样式确保优先）
+  // 注入背景光晕+强制渐变背景
   if (!document.querySelector('.bg-glow')) {
     var g1 = document.createElement('div'); g1.className = 'bg-glow'; document.body.appendChild(g1);
     var g2 = document.createElement('div'); g2.className = 'bg-glow-2'; document.body.appendChild(g2);
@@ -40,34 +42,31 @@
 
   function esc(s) { return String(s || '').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-  // 统一导航
+  // 渲染导航
   function renderNav() {
     var nav = document.querySelector('nav');
-    if (!nav) return;
+    if (!nav) {
+      // 如果页面没有 <nav>，创建一个
+      nav = document.createElement('nav');
+      document.body.insertBefore(nav, document.body.firstChild);
+    }
 
     var session = null;
     try { session = JSON.parse(localStorage.getItem('dc_session')); } catch(e) {}
     var loggedIn = !!(session && session.email);
 
-    // 标准导航链接（所有页面一致）
-    var links = [
-      { href: '/demand_square.html', label: '需求广场' },
-      { href: '/suppliers.html', label: '供应商' },
-      { href: '/forum.html', label: '论坛' },
-      { href: '/docs/tutorial.html', label: '教程' },
-      { href: '/api_docs.html', label: 'API文档' },
-    ];
-
     var brandHtml = '<a class="brand" href="/"><img src="/logo.jpg" alt="">需求链平台</a>';
     var linksHtml = '<div class="links">';
-    links.forEach(function(l) {
-      linksHtml += '<a href="' + l.href + '">' + esc(l.label) + '</a>';
-    });
+    linksHtml += '<a href="/demand_square.html">需求广场</a>';
+    linksHtml += '<a href="/suppliers.html">供应商</a>';
+    linksHtml += '<a href="/forum.html">论坛</a>';
+    linksHtml += '<a href="/docs/tutorial.html">教程</a>';
+    linksHtml += '<a href="/api_docs.html">API文档</a>';
     if (loggedIn) {
       linksHtml += '<a href="/flywheel_dashboard.html" style="font-size:12.5px;opacity:0.7">飞轮</a>';
-      linksHtml += '<a href="/profile.html" class="user-info" style="display:inline-flex;align-items:center;gap:4px;font-size:14px;color:var(--text);text-decoration:none;margin-left:4px">' +
-        '<span>' + esc(session.name || session.email) + '</span></a>';
-      linksHtml += '<a href="#" onclick="localStorage.removeItem(\'dc_session\');location.reload()" style="font-size:13px;color:var(--ts);text-decoration:none">退出</a>';
+      linksHtml += '<a href="/profile.html" style="display:inline-flex;align-items:center;gap:4px;font-size:14px;color:var(--text);margin-left:4px">' +
+        esc(session.name || session.email) + '</a>';
+      linksHtml += '<a href="#" onclick="localStorage.removeItem(\'dc_session\');location.reload()" style="font-size:13px;color:var(--ts)">退出</a>';
     } else {
       linksHtml += '<a href="/login.html" class="btn-nav">登录</a>';
     }
@@ -76,6 +75,25 @@
     nav.innerHTML = brandHtml + linksHtml;
   }
 
-  // 立即执行
-  renderNav();
+  // 立即执行（如果 DOM 已就绪）
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', renderNav);
+  } else {
+    renderNav();
+  }
+
+  // 监控 DOM 变化，如果导航被篡改则重新渲染
+  var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(m) {
+      if (m.type === 'childList' && m.target.tagName === 'NAV') {
+        renderNav();
+      }
+    });
+  });
+  setTimeout(function() {
+    var nav = document.querySelector('nav');
+    if (nav) {
+      observer.observe(nav, { childList: true, subtree: true });
+    }
+  }, 500);
 })();
