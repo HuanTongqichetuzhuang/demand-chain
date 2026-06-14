@@ -19,6 +19,7 @@
         '<a href="/suppliers.html">供应商</a>' +
         '<a href="/forum.html">论坛</a>' +
         '<a href="/docs/tutorial.html">教程</a>' +
+        '<a href="/flywheel_dashboard.html">飞轮</a>' +
         '<a href="profile.html" class="user-info" style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--text);text-decoration:none">' +
         '<span>' + esc(user.name || user.email) + '</span></a>' +
         '<a href="#" onclick="localStorage.removeItem(\'dc_session\');location.reload()" style="font-size:13px;color:var(--ts);text-decoration:none">退出</a>';

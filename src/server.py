@@ -339,14 +339,265 @@ async def search_suppliers(query: str = "", top_k: int = 20) -> str:
         return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
-async def get_pending_matches(user_id: str) -> str:
-    """查看待处理的匹配。"""
-    return json.dumps({"status": "stub", "matches": []}, ensure_ascii=False)
+async def get_pending_matches(session_token: str) -> str:
+    """查看当前用户所有待处理的匹配。"""
+    from src.shared.auth import verify
+    from src.shared.database import async_session
+    from src.shared.models import Match, MatchStatus, Demand, CapabilityProfile
+    from sqlalchemy import select
+
+    try:
+        token_data = await verify(session_token)
+        agent_id = token_data.get("agent_id", "")
+        human_id = token_data.get("human_id", "")
+
+        async with async_session() as session:
+            # 找当前用户相关的需求
+            r = await session.execute(
+                select(Demand).where(Demand.user_id == human_id)
+            )
+            user_demands = {d.id for d in r.scalars().all()}
+
+            if not user_demands:
+                return json.dumps({"status": "ok", "matches": []}, ensure_ascii=False)
+
+            r = await session.execute(
+                select(Match).where(
+                    Match.demand_id.in_(user_demands),
+                    Match.status == MatchStatus.PENDING,
+                ).order_by(Match.score.desc())
+            )
+            matches = list(r.scalars().all())
+
+        # Load demand & profile names
+        result_list = []
+        for m in matches:
+            async with async_session() as s:
+                dr = await s.execute(select(Demand).where(Demand.id == m.demand_id))
+                d = dr.scalar_one_or_none()
+                pr = await s.execute(select(CapabilityProfile).where(CapabilityProfile.id == m.profile_id))
+                p = pr.scalar_one_or_none()
+            result_list.append({
+                "match_id": m.id,
+                "demand_id": m.demand_id,
+                "demand_title": (d.raw_text or "")[:80] if d else "",
+                "supplier_id": m.profile_id,
+                "supplier_name": (p.agent_card_json.get("name", "") if p else ""),
+                "score": m.score,
+                "status": m.status.value,
+                "created_at": m.created_at.isoformat() if m.created_at else "",
+            })
+
+        return json.dumps({"status": "ok", "matches": result_list}, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[get_pending_matches] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
 
 @mcp.tool()
-async def accept_match(session_token: str, match_id: str, action: str, note: str = "") -> str:
-    """接受/拒绝/延伸匹配。action: accept | reject | extend"""
-    return json.dumps({"status": "stub", "match_id": match_id, "action": action}, ensure_ascii=False)
+async def accept_match(session_token: str, match_id: str, action: str, outcome_detail: str = "") -> str:
+    """接受/拒绝匹配。action: accept | reject
+
+    接受后会自动：
+    1. 将 Match 状态设为 accepted
+    2. 创建 MatchOutcome 记录
+    3. 创建 CollaborationWorkspace（供后续协作）
+    4. 如果是成功/失败，更新供应商信任分
+
+    拒绝后会自动：
+    1. 将 Match 状态设为 rejected
+    2. 创建 MatchOutcome 记录（标记失败原因）
+    """
+    from src.shared.auth import verify
+    from src.shared.database import async_session
+    from src.shared.models import Match, MatchStatus, MatchOutcome, OutcomeStatus, Demand, CapabilityProfile, CollaborationWorkspace
+    from src.shared.flywheel import update_trust_by_outcome
+    from sqlalchemy import select
+    from uuid import uuid4
+    from datetime import datetime, timezone
+
+    if action not in ("accept", "reject"):
+        return json.dumps({"status": "error", "message": "action 必须为 accept 或 reject"}, ensure_ascii=False)
+
+    try:
+        await verify(session_token)
+
+        async with async_session() as session:
+            r = await session.execute(select(Match).where(Match.id == match_id))
+            match = r.scalar_one_or_none()
+            if not match:
+                return json.dumps({"status": "error", "message": "匹配记录不存在"}, ensure_ascii=False)
+
+            new_status = MatchStatus.ACCEPTED if action == "accept" else MatchStatus.REJECTED
+            outcome_status = OutcomeStatus.SUCCESS if action == "accept" else OutcomeStatus.FAILED
+
+            match.status = new_status
+
+            # Create MatchOutcome record
+            outcome = MatchOutcome(
+                id=str(uuid4()),
+                match_id=match.id,
+                demand_id=match.demand_id,
+                supplier_id=match.profile_id,
+                status=outcome_status,
+                outcome_detail=outcome_detail,
+            )
+            session.add(outcome)
+
+            # If accepted, create a CollaborationWorkspace
+            workspace_id = ""
+            if action == "accept":
+                # Get demand and profile info
+                dr = await session.execute(select(Demand).where(Demand.id == match.demand_id))
+                demand = dr.scalar_one_or_none()
+                pr = await session.execute(select(CapabilityProfile).where(CapabilityProfile.id == match.profile_id))
+                profile = pr.scalar_one_or_none()
+
+                demand_agent_id = demand.user_id if demand else ""
+                supply_agent_id = profile.user_id if profile else ""
+
+                ws = CollaborationWorkspace(
+                    id=str(uuid4()),
+                    match_id=match.id,
+                    demand_id=match.demand_id,
+                    demand_agent_id=demand_agent_id,
+                    supply_agent_id=supply_agent_id,
+                    status="active",
+                )
+                session.add(ws)
+                workspace_id = ws.id
+
+            await session.commit()
+
+        # Update trust score asynchronously (fire & forget)
+        if outcome_status in (OutcomeStatus.SUCCESS, OutcomeStatus.FAILED):
+            try:
+                # Reload outcome with supplier info
+                async with async_session() as s:
+                    ro = await s.execute(select(MatchOutcome).where(MatchOutcome.id == outcome.id))
+                    loaded = ro.scalar_one_or_none()
+                    if loaded:
+                        await update_trust_by_outcome(loaded)
+            except Exception as e:
+                logger.warning(f"[accept_match] trust update skipped: {e}")
+
+        return json.dumps({
+            "status": "ok",
+            "match_id": match_id,
+            "action": action,
+            "workspace_id": workspace_id if action == "accept" else "",
+            "message": f"匹配已{'接受' if action == 'accept' else '拒绝'}",
+        }, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[accept_match] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+
+@mcp.tool()
+async def report_match_outcome(
+    session_token: str,
+    match_id: str,
+    status: str,
+    outcome_detail: str = "",
+) -> str:
+    """📊 报告匹配后续进展，驱动数据飞轮。
+
+    Agent 或用户在联系供应商后，用此工具更新匹配进展。
+    每次更新都会影响该供应商的信任分和分类交叉权重。
+
+    status 可选值:
+    - contacted: 已联系上供应商，正在沟通
+    - negotiating: 正在谈判具体方案
+    - success: 合作成功（需求得到满足）
+    - failed: 合作失败（技术不匹配/价格问题等）
+
+    建议：初始联系后立即设为 contacted；有进展时更新为 negotiating；
+    最终结果设为 success 或 failed（这会影响信任分）。
+    """
+    from src.shared.auth import verify
+    from src.shared.database import async_session
+    from src.shared.models import Match, MatchOutcome, OutcomeStatus
+    from src.shared.flywheel import update_trust_by_outcome, update_category_weight_by_outcome
+    from sqlalchemy import select
+    from uuid import uuid4
+
+    valid_statuses = {"contacted": OutcomeStatus.CONTACTED,
+                      "negotiating": OutcomeStatus.NEGOTIATING,
+                      "success": OutcomeStatus.SUCCESS,
+                      "failed": OutcomeStatus.FAILED}
+
+    if status not in valid_statuses:
+        return json.dumps({
+            "status": "error",
+            "message": f"无效 status: {status}。可选: contacted, negotiating, success, failed",
+        }, ensure_ascii=False)
+
+    try:
+        await verify(session_token)
+
+        async with async_session() as session:
+            # 验证 match 存在
+            r = await session.execute(select(Match).where(Match.id == match_id))
+            match = r.scalar_one_or_none()
+            if not match:
+                return json.dumps({"status": "error", "message": "匹配记录不存在"}, ensure_ascii=False)
+
+            # 更新 Match 状态
+            target_status = valid_statuses[status]
+            if status == "success":
+                from src.shared.models import MatchStatus
+                match.status = MatchStatus.ACCEPTED
+            elif status == "failed":
+                from src.shared.models import MatchStatus
+                match.status = MatchStatus.REJECTED
+
+            # 创建或更新 MatchOutcome
+            existing = await session.execute(
+                select(MatchOutcome).where(MatchOutcome.match_id == match_id)
+            )
+            outcome = existing.scalar_one_or_none()
+
+            if outcome:
+                outcome.status = target_status
+                if outcome_detail:
+                    outcome.outcome_detail = outcome_detail
+            else:
+                outcome = MatchOutcome(
+                    id=str(uuid4()),
+                    match_id=match.id,
+                    demand_id=match.demand_id,
+                    supplier_id=match.profile_id,
+                    status=target_status,
+                    outcome_detail=outcome_detail,
+                )
+                session.add(outcome)
+
+            await session.commit()
+
+        # 飞轮调整（异步执行）
+        try:
+            async with async_session() as s:
+                ro = await s.execute(select(MatchOutcome).where(MatchOutcome.match_id == match_id))
+                loaded = ro.scalar_one_or_none()
+                if loaded:
+                    await update_trust_by_outcome(loaded)
+                    if status in ("success", "failed"):
+                        await update_category_weight_by_outcome(loaded)
+        except Exception as e:
+            logger.warning(f"[report_match_outcome] flywheel update skipped: {e}")
+
+        return json.dumps({
+            "status": "ok",
+            "match_id": match_id,
+            "new_status": status,
+            "message": f"匹配进展已更新为: {status}",
+        }, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[report_match_outcome] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
 async def extend_demand(session_token: str, parent_demand_id: str, user_id: str, raw_text: str, lang: str = "zh") -> str:

@@ -15,6 +15,8 @@ from src.shared.models import (
 from src.shared.semantic_search import TfidfSearch, demand_search
 from sqlalchemy import select
 
+from src.shared.flywheel import get_category_weight
+
 logger = logging.getLogger(__name__)
 
 
@@ -63,6 +65,7 @@ async def match_one_demand(
     supplier_index: TfidfSearch,
     id_to_profile: dict[str, CapabilityProfile],
     top_k: int = 5,
+    category_weights: dict[tuple[str, str], float] | None = None,
 ) -> list[dict]:
     """为单条需求找最佳匹配供应商"""
     # Build query text
@@ -88,10 +91,17 @@ async def match_one_demand(
         dcat = demand.category or ""
         cat_score = _category_overlap(dcat, scat)
 
-        # Final score: 60% text match + 30% category + 10% trust
+        # Dynamic category boost from flywheel (default 1.0 = no change)
+        cat_boost = 1.0
+        if category_weights is not None and dcat and scat:
+            cw = category_weights.get((dcat.lower().strip(), scat.lower().strip()))
+            if cw is not None:
+                cat_boost = cw * 2  # 0.5 (default) → 1.0, 1.0 → 2.0, 0.0 → 0.0
+
+        # Final score: 60% text match + 30% category (flywheel-adjusted) + 10% trust
         final = (
             tfidf_score * 0.6
-            + cat_score * 0.3
+            + cat_score * cat_boost * 0.3
             + (profile.trust_score or 0.0) * 0.1
         )
 
@@ -100,6 +110,7 @@ async def match_one_demand(
             "score": round(final, 4),
             "tfidf_score": round(tfidf_score, 4),
             "cat_score": round(cat_score, 4),
+            "cat_boost": round(cat_boost, 4),
             "supplier_name": card.get("name", "Unknown"),
             "supplier_category": scat,
         })
@@ -113,6 +124,15 @@ async def match_one_demand(
             seen_names.add(m["supplier_name"])
             deduped.append(m)
     return deduped[:top_k]
+
+
+async def _load_category_weights() -> dict[tuple[str, str], float]:
+    """批量加载分类交叉权重，返回 {(dcat, scat): weight} 字典。"""
+    from src.shared.models import CategoryWeight
+    async with async_session() as session:
+        r = await session.execute(select(CategoryWeight))
+        rows = list(r.scalars().all())
+    return {(w.demand_category, w.supplier_category): w.weight for w in rows}
 
 
 async def run_matching(dry_run: bool = False, max_profiles: int | None = None) -> dict:
@@ -132,9 +152,14 @@ async def run_matching(dry_run: bool = False, max_profiles: int | None = None) -
     id_to_profile, sidx = await build_supplier_index(max_profiles=max_profiles)
     print(f"供应商: {len(id_to_profile)} 家已索引")
 
+    # Load dynamic category weights from flywheel
+    cat_weights = await _load_category_weights()
+    if cat_weights:
+        print(f"分类交叉权重: {len(cat_weights)} 条已加载")
+
     results = []
     for i, demand in enumerate(demands):
-        matches = await match_one_demand(demand, sidx, id_to_profile)
+        matches = await match_one_demand(demand, sidx, id_to_profile, category_weights=cat_weights)
         results.append({"demand_id": demand.id, "demand_title": (demand.raw_text or demand.id)[:60], "matches": matches})
 
         if not dry_run and matches:
