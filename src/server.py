@@ -1263,18 +1263,44 @@ async def register_human(email: str, display_name: str, password: str) -> str:
     帮人类注册账号。
     人类告诉Agent：名字+邮箱+密码 → Agent调此工具。
     返回 human_id，人类换AI助手时用邮箱+密码登录即可继续。
+    账号同时写入数据库 users 表（持久化）和内存注册表。
     """
     from passlib.hash import bcrypt
     from src.shared.agent_identity import agent_registry, generate_ulid
+    from src.shared.database import async_session
+    from src.shared.models import User
+    from sqlalchemy import select
     try:
+        # 检查是否已注册（查数据库）
+        async with async_session() as session:
+            r = await session.execute(select(User).where(User.email == email))
+            existing_user = r.scalar_one_or_none()
+            if existing_user:
+                return json.dumps({
+                    "status": "error",
+                    "message": "该邮箱已注册。请让人类用 login_human 登录。"
+                }, ensure_ascii=False)
+
         human_id = generate_ulid()
         hashed = bcrypt.hash(password)
 
+        # 写入数据库 users 表（持久化）
+        async with async_session() as session:
+            user = User(
+                human_id=human_id,
+                email=email,
+                display_name=display_name,
+                password_hash=hashed,
+                email_verified=True,  # MCP Agent 注册视为已验证
+            )
+            session.add(user)
+            await session.commit()
+
+        # 同时注册到内存 AgentRegistry
         identity, _ = agent_registry.register(
             human_id=human_id,
             display_name=display_name,
         )
-        # Store email+hash mapping (in-memory for now)
         agent_registry._email_to_human[email] = {
             "human_id": human_id,
             "password_hash": hashed,
@@ -1299,18 +1325,56 @@ async def login_human(email: str, password: str, display_name: str = "") -> str:
     人类登录。人类把邮箱和密码告诉Agent → Agent调此工具。
     返回 human_id，拿到后可以正常使用所有功能。
     换AI助手时用这个登录，之前的需求、匹配、工作区都还在。
+    支持 bcrypt 和 SHA256 密码兼容（旧版SHA256密码自动升级为bcrypt）。
     """
     from passlib.hash import bcrypt
+    import hashlib as _hashlib
     from src.shared.agent_identity import agent_registry
+    from src.shared.database import async_session
+    from src.shared.models import User
+    from sqlalchemy import select
     try:
+        # 1. 先查内存注册表（最近MCP注册的用户）
         entry = agent_registry._email_to_human.get(email)
-        if not entry:
-            return json.dumps({"error": "邮箱未注册。请先注册。"}, ensure_ascii=False)
+        if entry:
+            if bcrypt.verify(password, entry["password_hash"]):
+                human_id = entry["human_id"]
+            else:
+                return json.dumps({"error": "密码错误"}, ensure_ascii=False)
+        else:
+            # 2. 查数据库 users 表（持久化存储）
+            async with async_session() as session:
+                r = await session.execute(select(User).where(User.email == email))
+                user = r.scalar_one_or_none()
 
-        if not bcrypt.verify(password, entry["password_hash"]):
-            return json.dumps({"error": "密码错误"}, ensure_ascii=False)
+            if not user:
+                return json.dumps({"error": "邮箱未注册。请先注册。"}, ensure_ascii=False)
 
-        human_id = entry["human_id"]
+            # 3. 密码验证（兼容 bcrypt 和旧版 SHA256）
+            stored_hash = user.password_hash
+            if stored_hash.startswith("$2b$") or stored_hash.startswith("$2a$"):
+                # bcrypt hash
+                if not bcrypt.verify(password, stored_hash):
+                    return json.dumps({"error": "密码错误"}, ensure_ascii=False)
+            else:
+                # 旧版 SHA256 hash — 验证后升级到 bcrypt
+                if _hashlib.sha256(password.encode()).hexdigest() != stored_hash:
+                    return json.dumps({"error": "密码错误"}, ensure_ascii=False)
+                # 升级为 bcrypt
+                new_hash = bcrypt.hash(password)
+                async with async_session() as session:
+                    u = await session.get(User, user.human_id)
+                    if u:
+                        u.password_hash = new_hash
+                        await session.commit()
+
+            human_id = user.human_id
+
+            # 同步到内存注册表（后续MCP调用可直接命中）
+            agent_registry._email_to_human[email] = {
+                "human_id": human_id,
+                "password_hash": user.password_hash,
+            }
         old_agents = agent_registry.list_for_human(human_id)
         old_name = old_agents[0].display_name if old_agents else email
 

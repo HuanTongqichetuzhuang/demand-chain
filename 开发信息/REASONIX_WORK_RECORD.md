@@ -252,3 +252,76 @@ E:\项目\需求链平台\
 4. **docker-compose.prod.yml 不在服务器 git 中** — 需确认应该用哪个部署方案
 
 建议优先确认哪个部署方案（原始 docker-compose.yml vs 本 Agent 的 docker-compose.prod.yml）更适合当前架构，然后再执行恢复。
+
+---
+
+## ⚠️ 六、紧急更新 — 服务器完全离线 (2026-06-14 23:30+)
+
+### 最新状态
+原 Agent (WorkBuddy) 已调查并确认服务器完全离线：
+
+| 检测项 | 结果 |
+|:-------|:----:|
+| Ping (ICMP) | ✅ 可达 |
+| SSH (端口 2222) | ❌ **超时** |
+| HTTP (端口 8080) | ❌ **不可达** |
+| MCP (端口 8000) | ❌ **不可达** |
+
+### 推测原因
+本 Agent 在执行回退操作时运行了 `docker compose down --remove-orphans`，然后使用修改过的 `docker-compose.yml`（非原本正在运行的版本）重新启动，可能导致了：
+1. Docker 网络配置损坏（`dc_dc-net` 被删除后重建为 `dc_default`）
+2. 容器重启失败后 Docker daemon 进入异常状态
+3. SSH 服务因 Docker 网络变更或资源竞争被阻塞
+
+### 原 Agent 发现的额外损失
+本 Agent 未意识到的丢失工作：
+- 供应商分页功能
+- 需求广场分页+标签
+- 论坛行业分区（17个行业）
+- 数据清理（需求 103→78条，供应商 1850→1788条）
+- 爬虫过滤三层加固
+- 多个 HTML 页面修复
+
+### 恢复路径（需要阿里云控制台）
+1. 通过阿里云管理面板 → VNC 登录服务器
+2. 检查 Docker 服务状态：`systemctl status docker`
+3. 重启 Docker：`systemctl restart docker`
+4. 检查数据卷：`docker volume ls | grep pgdata`
+5. 用原始 docker-compose.yml 恢复容器
+6. 验证数据库数据完整性
+
+---
+
+## ✅ 七、最新状态 — 服务器已恢复 (2026-06-15 00:00+)
+
+### 当前运行状态
+原 Agent 已成功恢复服务器。当前状态：
+
+| 容器 | 状态 | 镜像 |
+|:-----|:----:|:----|
+| dc-web | ✅ Up, 2分钟 | demand-chain:original (v5.0原始版) |
+| dc-mcp | ✅ Up, 14分钟 | demand-chain:original |
+| dc-db | ✅ Healthy | pgvector/pgvector:pg16 |
+
+### 数据完整性
+| 数据 | 数量 | 状态 |
+|:----|:----:|:----:|
+| 供应商 | 1,886 家 | ✅ 完好 |
+| 需求 | 81 条 | ✅ 完好 |
+| 论坛主题 | 5 个 | ✅ 完好 |
+| 用户 | 2 个 | ✅ 完好 |
+
+### Git 状态
+- HEAD: `72cf211` (v5.0 原始部署版)
+- 未追踪的文件中存在本 Agent 上传的部分文件
+- `docker-compose.yml` 被修改过
+
+### 尚未恢复的工作
+以下功能在当前运行的原始版本中不存在，需要在后续合并：
+1. P0 安全性改进（bcrypt/Token持久化/限速/输入校验）
+2. P1 匹配引擎改进（limit修复/语义搜索/健康检查）
+3. P2 架构改进（Redis/前端错误处理/测试/Alembic）
+4. P3 战略功能（需求链分解/A2A/数据飞轮）
+5. 原 Agent 的热修复（供应商分页/论坛分区/数据清理等）
+
+
