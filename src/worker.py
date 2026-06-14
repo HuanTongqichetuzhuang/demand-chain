@@ -16,9 +16,12 @@ from src.shared.database import async_session
 from src.shared.models import Demand, DemandStatus
 from sqlalchemy import select, func
 
+from src.shared.flywheel import run_learning_cycle
+
 logger = logging.getLogger(__name__)
 
 MATCH_INTERVAL = 900  # 15 minutes
+FLYWHEEL_INTERVAL = 3600  # 1 hour — 数据飞轮学习周期
 HEALTH_PORT = 8003
 MAX_CONSECUTIVE_FAILURES = 3
 MATCH_TIMEOUT_SECONDS = 60
@@ -139,14 +142,33 @@ async def scan_and_match():
         await asyncio.sleep(MATCH_INTERVAL)
 
 
+async def flywheel_cycle():
+    """数据飞轮学习周期 — 每小时处理一次 match_outcomes，更新信任分和权重。"""
+    global _healthy
+
+    while True:
+        try:
+            stats = await run_learning_cycle()
+            if stats["processed"] > 0:
+                logger.info(f"[Worker] 飞轮学习完成: {stats}")
+            _healthy = True
+        except Exception as e:
+            logger.error(f"[Worker] 飞轮学习失败: {e}")
+            import traceback
+            traceback.print_exc()
+
+        await asyncio.sleep(FLYWHEEL_INTERVAL)
+
+
 async def main():
     logging.basicConfig(
         level=getattr(logging, settings.log_level),
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     logger.info(f"[Worker] Started — matching every {MATCH_INTERVAL}s, "
+                f"flywheel every {FLYWHEEL_INTERVAL}s, "
                 f"health on :{HEALTH_PORT}")
-    await asyncio.gather(health_server(), scan_and_match())
+    await asyncio.gather(health_server(), scan_and_match(), flywheel_cycle())
 
 
 if __name__ == "__main__":

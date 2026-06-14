@@ -129,6 +129,7 @@ async def public_demand(request): return await serve_file(request, "public_deman
 async def batch_export(request): return await serve_file(request, "batch_export.html")
 async def api_docs(request): return await serve_file(request, "api_docs.html")
 async def tools_extra(request): return await serve_file(request, "tools_extra.html")
+async def flywheel_dashboard(request): return await serve_file(request, "flywheel_dashboard.html")
 async def tutorial(request): return await serve_file(request, "docs/tutorial.html")
 
 async def verify_email_page(request):
@@ -1086,6 +1087,96 @@ async def api_match_email(request):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
+
+# ── 数据飞轮 API ───────────────────────────────────────────
+
+async def api_match_feedback(request):
+    """POST /api/match/{match_id}/feedback — 用户反馈匹配是否有用"""
+    from src.shared.database import async_session
+    from src.shared.models import Match, MatchOutcome, OutcomeStatus
+    from sqlalchemy import select
+    from uuid import uuid4
+
+    try:
+        match_id = request.path_params.get("match_id", "")
+        body = await request.json()
+        useful = body.get("useful", None)  # True/False
+        detail = body.get("detail", "")
+
+        if useful is None:
+            return JSONResponse({"error": "缺少 useful 字段（true/false）"}, status_code=400)
+
+        async with async_session() as session:
+            r = await session.execute(select(Match).where(Match.id == match_id))
+            match = r.scalar_one_or_none()
+            if not match:
+                return JSONResponse({"error": "匹配不存在"}, status_code=404)
+
+            outcome_status = OutcomeStatus.SUCCESS if useful else OutcomeStatus.FAILED
+
+            existing = await session.execute(
+                select(MatchOutcome).where(MatchOutcome.match_id == match_id)
+            )
+            outcome = existing.scalar_one_or_none()
+            if outcome:
+                outcome.status = outcome_status
+                if detail:
+                    outcome.outcome_detail = detail
+            else:
+                outcome = MatchOutcome(
+                    id=str(uuid4()),
+                    match_id=match.id,
+                    demand_id=match.demand_id,
+                    supplier_id=match.profile_id,
+                    status=outcome_status,
+                    outcome_detail=detail,
+                )
+                session.add(outcome)
+            await session.commit()
+
+        # Fire & forget flywheel update
+        try:
+            from src.shared.flywheel import update_trust_by_outcome, update_category_weight_by_outcome
+            async with async_session() as s:
+                ro = await s.execute(select(MatchOutcome).where(MatchOutcome.match_id == match_id))
+                loaded = ro.scalar_one_or_none()
+                if loaded:
+                    await update_trust_by_outcome(loaded)
+                    await update_category_weight_by_outcome(loaded)
+        except Exception as e:
+            logger.warning(f"[flywheel] async update error: {e}")
+
+        return JSONResponse({
+            "status": "ok",
+            "match_id": match_id,
+            "useful": useful,
+            "message": "感谢反馈！您的评价已进入数据飞轮，将优化后续匹配。",
+        })
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_flywheel_stats(request):
+    """GET /api/flywheel/stats — 飞轮运行统计"""
+    from src.shared.flywheel import get_flywheel_stats
+    try:
+        stats = await get_flywheel_stats()
+        return JSONResponse(stats)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_flywheel_weights(request):
+    """GET /api/flywheel/weights — 权重矩阵"""
+    from src.shared.flywheel import get_weight_matrix
+    try:
+        weights = await get_weight_matrix()
+        return JSONResponse({"weights": weights, "total": len(weights)})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 routes = [
     Route("/", index),
     Route("/login.html", login_page),
@@ -1103,6 +1194,7 @@ routes = [
     Route("/batch_export.html", batch_export),
     Route("/api_docs.html", api_docs),
     Route("/tools_extra.html", tools_extra),
+    Route("/flywheel_dashboard.html", flywheel_dashboard),
     Route("/docs/tutorial.html", tutorial),
     Route("/verify-email", verify_email_page),
     # API Routes
@@ -1127,6 +1219,9 @@ routes = [
     Route("/api/demands", api_demand_list),
     Route("/api/matches", api_matches),
     Route("/api/matches/{match_id}/email", api_match_email),
+    Route("/api/matches/{match_id}/feedback", api_match_feedback, methods=["POST"]),
+    Route("/api/flywheel/stats", api_flywheel_stats),
+    Route("/api/flywheel/weights", api_flywheel_weights),
     Route("/api/home/stats", api_home_stats),
     Route("/.well-known/agent.json", api_agent_card),
     # Catch-all static

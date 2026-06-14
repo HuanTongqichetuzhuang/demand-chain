@@ -58,6 +58,15 @@ class ProfileType(str, enum.Enum):
     GOVERNMENT = "government"
 
 
+class OutcomeStatus(str, enum.Enum):
+    """匹配结果追踪 — 从匹配到合作完成的完整链路"""
+    MATCHED = "matched"
+    CONTACTED = "contacted"
+    NEGOTIATING = "negotiating"
+    SUCCESS = "success"
+    FAILED = "failed"
+
+
 class Demand(Base):
     __tablename__ = "demands"
 
@@ -196,6 +205,35 @@ class Match(Base):
 
     demand = relationship("Demand", back_populates="matches")
     profile = relationship("CapabilityProfile", back_populates="matches")
+
+
+class MatchOutcome(Base):
+    """匹配结果追踪 — 记录匹配后的完整链路（联系→谈判→成功/失败），驱动数据飞轮"""
+    __tablename__ = "match_outcomes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    match_id: Mapped[str] = mapped_column(String(36), ForeignKey("matches.id"), index=True, nullable=False)
+    demand_id: Mapped[str] = mapped_column(String(36), ForeignKey("demands.id"), index=True, nullable=False)
+    supplier_id: Mapped[str] = mapped_column(String(36), ForeignKey("capability_profiles.id"), index=True, nullable=False)
+    status: Mapped[OutcomeStatus] = mapped_column(SAEnum(OutcomeStatus), default=OutcomeStatus.MATCHED, index=True)
+    outcome_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    match = relationship("Match", lazy="selectin")
+
+
+class CategoryWeight(Base):
+    """分类交叉权重 — 数据飞轮自动调整，用于匹配引擎的动态权重"""
+    __tablename__ = "category_weights"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    demand_category: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    supplier_category: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    weight: Mapped[float] = mapped_column(Float, default=0.5)
+
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 # ============================================================
