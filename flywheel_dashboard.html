@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>数据飞轮仪表盘 — 需求链平台</title>
 <link rel="stylesheet" href="/shared.css">
-<script src="/nav.js"></script>
 <style>
 :root { --green: #22c55e; --red: #ef4444; --amber: #f59e0b; --blue: #3b82f6; }
 .page { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
@@ -59,7 +58,20 @@ tr:hover { background: rgba(255,255,255,0.03); }
 </style>
 </head>
 <body>
-<nav id="main-nav"></nav>
+<nav>
+  <a class="brand" href="/">
+    <img src="/logo.jpg" alt="">
+    需求链平台
+  </a>
+  <div class="links">
+    <a href="/demand_square.html">需求广场</a>
+    <a href="/suppliers.html">供应商</a><a href="/forum.html">论坛</a>
+    <a href="/docs/tutorial.html">教程</a>
+    <a href="/flywheel_dashboard.html">飞轮</a>
+    <a href="/login.html" class="btn-nav">登录</a>
+  </div>
+</nav>
+<script src="/nav.js?v=1"></script>
 <div class="page">
     <h1>🔄 数据飞轮仪表盘</h1>
     <p class="subtitle">匹配结果反哺算法 — 越用越准</p>
