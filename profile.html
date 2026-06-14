@@ -179,7 +179,8 @@ async function loadUserData() {
     if (userData.avatar) {
       document.getElementById("avatarPlaceholder").classList.add("hidden");
       document.getElementById("avatarImg").classList.remove("hidden");
-      document.getElementById("avatarImg").src = userData.avatar;
+      // avatar is stored as relative path e.g. "avatars/xxx.jpg"
+      document.getElementById("avatarImg").src = userData.avatar.startsWith("data:") ? userData.avatar : (API + "/" + userData.avatar);
     } else {
       document.getElementById("avatarPlaceholder").textContent = (userData.display_name||currentUser.email).charAt(0).toUpperCase();
     }
@@ -252,6 +253,8 @@ function copyEmailBody(matchId) {
   var text = (tmplDiv.textContent||'').replace(/📋 一键复制全文复制后粘贴到你的邮箱客户端发送即可|💡[^]*/g,'').trim();
   navigator.clipboard.writeText(text).then(function(){
     alert('已复制到剪贴板！打开你的邮箱（Gmail/QQ邮箱/Outlook），粘贴即可发送。');
+  });
+}
 
 async function saveNotify() {
   var checked = document.getElementById("notifyMatches").checked;
@@ -287,11 +290,11 @@ async function uploadAvatar() {
       body: JSON.stringify({email:currentUser.email, avatar:reader.result})
     });
     const d = await resp.json();
-    if (d.status === "ok") {
+    if (d.avatar_url) {
       document.getElementById("avatarPlaceholder").classList.add("hidden");
       document.getElementById("avatarImg").classList.remove("hidden");
-      document.getElementById("avatarImg").src = reader.result;
-      updateNav(userData?.display_name || currentUser.email, reader.result);
+      document.getElementById("avatarImg").src = API + "/" + d.avatar_url;
+      updateNav(userData?.display_name || currentUser.email, API + "/" + d.avatar_url);
     }
   };
   reader.readAsDataURL(file);
@@ -340,8 +343,7 @@ function esc(s) { return String(s||"").replace(/</g,"&lt;").replace(/>/g,"&gt;")
 
 checkLogin();
 </script>
-</body>
-</html>
-<script src="/nav.js"></script><script src="/i18n.js"></script>
+<script src="/nav.js"></script>
+<script src="/i18n.js"></script>
 </body>
 </html>

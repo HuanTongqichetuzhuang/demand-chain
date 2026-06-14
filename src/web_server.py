@@ -126,7 +126,8 @@ async def api_user_profile_update(request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 async def api_user_avatar(request):
-    """POST /api/user/avatar — 上传头像"""
+    """POST /api/user/avatar — 上传头像，存入文件系统"""
+    import base64, imghdr, os
     from src.shared.database import async_session
     from src.shared.models import User
     from sqlalchemy import select
@@ -138,14 +139,44 @@ async def api_user_avatar(request):
         avatar_data = body.get("avatar","")
         if len(avatar_data) > 512 * 1024:  # 512KB max
             return JSONResponse({"error": "头像文件过大，最大512KB"}, status_code=400)
+
+        # 解析 base64 data URI: "data:image/png;base64,xxxx"
+        if not avatar_data.startswith("data:image/"):
+            return JSONResponse({"error": "不支持的头像格式，仅支持 jpg/png/webp"}, status_code=400)
+        
+        mime_match = re.match(r'^data:image/(png|jpeg|jpg|webp);base64,', avatar_data)
+        if not mime_match:
+            return JSONResponse({"error": "不支持的头像格式，仅支持 jpg/png/webp"}, status_code=400)
+        
+        ext = mime_match.group(1)
+        if ext == "jpeg":
+            ext = "jpg"
+        
+        # 解码
+        b64_str = avatar_data.split(",", 1)[1]
+        img_bytes = base64.b64decode(b64_str)
+        
+        if len(img_bytes) > 1024 * 1024:  # 2MB → 解码后 1MB
+            return JSONResponse({"error": "头像文件过大，解码后超过1MB"}, status_code=400)
+
         async with async_session() as session:
             result = await session.execute(select(User).where(User.email == email))
             u = result.scalar_one_or_none()
             if not u:
                 return JSONResponse({"error": "not found"}, status_code=404)
-            u.avatar = avatar_data  # stored as base64 data URI
+            
+            # 保存到文件系统
+            avatar_dir = os.path.join(WEB_ROOT, "avatars")
+            os.makedirs(avatar_dir, exist_ok=True)
+            filename = f"{u.human_id}.{ext}"
+            filepath = os.path.join(avatar_dir, filename)
+            with open(filepath, "wb") as f:
+                f.write(img_bytes)
+            
+            # 存储 URL 路径（通过 catch-all 静态路由提供）
+            u.avatar = f"avatars/{filename}"
             await session.commit()
-            return JSONResponse({"status": "ok"})
+            return JSONResponse({"status": "ok", "avatar_url": f"avatars/{filename}"})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
