@@ -76,6 +76,9 @@ class Demand(Base):
     visibility: Mapped[str] = mapped_column(String(32), default="public")
     country_restrictions: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     parent_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("demands.id"), nullable=True)
+    interest_count: Mapped[int] = mapped_column(Integer, default=1)
+    duplicate_group_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    interest_users: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True, default=list)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

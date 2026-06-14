@@ -8,7 +8,7 @@ import json
 import logging
 import hashlib
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -39,7 +39,7 @@ class SupplierCandidate:
             "data_sources": self.data_sources,
             "contact_hints": self.contact_hints,
             "country": self.country,
-            "discovered_at": datetime.utcnow(),
+            "discovered_at": datetime.now(timezone.utc),
         }
 
 

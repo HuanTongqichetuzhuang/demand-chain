@@ -6,7 +6,7 @@
 import hashlib
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -43,7 +43,7 @@ class DiscoveredDemand:
             "deadline": self.deadline,
             "budget_hint": self.budget_hint,
             "organization": self.organization,
-            "discovered_at": datetime.utcnow(),
+            "discovered_at": datetime.now(timezone.utc),
             "fingerprint": self.fingerprint,
         }
 

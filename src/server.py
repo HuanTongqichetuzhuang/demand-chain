@@ -1,5 +1,5 @@
 """
-需求链平台 MCP Server — 53个工具，Agent 通过 MCP 协议直接接入。
+需求链平台 MCP Server — 68个工具，Agent 通过 MCP 协议直接接入。
 """
 import json
 import logging
@@ -25,18 +25,40 @@ mcp = FastMCP("需求链平台")
 
 @mcp.tool()
 async def publish_demand(user_id: str, raw_text: str, session_token: str, lang: str = "zh") -> str:
-    """发布一条需求。必须先注册/登录获得 session_token。"""
+    """发布一条需求。必须先注册/登录获得 session_token。
+
+    发布后会自动检测是否有类似已有需求。
+    如果有，返回结果中包含 similar_demands 列表，可调 join_demand_group 加入。
+    """
     from src.shared.auth import verify
     await verify(session_token)
     async with async_session() as session:
         svc = DemandService(session)
         demand = await svc.publish(user_id, raw_text, lang=lang)
-        return json.dumps({
+
+        # 检测相似需求
+        similar = await svc.find_similar(raw_text, threshold=0.7, limit=5)
+        similar_list = [
+            {
+                "id": d.id,
+                "summary": (d.structured_json or {}).get("requirement", {}).get("core_need", d.raw_text[:80]) if d.structured_json else d.raw_text[:80],
+                "category": d.category,
+                "interest_count": d.interest_count or 1,
+            }
+            for d in similar if d.id != demand.id
+        ]
+
+        result = {
             "demand_id": demand.id,
             "category": demand.category,
-            "summary": demand.structured_json.get("summary", "") if demand.structured_json else "",
+            "summary": demand.structured_json.get("requirement", {}).get("core_need", "") if demand.structured_json else "",
             "status": demand.status.value,
-        }, ensure_ascii=False)
+        }
+        if similar_list:
+            result["similar_demands"] = similar_list
+            result["message"] = f"发现 {len(similar_list)} 条相似需求，可调 join_demand_group 加入"
+
+        return json.dumps(result, ensure_ascii=False)
 
 @mcp.tool()
 async def search_demands(
@@ -66,25 +88,168 @@ async def search_demands(
         return json.dumps(results, ensure_ascii=False)
 
 @mcp.tool()
+async def search_similar_demands(raw_text: str, threshold: float = 0.7, limit: int = 10) -> str:
+    """🔍 搜索与给定文本相似的需求。
+
+    检测是否有其他人提过类似的需求。
+    返回结果含 interest_count（多少人提了同样需求）。
+
+    参数：
+    - raw_text: 需求文本
+    - threshold: 相似度阈值 (0-1)，默认 0.7
+    - limit: 最大返回条数
+    """
+    from src.shared.database import async_session
+
+    try:
+        async with async_session() as session:
+            svc = DemandService(session)
+            similar = await svc.find_similar(raw_text, threshold=threshold, limit=limit)
+
+            results = []
+            for d in similar:
+                entry = {
+                    "id": d.id,
+                    "raw_text": d.raw_text[:120],
+                    "category": d.category,
+                    "status": d.status.value if d.status else "",
+                    "interest_count": d.interest_count or 1,
+                    "duplicate_group_id": d.duplicate_group_id or "",
+                    "created_at": d.created_at.isoformat() if d.created_at else "",
+                }
+                if d.structured_json:
+                    s = d.structured_json
+                    entry["summary"] = s.get("requirement", {}).get("core_need", "")
+                results.append(entry)
+
+            return json.dumps({
+                "status": "ok",
+                "query": raw_text[:60],
+                "threshold": threshold,
+                "total": len(results),
+                "results": results,
+            }, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[search_similar_demands] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+
+@mcp.tool()
+async def join_demand_group(
+    session_token: str,
+    demand_id: str,
+    user_id: str,
+    context: str = "",
+    subscribe_all: bool = True,
+) -> str:
+    """👥 加入一个已有需求组。
+
+    当你发现别人提的需求跟你一样，用此工具加入而不是重复发布。
+    加入后：
+
+    1. 该需求的 interest_count +1
+    2. 你可以描述自己的差异点（可选）
+    3. 你可以选择追踪全部进展或只看部分子需求
+    4. 当有供应商对接或子需求拆分时，你会收到通知
+
+    参数：
+    - session_token: 会话令牌
+    - demand_id: 要加入的需求 ID
+    - user_id: 你的用户 ID
+    - context: 你的差异描述（可选，如"我只需要800°C以上版本"）
+    - subscribe_all: 是否追踪全部进展（默认 true）
+    """
+    from src.shared.auth import verify
+    from src.shared.database import async_session
+
+    try:
+        await verify(session_token)
+
+        async with async_session() as session:
+            svc = DemandService(session)
+            result = await svc.join_demand_group(demand_id, user_id, context, subscribe_all)
+
+        return json.dumps(result, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[join_demand_group] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+
+@mcp.tool()
+async def update_subscription(
+    session_token: str,
+    demand_id: str,
+    user_id: str,
+    sub_demand_id: str = "",
+    track: bool = True,
+    subscribe_all: bool | None = None,
+) -> str:
+    """🔔 更新你对需求的追踪设置。
+
+    加入需求组后，用此工具精细控制你想追踪哪些进展：
+    - 选择追踪全部进展（subscribe_all=true）
+    - 或只追踪特定子需求（用 sub_demand_id + track=true）
+
+    参数：
+    - session_token: 会话令牌
+    - demand_id: 需求 ID
+    - user_id: 你的用户 ID
+    - sub_demand_id: 子需求 ID（可选，不填则只改 subscribe_all）
+    - track: true=追踪此子需求，false=取消追踪
+    - subscribe_all: 是否追踪全部进展（不填则不改变）
+    """
+    from src.shared.auth import verify
+    from src.shared.database import async_session
+
+    try:
+        await verify(session_token)
+
+        async with async_session() as session:
+            svc = DemandService(session)
+            result = await svc.update_subscription(
+                demand_id, user_id,
+                sub_demand_id=sub_demand_id or None,
+                track=track,
+                subscribe_all=subscribe_all,
+            )
+
+        return json.dumps(result, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[update_subscription] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+
+@mcp.tool()
 async def get_demand(demand_id: str) -> str:
-    """查看一条需求的完整详情，含匹配记录和需求链。"""
+    """查看一条需求的完整详情，含匹配记录、需求链和关注人数。"""
     async with async_session() as session:
         svc = DemandService(session)
         demand = await svc.get(demand_id)
         if not demand:
             return json.dumps({"error": "需求不存在"}, ensure_ascii=False)
-        return json.dumps({
+
+        result = {
             "id": demand.id,
             "user_id": demand.user_id,
             "raw_text": demand.raw_text,
             "structured": demand.structured_json,
             "category": demand.category,
             "status": demand.status.value,
+            "parent_id": demand.parent_id,
+            "duplicate_group_id": demand.duplicate_group_id,
+            "interest_count": demand.interest_count or 1,
+            "interest_users": demand.interest_users or [],
             "created_at": demand.created_at.isoformat(),
-        }, ensure_ascii=False)
+        }
+
+        return json.dumps(result, ensure_ascii=False)
 
 # ============================================================
-# 存根工具：能力画像、匹配、需求链
+# ============================================================
+# 工具：注册能力、匹配反馈、需求链
 # ============================================================
 
 @mcp.tool()
@@ -95,9 +260,83 @@ async def register_capability(session_token: str, user_id: str, description: str
     return json.dumps({"status": "stub", "message": "能力画像注册功能开发中"}, ensure_ascii=False)
 
 @mcp.tool()
-async def search_capabilities(keyword: str = "", limit: int = 20) -> str:
-    """搜索能力画像库。"""
-    return json.dumps({"status": "stub", "results": []}, ensure_ascii=False)
+async def search_suppliers(query: str = "", top_k: int = 20) -> str:
+    """🔍 搜索供应商能力画像（TF-IDF 语义搜索，零成本）。
+
+    Agent 用自然语言描述需要的供应商特长，平台快速返回匹配结果。
+    返回含名称/分类/简介/信任分/TF-IDF 得分，Agent 自行判断是否匹配。
+
+    使用建议：
+    - query 描述越具体越好（如："800°C高温管道裂缝检测传感器"）
+    - 如果第一轮结果不够理想，换关键词再搜一次
+    - 对感兴趣的供应商调 get_supplier_detail 看完整档案
+    """
+    from src.shared.database import async_session
+    from src.shared.models import CapabilityProfile
+    from src.shared.semantic_search import TfidfSearch
+    from sqlalchemy import select
+
+    try:
+        async with async_session() as session:
+            result = await session.execute(select(CapabilityProfile))
+            profiles = list(result.scalars().all())
+
+        if not profiles:
+            return json.dumps({"status": "ok", "results": []}, ensure_ascii=False)
+
+        # 构建 TF-IDF 索引
+        idx = TfidfSearch()
+        for p in profiles:
+            card = p.agent_card_json or {}
+            text = " ".join(filter(None, [
+                card.get("name", ""),
+                card.get("description", ""),
+                card.get("category", ""),
+                card.get("industry", ""),
+                card.get("discipline", ""),
+                " ".join(card.get("skills", []) or []),
+            ]))
+            idx.add(p.id, text)
+
+        idx.build_index()
+
+        # 搜索
+        if not query.strip():
+            # 无查询词时返回最新供应商（按信任分排序）
+            scored = [(p.id, p.trust_score or 0.0) for p in profiles]
+            scored.sort(key=lambda x: -x[1])
+        else:
+            scored = idx.search(query, top_k=top_k * 2)
+
+        results = []
+        for sid, score in scored[:top_k]:
+            p = next((pp for pp in profiles if pp.id == sid), None)
+            if not p:
+                continue
+            card = p.agent_card_json or {}
+            results.append({
+                "id": p.id,
+                "name": card.get("name", "未命名"),
+                "category": card.get("category", ""),
+                "industry": card.get("industry", ""),
+                "description": (card.get("description", "") or "")[:200],
+                "skills": card.get("skills", [])[:8],
+                "trust_score": p.trust_score or 0.0,
+                "country": p.country or "",
+                "match_score": round(score, 4),
+                "profile_type": p.profile_type.value if p.profile_type else "",
+            })
+
+        return json.dumps({
+            "status": "ok",
+            "query": query,
+            "total": len(results),
+            "results": results,
+        }, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[search_suppliers] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
 async def get_pending_matches(user_id: str) -> str:
@@ -110,14 +349,86 @@ async def accept_match(session_token: str, match_id: str, action: str, note: str
     return json.dumps({"status": "stub", "match_id": match_id, "action": action}, ensure_ascii=False)
 
 @mcp.tool()
-async def extend_demand(session_token: str, parent_demand_id: str, user_id: str, raw_text: str) -> str:
-    """将一个需求拆分成子需求。子需求回到匹配引擎。"""
-    return json.dumps({"status": "stub", "message": "需求拆分功能开发中"}, ensure_ascii=False)
+async def extend_demand(session_token: str, parent_demand_id: str, user_id: str, raw_text: str, lang: str = "zh") -> str:
+    """🔗 将一条需求拆分成子需求。
+
+    供应商收到大需求后，如果发现自己只能做其中一部分，
+    或者想把需求分解成更细的条目，可以用此工具创建子需求。
+    子需求会：
+    1. 关联父需求（通过 parent_id）
+    2. 自动结构化并分类
+    3. 进入匹配引擎，匹配合适的供应商
+
+    参数：
+    - session_token: 会话令牌
+    - parent_demand_id: 父需求 ID
+    - user_id: 用户 ID
+    - raw_text: 子需求的自然语言描述
+    - lang: 语言（zh/en）
+    """
+    from src.shared.auth import verify
+    from src.shared.database import async_session
+
+    try:
+        await verify(session_token)
+
+        async with async_session() as session:
+            svc = DemandService(session)
+            sub = await svc.create_sub_demand(parent_demand_id, user_id, raw_text, lang)
+
+            # 获取父需求信息
+            parent = await svc.get(parent_demand_id)
+            parent_title = ""
+            if parent:
+                parent_title = (parent.structured_json or {}).get("requirement", {}).get("core_need", "") or parent.raw_text[:60]
+
+            return json.dumps({
+                "status": "ok",
+                "sub_demand_id": sub.id,
+                "parent_demand_id": parent_demand_id,
+                "parent_title": parent_title,
+                "sub_summary": (sub.structured_json or {}).get("requirement", {}).get("core_need", sub.raw_text[:60]) if sub.structured_json else sub.raw_text[:60],
+                "category": sub.category,
+                "status": sub.status.value,
+                "message": f"子需求已创建，将进入匹配引擎匹配合适的供应商",
+            }, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[extend_demand] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
 
 @mcp.tool()
 async def get_demand_chain(demand_id: str) -> str:
-    """查看完整需求链路（上下游关系）。"""
-    return json.dumps({"status": "stub", "chain": []}, ensure_ascii=False)
+    """🔗 查看完整需求链路（祖辈需求 → 当前需求 → 子需求）。
+
+    展示需求的完整分解树，帮助理解：
+    - 当前需求从哪个大需求拆分而来（ancestors）
+    - 当前需求已经被拆分成哪些子需求（children）
+
+    返回按时间排序的完整链路。
+    """
+    from src.shared.database import async_session
+
+    try:
+        async with async_session() as session:
+            svc = DemandService(session)
+            chain = await svc.get_chain(demand_id)
+
+            return json.dumps({
+                "status": "ok",
+                "demand_id": demand_id,
+                "chain": chain,
+                "summary": {
+                    "ancestors_count": len(chain.get("ancestors", [])),
+                    "children_count": len(chain.get("children", [])),
+                    "total_depth": len(chain.get("ancestors", [])) + 1,
+                },
+            }, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[get_demand_chain] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
 async def update_demand(demand_id: str, session_token: str, raw_text: str = "", status: str = "") -> str:
@@ -233,15 +544,277 @@ async def discover_suppliers(demand_keywords: str, ipc_class: str = "") -> str:
 
 @mcp.tool()
 async def get_supplier_detail(supplier_id: str) -> str:
-    """查看未注册供应商详情和数据来源。"""
-    return json.dumps({"status": "stub"}, ensure_ascii=False)
+    """📋 查看一个供应商的完整能力档案。
+
+    先调 search_suppliers 找到感兴趣的供应商，再用此工具看详情。
+    返回包括完整描述、技能列表、联系方式、数据来源等。
+    """
+    from src.shared.database import async_session
+    from src.shared.models import CapabilityProfile, UnclaimedSupplier
+    from sqlalchemy import select
+
+    try:
+        # 先查已注册供应商
+        async with async_session() as session:
+            result = await session.execute(
+                select(CapabilityProfile).where(CapabilityProfile.id == supplier_id)
+            )
+            profile = result.scalar_one_or_none()
+
+        if profile:
+            card = profile.agent_card_json or {}
+            return json.dumps({
+                "status": "ok",
+                "type": "registered",
+                "profile": {
+                    "id": profile.id,
+                    "user_id": profile.user_id,
+                    "name": card.get("name", "未命名"),
+                    "description": card.get("description", ""),
+                    "category": card.get("category", ""),
+                    "industry": card.get("industry", ""),
+                    "discipline": card.get("discipline", ""),
+                    "skills": card.get("skills", []),
+                    "achievements": card.get("achievements", []),
+                    "contact": card.get("contact", {}),
+                    "profile_type": profile.profile_type.value if profile.profile_type else "",
+                    "country": profile.country or "",
+                    "trust_score": profile.trust_score or 0.0,
+                    "verified": profile.verified,
+                    "is_claimed": profile.is_claimed,
+                    "created_at": profile.created_at.isoformat() if profile.created_at else "",
+                }
+            }, ensure_ascii=False)
+
+        # 再查未注册供应商
+        async with async_session() as session:
+            result = await session.execute(
+                select(UnclaimedSupplier).where(UnclaimedSupplier.id == supplier_id)
+            )
+            u = result.scalar_one_or_none()
+
+        if u:
+            return json.dumps({
+                "status": "ok",
+                "type": "unclaimed",
+                "profile": {
+                    "id": u.id,
+                    "name": u.name,
+                    "capabilities": u.capabilities,
+                    "data_sources": u.data_sources,
+                    "contact_hints": u.contact_hints,
+                    "country": u.country or "",
+                    "discovered_at": u.discovered_at.isoformat() if u.discovered_at else "",
+                }
+            }, ensure_ascii=False)
+
+        return json.dumps({"status": "not_found", "message": "供应商不存在"}, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[get_supplier_detail] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
-async def invite_supplier(session_token: str, supplier_id: str, demand_id: str) -> str:
-    """生成供应商注册邀请链接。"""
+async def match_feedback(
+    session_token: str,
+    demand_id: str,
+    matched_supplier_ids: list[str],
+    notes: str = "",
+) -> str:
+    """✅ Agent 告知平台其匹配结论。
+
+    Agent 用 search_suppliers 搜到候选后，用自己的判断决定哪些供应商匹配，
+    然后调此工具把结论记录到平台。平台会创建正式 Match 记录并通知相关方。
+
+    参数说明：
+    - session_token: 登录后获取的会话令牌
+    - demand_id: 需求的 ID
+    - matched_supplier_ids: Agent 认为匹配的供应商 ID 列表（最多 10 个）
+    - notes: Agent 的匹配理由（可选，帮助人类理解为什么选这些）
+    """
     from src.shared.auth import verify
-    await verify(session_token)
-    return json.dumps({"status": "stub", "invite_url": ""}, ensure_ascii=False)
+    from src.shared.database import async_session
+    from src.shared.models import Match, Demand, DemandStatus
+    from sqlalchemy import select
+    from uuid import uuid4
+    from datetime import datetime, timezone
+
+    try:
+        await verify(session_token)
+
+        if not matched_supplier_ids:
+            return json.dumps({"status": "error", "message": "请至少提供一个供应商 ID"}, ensure_ascii=False)
+
+        matched_supplier_ids = matched_supplier_ids[:10]  # 最多 10 个
+        created = []
+
+        async with async_session() as session:
+            # 验证需求存在
+            result = await session.execute(select(Demand).where(Demand.id == demand_id))
+            demand = result.scalar_one_or_none()
+            if not demand:
+                return json.dumps({"status": "error", "message": "需求不存在"}, ensure_ascii=False)
+
+            # 更新需求状态为匹配中
+            if demand.status == DemandStatus.NEW:
+                demand.status = DemandStatus.MATCHING
+
+            for sid in matched_supplier_ids:
+                # 避免重复
+                existing = await session.execute(
+                    select(Match).where(
+                        Match.demand_id == demand_id,
+                        Match.profile_id == sid,
+                    )
+                )
+                if existing.scalar_one_or_none():
+                    continue
+
+                match = Match(
+                    id=str(uuid4()),
+                    demand_id=demand_id,
+                    profile_id=sid,
+                    score=1.0,  # Agent 推荐，得分最高
+                    status=MatchStatus.PENDING,
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
+                )
+                session.add(match)
+                created.append(sid)
+
+            await session.commit()
+
+        return json.dumps({
+            "status": "ok",
+            "demand_id": demand_id,
+            "matched": len(created),
+            "supplier_ids": created,
+            "notes": notes,
+            "message": f"已为需求记录 {len(created)} 个 Agent 推荐匹配",
+        }, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[match_feedback] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+@mcp.tool()
+async def invite_supplier(session_token: str, supplier_id: str, demand_id: str = "") -> str:
+    """📧 邀请供应商加入需求链平台。
+
+    当发现匹配的供应商还不是平台用户时，调用此工具发送邀请。
+    如果供应商有关联邮箱，平台会代发邀请邮件（含注册链接）。
+    如果没有邮箱，返回邀请链接，用户可以手动转发。
+
+    参数：
+    - session_token: 你的会话令牌
+    - supplier_id: 供应商 ID（来自 search_suppliers 或 get_supplier_detail）
+    - demand_id: 关联的需求 ID（可选，邀请时会说明来意）
+    """
+    from src.shared.auth import verify
+    from src.shared.database import async_session
+    from src.shared.models import CapabilityProfile, UnclaimedSupplier, Demand
+    from src.shared.outreach import outreach_service
+    from urllib.parse import urlencode
+    from sqlalchemy import select
+    import secrets
+
+    try:
+        await verify(session_token)
+        invite_code = secrets.token_urlsafe(16)
+        base_url = "https://ai-demand-chain.com"
+
+        # 查找供应商
+        supplier_name = ""
+        supplier_email = ""
+        supplier_info = {}
+
+        async with async_session() as session:
+            # 先查已注册供应商
+            result = await session.execute(
+                select(CapabilityProfile).where(CapabilityProfile.id == supplier_id)
+            )
+            profile = result.scalar_one_or_none()
+            if profile:
+                card = profile.agent_card_json or {}
+                supplier_name = card.get("name", "未命名供应商")
+                contact = card.get("contact", {})
+                supplier_email = contact.get("email", "") if isinstance(contact, dict) else ""
+                supplier_info = {"type": "registered", "name": supplier_name}
+
+            if not profile:
+                # 再查未注册供应商
+                result = await session.execute(
+                    select(UnclaimedSupplier).where(UnclaimedSupplier.id == supplier_id)
+                )
+                u = result.scalar_one_or_none()
+                if u:
+                    supplier_name = u.name
+                    hints = u.contact_hints or {}
+                    if isinstance(hints, dict):
+                        emails = hints.get("emails", [])
+                        supplier_email = emails[0] if emails else ""
+                    supplier_info = {"type": "unclaimed", "name": supplier_name}
+
+            if not supplier_name:
+                return json.dumps({"status": "error", "message": "供应商不存在"}, ensure_ascii=False)
+
+            # 获取需求标题（如果有）
+            demand_title = ""
+            if demand_id:
+                result = await session.execute(
+                    select(Demand).where(Demand.id == demand_id)
+                )
+                demand = result.scalar_one_or_none()
+                if demand:
+                    demand_title = (demand.structured_json or {}).get("summary", "") or demand.raw_text[:60]
+
+        # 生成邀请链接
+        invite_params = urlencode({
+            "code": invite_code,
+            "supplier": supplier_id,
+            "name": supplier_name,
+            "demand": demand_id or "",
+        })
+        invite_url = f"{base_url}/claim-profile?{invite_params}"
+        register_url = f"{base_url}/login.html"
+
+        # 如果有邮箱，尝试发送邀请邮件
+        email_sent = False
+        if supplier_email:
+            try:
+                result = await outreach_service.deliver(
+                    demand_id=demand_id or "invite",
+                    demand_title=demand_title or "能力匹配邀请",
+                    demand_body=(
+                        f"我们发现贵公司（{supplier_name}）的能力与一条需求非常匹配。\n\n"
+                        f"邀请你加入需求链平台认领你的企业画像，"
+                        f"与需求方直接沟通。\n\n"
+                        f"认领链接（24小时有效）：{invite_url}"
+                    ),
+                    match_reason=f"基于能力画像匹配",
+                    target_company=supplier_name,
+                    target_email=supplier_email,
+                )
+                email_sent = result.success
+            except Exception:
+                logger.warning(f"[invite_supplier] 邮件发送失败: {supplier_email}")
+
+        return json.dumps({
+            "status": "ok",
+            "supplier_name": supplier_name,
+            "invite_url": invite_url,
+            "register_url": register_url,
+            "invite_code": invite_code,
+            "email_sent": email_sent,
+            "email": supplier_email if email_sent else "",
+            "message": (
+                f"已生成邀请链接，{'邮件已发送至 ' + supplier_email if email_sent else '请手动将链接发给对方'}"
+            ),
+        }, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[invite_supplier] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
 async def refresh_suppliers(domain: str = "") -> str:
@@ -252,6 +825,152 @@ async def refresh_suppliers(domain: str = "") -> str:
 async def claim_profile(invite_code: str) -> str:
     """未注册供应商认领画像升级为正式用户。"""
     return json.dumps({"status": "stub"}, ensure_ascii=False)
+
+@mcp.tool()
+async def agent_contact_supplier(
+    session_token: str,
+    supplier_id: str,
+    demand_id: str = "",
+    message: str = "",
+) -> str:
+    """💬 Agent 主动联系供应商。
+
+    匹配到供应商后，调用此工具尝试联系对方。
+    系统会自动判断最佳联系渠道：
+
+    1. 如果对方有 Agent 在线 → 自动发起 A2A 握手
+    2. 如果有邮箱 → 发送需求投递邮件
+    3. 兜底 → 生成公开页面链接
+
+    参数：
+    - session_token: 你的会话令牌
+    - supplier_id: 供应商 ID
+    - demand_id: 关联的需求 ID
+    - message: 附言（可选，告诉对方你是谁）
+    """
+    from src.shared.auth import verify
+    from src.shared.database import async_session
+    from src.shared.models import CapabilityProfile, UnclaimedSupplier, Demand
+    from src.shared.outreach import outreach_service
+    from sqlalchemy import select
+    from uuid import uuid4
+    from datetime import datetime, timezone
+
+    try:
+        await verify(session_token)
+
+        supplier_name = ""
+        supplier_email = ""
+        supplier_agent_id = ""
+        demand_title = ""
+
+        async with async_session() as session:
+            # 查注册供应商
+            result = await session.execute(
+                select(CapabilityProfile).where(CapabilityProfile.id == supplier_id)
+            )
+            profile = result.scalar_one_or_none()
+            if profile:
+                card = profile.agent_card_json or {}
+                supplier_name = card.get("name", "未命名")
+                contact = card.get("contact", {})
+                supplier_email = contact.get("email", "") if isinstance(contact, dict) else ""
+                supplier_agent_id = profile.user_id  # Agent ID
+
+            # 查未注册供应商
+            if not profile:
+                result = await session.execute(
+                    select(UnclaimedSupplier).where(UnclaimedSupplier.id == supplier_id)
+                )
+                u = result.scalar_one_or_none()
+                if u:
+                    supplier_name = u.name
+                    hints = u.contact_hints or {}
+                    if isinstance(hints, dict):
+                        emails = hints.get("emails", [])
+                        supplier_email = emails[0] if emails else ""
+
+            if not supplier_name:
+                return json.dumps({"status": "error", "message": "供应商不存在"}, ensure_ascii=False)
+
+            # 获取需求详情
+            if demand_id:
+                result = await session.execute(
+                    select(Demand).where(Demand.id == demand_id)
+                )
+                demand = result.scalar_one_or_none()
+                if demand:
+                    demand_title = (demand.structured_json or {}).get("summary", "") or demand.raw_text[:80]
+
+        # 判断最佳联系渠道
+        contacted_via = "none"
+        public_url = ""
+
+        if supplier_agent_id:
+            # 有 Agent → A2A 握手
+            from src.shared.models import CollaborationWorkspace
+            ws_id = str(uuid4())
+            async with async_session() as session:
+                ws = CollaborationWorkspace(
+                    id=ws_id, match_id="", demand_id=demand_id,
+                    demand_agent_id="", supply_agent_id=supplier_agent_id,
+                    status="pending", consent_granted=False, following=False,
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
+                )
+                session.add(ws)
+                await session.commit()
+            contacted_via = "a2a_handshake"
+
+            return json.dumps({
+                "status": "ok",
+                "supplier_name": supplier_name,
+                "contacted_via": "a2a_handshake",
+                "workspace_id": ws_id,
+                "message": f"已向 {supplier_name} 发起 A2A 握手，等待对方接受",
+            }, ensure_ascii=False)
+
+        if supplier_email:
+            # 有邮箱 → 发邮件
+            result = await outreach_service.deliver(
+                demand_id=demand_id or "",
+                demand_title=demand_title or "能力匹配",
+                demand_body=message or demand_title,
+                match_reason="基于 AI 匹配引擎推荐",
+                target_company=supplier_name,
+                target_email=supplier_email,
+            )
+            contacted_via = "email"
+            public_url = result.public_url
+
+        if not supplier_email:
+            # 没有联系方式 → 生成公开页面
+            result = await outreach_service.deliver(
+                demand_id=demand_id or "",
+                demand_title=demand_title or "能力匹配",
+                demand_body=message or demand_title,
+                match_reason="基于 AI 匹配引擎推荐",
+                target_company=supplier_name,
+            )
+            contacted_via = "public_page"
+            public_url = result.public_url
+
+        return json.dumps({
+            "status": "ok",
+            "supplier_name": supplier_name,
+            "contacted_via": contacted_via,
+            "public_url": public_url,
+            "message": {
+                "a2a_handshake": f"已与 {supplier_name} 建立 A2A 连接",
+                "email": f"邮件已发送至 {supplier_email}",
+                "public_page": f"已生成公开需求页面：{public_url}",
+                "none": "无法联系到该供应商（无 Agent、无邮箱）",
+            }.get(contacted_via, "联系完成"),
+        }, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[agent_contact_supplier] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
 async def get_agent_guide(lang: str = "zh") -> str:
@@ -1357,6 +2076,175 @@ async def generate_outreach_email(demand_title: str, demand_body: str, match_rea
         return json.dumps(result, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+# ============================================================
+# A2A 通信工具
+# ============================================================
+
+@mcp.tool()
+async def agent_handshake(
+    session_token: str,
+    target_agent_id: str,
+    my_agent_id: str,
+    message: str = "",
+) -> str:
+    """🤝 向另一个 Agent 发起 A2A 握手。
+
+    匹配完成后，Agent 可以调用此工具向匹配到的对方 Agent 发起沟通。
+    平台会创建握手通道，并通知对方 Agent。
+
+    参数：
+    - session_token: 你的会话令牌
+    - target_agent_id: 目标 Agent 的 ID（从 search_suppliers 结果中获得）
+    - my_agent_id: 你自己的 Agent ID
+    - message: 附言（可选，告诉对方你是谁、想聊什么）
+    """
+    from src.shared.auth import verify
+    from src.shared.database import async_session
+    from src.shared.models import CollaborationWorkspace
+    from uuid import uuid4
+    from datetime import datetime, timezone
+
+    try:
+        await verify(session_token)
+
+        if not target_agent_id or not my_agent_id:
+            return json.dumps({"status": "error", "message": "请提供双方 Agent ID"}, ensure_ascii=False)
+
+        workspace_id = str(uuid4())
+        async with async_session() as session:
+            ws = CollaborationWorkspace(
+                id=workspace_id,
+                match_id="",  # 可选关联匹配
+                demand_id="",
+                demand_agent_id=my_agent_id,
+                supply_agent_id=target_agent_id,
+                status="pending",
+                consent_granted=False,
+                following=False,
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+            )
+            session.add(ws)
+            await session.commit()
+
+        return json.dumps({
+            "status": "ok",
+            "workspace_id": workspace_id,
+            "message": f"已向 {target_agent_id[:8]}... 发起握手，等待对方接受",
+            "handshake_status": "pending",
+        }, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[agent_handshake] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+
+@mcp.tool()
+async def agent_accept_handshake(
+    session_token: str,
+    workspace_id: str,
+    my_agent_id: str,
+    accept: bool = True,
+    reply_message: str = "",
+) -> str:
+    """✅ 接受或拒绝另一个 Agent 的 A2A 握手邀请。
+
+    收到握手通知后，调用此工具回应对方。
+    接受后双方获得一个协作工作区，可以在其中交换信息。
+    """
+    from src.shared.auth import verify
+    from src.shared.database import async_session
+    from src.shared.models import CollaborationWorkspace
+    from sqlalchemy import select
+    from datetime import datetime, timezone
+
+    try:
+        await verify(session_token)
+
+        async with async_session() as session:
+            result = await session.execute(
+                select(CollaborationWorkspace).where(CollaborationWorkspace.id == workspace_id)
+            )
+            ws = result.scalar_one_or_none()
+            if not ws:
+                return json.dumps({"status": "error", "message": "握手通道不存在"}, ensure_ascii=False)
+
+            if accept:
+                ws.status = "active"
+                ws.consent_granted = True
+                ws.consent_granted_at = datetime.now(timezone.utc)
+                ws.updated_at = datetime.now(timezone.utc)
+                await session.commit()
+                return json.dumps({
+                    "status": "ok",
+                    "workspace_id": workspace_id,
+                    "handshake_status": "accepted",
+                    "message": "已接受握手，现在可以使用 agent_send_message 与对方通信",
+                }, ensure_ascii=False)
+            else:
+                ws.status = "rejected"
+                ws.updated_at = datetime.now(timezone.utc)
+                await session.commit()
+                return json.dumps({
+                    "status": "ok",
+                    "workspace_id": workspace_id,
+                    "handshake_status": "rejected",
+                }, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[agent_accept_handshake] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+
+@mcp.tool()
+async def agent_get_card(
+    agent_id: str,
+) -> str:
+    """📇 获取任意 Agent 的公开能力画像（Agent Card）。
+
+    不需要握手即可查询。返回该 Agent 的公开信息：
+    名称、描述、行业、分类、技能、信任分等。
+    相当于 /.well-known/agent.json?agent_id=xxx 的 MCP 版本。
+    """
+    from src.shared.database import async_session
+    from src.shared.models import CapabilityProfile
+    from sqlalchemy import select
+
+    try:
+        async with async_session() as session:
+            result = await session.execute(
+                select(CapabilityProfile).where(CapabilityProfile.id == agent_id)
+            )
+            profile = result.scalar_one_or_none()
+            if not profile:
+                return json.dumps({"status": "not_found", "message": "Agent 不存在"}, ensure_ascii=False)
+
+            card = profile.agent_card_json or {}
+            return json.dumps({
+                "status": "ok",
+                "agent_id": profile.id,
+                "name": card.get("name", "Unknown"),
+                "description": card.get("description", ""),
+                "category": card.get("category", ""),
+                "industry": card.get("industry", ""),
+                "discipline": card.get("discipline", ""),
+                "skills": card.get("skills", []),
+                "trust_score": profile.trust_score or 0.0,
+                "profile_type": profile.profile_type.value if profile.profile_type else "",
+                "country": profile.country or "",
+                "url": card.get("url", ""),
+                "trl": card.get("trl", ""),
+            }, ensure_ascii=False)
+
+    except Exception as e:
+        logger.exception("[agent_get_card] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+
+# ============================================================
+# 主入口
+# ============================================================
 
 def run():
     logging.basicConfig(level=logging.INFO)

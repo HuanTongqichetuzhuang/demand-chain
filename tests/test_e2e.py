@@ -1,7 +1,9 @@
 """
 E2E测试 — 验证核心链路：数据库建表 → 需求发布 → 读取。
+需要本地 PostgreSQL 运行中，否则自动跳过。
 """
 import asyncio
+import pytest
 import sys
 import os
 
@@ -9,13 +11,40 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.shared.database import engine, async_session, Base
 from src.shared.models import Demand, DemandStatus
+from sqlalchemy import text
 
+
+def _db_reachable():
+    """模块加载时检查 DB 是否可达"""
+    async def _check():
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            return True
+        except Exception:
+            return False
+    try:
+        return asyncio.run(_check())
+    except Exception:
+        return False
+
+
+skip_if_no_db = pytest.mark.skipif(
+    not _db_reachable(),
+    reason="需要本地 PostgreSQL（docker compose up -d db）"
+)
+
+
+@skip_if_no_db
+@pytest.mark.asyncio
 async def test_db_tables():
     """测试：创建所有表"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     print("所有表已创建（demands, capability_profiles, unclaimed_suppliers, matches, forum_*, collaboration_*, working_memory_*）")
 
+@skip_if_no_db
+@pytest.mark.asyncio
 async def test_create_demand():
     """测试：创建一条需求"""
     async with async_session() as session:

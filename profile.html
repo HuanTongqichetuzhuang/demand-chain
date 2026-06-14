@@ -186,7 +186,7 @@ async function loadUserData() {
     }
     
     updateNav(userData.display_name || currentUser.email, userData.avatar);
-  } catch(e) {}
+  } catch(e) { console.error("loadUserData:", e); showError("userDataMsg", "加载用户数据失败"); }
 }
 
 async function loadUserStats() {
@@ -196,7 +196,7 @@ async function loadUserStats() {
     document.getElementById("statDemands").textContent = s.demands || 0;
     document.getElementById("statTopics").textContent = s.topics || 0;
     document.getElementById("statReplies").textContent = s.replies || 0;
-  } catch(e) {}
+  } catch(e) { console.error("loadUserStats:", e); }
   loadMyMatches();
 }
 
@@ -265,7 +265,7 @@ async function saveNotify() {
     });
     document.getElementById("notifyMsg").innerHTML = '<div class="msg msg-ok">通知设置已保存</div>';
     setTimeout(function(){ document.getElementById("notifyMsg").innerHTML = ''; }, 2000);
-  } catch(e) {}
+  } catch(e) { console.error("saveNotify:", e); }
 }
 
 function updateNav(name, avatar) {
@@ -343,7 +343,7 @@ function esc(s) { return String(s||"").replace(/</g,"&lt;").replace(/>/g,"&gt;")
 
 checkLogin();
 </script>
-<script src="/nav.js"></script>
-<script src="/i18n.js"></script>
+<script src="/nav.js?v=1"></script>
+<script src="/i18n.js?v=1"></script>
 </body>
 </html>
