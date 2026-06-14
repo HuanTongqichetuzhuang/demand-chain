@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>邮箱验证 - 需求链平台</title>
+<link rel="icon" href="logo.jpg" type="image/jpeg">
+<style>
+:root{--bg:#0c0c1d;--card-bg:#14142b;--text:#e8e8f0;--ts:#9090b0;--accent:#7c6ef0;--border:#2a2a4a;--green:#00b894}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:40px;max-width:480px;text-align:center;margin:20px}
+.loading{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.status-icon{font-size:48px;margin-bottom:16px}
+.btn{display:inline-block;margin-top:20px;padding:10px 28px;border-radius:10px;background:var(--accent);color:#fff;text-decoration:none;font-weight:600}
+</style>
+</head>
+<body>
+<div class="card">
+  <div id="result">
+    <div class="status-icon loading">⏳</div>
+    <h2>验证中...</h2>
+    <p style="color:var(--ts);margin-top:8px">正在验证你的邮箱地址</p>
+  </div>
+</div>
+<script>
+(async function(){
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("token");
+  const div = document.getElementById("result");
+  if (!token) {
+    div.innerHTML = '<div class="status-icon">❌</div><h2>无效链接</h2><p style="color:var(--ts);margin-top:8px">缺少验证令牌</p><a href="login.html" class="btn">返回登录</a>';
+    return;
+  }
+  try {
+    const r = await fetch("/api/verify-email?token=" + encodeURIComponent(token));
+    const d = await r.json();
+    if (d.status === "ok") {
+      div.innerHTML = '<div class="status-icon">✅</div><h2 style="color:var(--green)">验证成功！</h2><p style="color:var(--ts);margin-top:8px">'+d.message+'</p><a href="login.html" class="btn">前往登录</a>';
+    } else {
+      div.innerHTML = '<div class="status-icon">❌</div><h2>验证失败</h2><p style="color:var(--ts);margin-top:8px">'+(d.error||"链接无效或已过期")+'</p><a href="login.html" class="btn">返回登录</a>';
+    }
+  } catch(e) {
+    div.innerHTML = '<div class="status-icon">❌</div><h2>网络错误</h2><p style="color:var(--ts);margin-top:8px">请检查网络后重试</p><a href="login.html" class="btn">返回登录</a>';
+  }
+})();
+</script>
+</body>
+</html>
