@@ -356,15 +356,44 @@ async def api_forum_replies(request):
 
 
 async def api_suppliers(request):
-    """GET /api/suppliers — 获取公开供应商资料"""
+    """GET /api/suppliers — 获取公开供应商资料（支持分页+搜索）"""
     from src.shared.database import async_session
     from src.shared.models import CapabilityProfile
-    from sqlalchemy import select
+    from sqlalchemy import select, func
     try:
+        # 分页参数
+        page = int(request.query_params.get('page', 1))
+        per_page = int(request.query_params.get('per_page', 50))
+        keyword = request.query_params.get('keyword', '').strip()
+        page = max(1, page)
+        per_page = max(1, min(200, per_page))
+        offset = (page - 1) * per_page
+
         async with async_session() as session:
-            result = await session.execute(select(CapabilityProfile).order_by(CapabilityProfile.created_at.desc()).limit(100))
+            query = select(CapabilityProfile)
+            
+            # 关键词搜索
+            if keyword:
+                query = query.where(
+                    CapabilityProfile.agent_card_json['name'].as_string().ilike(f'%{keyword}%') |
+                    CapabilityProfile.agent_card_json['description'].as_string().ilike(f'%{keyword}%') |
+                    CapabilityProfile.agent_card_json['industry'].as_string().ilike(f'%{keyword}%') |
+                    CapabilityProfile.agent_card_json['discipline'].as_string().ilike(f'%{keyword}%')
+                )
+            
+            # 总数
+            count_result = await session.execute(select(func.count()).select_from(query.subquery()))
+            total = count_result.scalar()
+
+            # 分页数据
+            result = await session.execute(
+                query.order_by(CapabilityProfile.created_at.desc())
+                .limit(per_page)
+                .offset(offset)
+            )
             profiles = result.scalars().all()
-            return JSONResponse([{
+
+            items = [{
                 'id': p.id,
                 'user_id': p.user_id,
                 'profile_type': p.profile_type,
@@ -378,9 +407,19 @@ async def api_suppliers(request):
                 'category': p.agent_card_json.get('category',''),
                 'industry': p.agent_card_json.get('industry',''),
                 'discipline': p.agent_card_json.get('discipline',''),
+                'process': p.agent_card_json.get('process',[]),
+                'contact': p.agent_card_json.get('contact',{}),
                 'trl': p.agent_card_json.get('trl',0),
                 'url': p.agent_card_json.get('url',''),
-            } for p in profiles])
+            } for p in profiles]
+
+            return JSONResponse({
+                'items': items,
+                'total': total,
+                'page': page,
+                'per_page': per_page,
+                'total_pages': (total + per_page - 1) // per_page if total > 0 else 0,
+            })
     except Exception as e:
         return JSONResponse({'error':str(e)}, status_code=500)
 
@@ -560,24 +599,36 @@ async def api_forum_topic_detail(request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 async def api_demand_list(request):
-    """GET /api/demands — 需求列表，支持语义搜索"""
+    """GET /api/demands — 需求列表，支持分页、语义搜索"""
     from src.shared.database import async_session
     from src.shared.models import Demand
     from src.shared.semantic_search import demand_search, TfidfSearch
+    from sqlalchemy import select, func
     try:
         keyword = request.query_params.get("keyword", "").strip()
         category = request.query_params.get("category", "")
         sort = request.query_params.get("sort", "new")
-        limit = int(request.query_params.get("limit", "200"))
+        page = int(request.query_params.get("page", 1))
+        per_page = int(request.query_params.get("per_page", 50))
+        page = max(1, page)
+        per_page = max(1, min(200, per_page))
+        offset = (page - 1) * per_page
 
         async with async_session() as session:
-            from sqlalchemy import select
+            # Get total count
+            count_result = await session.execute(select(func.count(Demand.id)))
+            total = count_result.scalar()
+
             result = await session.execute(
                 select(Demand).order_by(Demand.created_at.desc()).limit(2000)
             )
             all_demands = list(result.scalars().all())
 
-        # Build search index if keyword present
+        # Filter by category
+        if category:
+            all_demands = [d for d in all_demands if d.category == category]
+
+        # Semantic search
         if keyword:
             search = TfidfSearch()
             for d in all_demands:
@@ -590,29 +641,38 @@ async def api_demand_list(request):
                     text += " " + " ".join(s.get("tags", []))
                 search.add(d.id, text)
             search.build_index()
-            scored = search.search(keyword, top_k=limit)
+            scored = search.search(keyword, top_k=len(all_demands))
             id_to_d = {d.id: d for d in all_demands}
             ranked = [id_to_d[did] for did, score in scored if did in id_to_d]
-            # Append remaining that match by ILIKE
             seen = {d.id for d in ranked}
             for d in all_demands:
                 if d.id not in seen and keyword.lower() in (d.raw_text or "").lower():
                     ranked.append(d)
-            demands = ranked[:limit]
-        elif category:
-            demands = [d for d in all_demands if d.category == category][:limit]
-        else:
-            demands = all_demands[:limit]
+            all_demands = ranked
 
-        return JSONResponse([{
-            "id": d.id,
-            "raw_text": d.raw_text[:200] if d.raw_text else "",
-            "category": d.category,
-            "status": d.status.value if d.status else "open",
-            "summary": (d.structured_json.get("summary", "") if d.structured_json else ""),
-            "tags": (d.structured_json.get("tags", []) if d.structured_json else []),
-            "created_at": d.created_at.isoformat() if d.created_at else "",
-        } for d in demands])
+        # Sort
+        if sort == "old":
+            all_demands.reverse()
+
+        total = len(all_demands)
+        total_pages = (total + per_page - 1) // per_page if total > 0 else 0
+        page_items = all_demands[offset:offset + per_page]
+
+        return JSONResponse({
+            "items": [{
+                "id": d.id,
+                "raw_text": d.raw_text[:300] if d.raw_text else "",
+                "category": d.category,
+                "status": d.status.value if d.status else "open",
+                "summary": (d.structured_json.get("summary", "") if d.structured_json else ""),
+                "tags": (d.structured_json.get("tags", []) if d.structured_json else []),
+                "created_at": d.created_at.isoformat() if d.created_at else "",
+            } for d in page_items],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": total_pages,
+        })
     except Exception as e:
         return JSONResponse({"error": str(e), "demands": []}, status_code=500)
 

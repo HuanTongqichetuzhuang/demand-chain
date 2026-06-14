@@ -115,6 +115,36 @@ SOURCES = {
         "extractor": "grant_search",
         "label": "Grants.gov美国联邦资助",
     },
+    # === 中国技术需求来源 ===
+    "sdut_tech_demands": {
+        "enabled": True,
+        "url": "https://research.sdut.edu.cn/jsxq/list.htm",
+        "type": "demand",
+        "extractor": "generic_links",
+        "label": "中国各地企业技术需求（高校汇总）",
+    },
+    "ningbo_challenge": {
+        "enabled": True,
+        "url": "http://www.nbhpsa.cn/a/tongzhigonggao/20260528/3421.html",
+        "type": "demand",
+        "extractor": "generic_links",
+        "label": "宁波创新挑战赛企业技术需求",
+    },
+    "suzhou_jiebang": {
+        "enabled": True,
+        "url": "https://kjcyc.usts.edu.cn/info/1046/5927.htm",
+        "type": "demand",
+        "extractor": "generic_links",
+        "label": "苏州市揭榜挂帅关键核心技术攻关",
+    },
+    # === 更多海外挑战平台 ===
+    "herox_challenges": {
+        "enabled": True,
+        "url": "https://www.herox.com/challenges",
+        "type": "demand",
+        "extractor": "generic_links",
+        "label": "HeroX挑战赛",
+    },
     # === 供应商 / 公司来源 ===
     "startus_ccus": {
         "enabled": True,
@@ -210,6 +240,42 @@ NAV_SKIP_TITLE = [
     "get.agorize", "powered by agorize",
     "about this site", "using this site",
     "agree to support", "icfcrt",
+    # 导航短语过滤器（新增）
+    "check out", "view all", "explore our", "learn about",
+    "discover how", "see all", "browse our",
+    "solve challenge final", "challenge statements",
+    "health at home", "connecting talent",
+    "nih nams", "prize competition",
+    "undercover backstopping",
+    "high school equivalency", "college assistance migrant",
+    "alfalfa", "japanese american confinement",
+    "research fund for international scientists",
+    "freedom 250", "american spaces",
+    "disaster distress helpline",
+    "science fund for global",
+]
+
+# 负向关键词 — 如果标题包含这些词，判定为非技术类需求，直接跳过
+NEGATIVE_KEYWORDS = [
+    "migrant", "suicide", "disaster distress", "high school",
+    "college assistance", "police", "sheriff", "law enforcement",
+    "labor certification", "agriculture food", "agricultural",
+    "food for peace", "confinement", "alumni engagement",
+    "backstopping", "foreign labor",
+    "residence instruction", "institutions of higher education",
+    "undercover", "american spaces", "freedom 250",
+    # 补充（来自Grants.gov的剩余非技术类条目）
+    "binational centers", "cervid", "chronic wasting", "distance education",
+    "manufacturing in america", "grant administration for",
+    "garrett lee smith", "suicide prevention", "youth suicide",
+    "young adults at clinical", "aquaculture research",
+    "undercover backstopping", "special research grants",
+    "u.s. mission", "embassy", "public diplomacy",
+    "american spaces support", "freedom250",
+    "generic program announcement", "understanding and promoting",
+    "cooperative agreement for affiliated",
+    "community programs for youth",
+    "staff sergeant fox",
 ]
 
 DEMAND_KEYWORDS = [
@@ -254,6 +320,10 @@ def extract_generic_links(html, base_url, source_label):
         if not has_demand_kw:
             continue
 
+        # Skip non-tech grants (government administrative grants)
+        if any(kw in title_lower for kw in NEGATIVE_KEYWORDS):
+            continue
+
         # Build absolute URL
         if path.startswith("http"):
             url = path
@@ -279,13 +349,22 @@ def extract_demands_from_darpa(html):
 
 
 def extract_demands_from_grant_search(html):
-    """Extract demands from Grants.gov search results."""
+    """Extract demands from Grants.gov search results with quality filtering."""
     demands = []
     pattern = r'<a[^>]*href="[^"]*opportunity[^"]*"[^>]*>([^<]+)</a>'
     for match in re.finditer(pattern, html):
         title = match.group(1).strip()
-        if len(title) > 20:
-            demands.append({"title": title, "source": "Grants.gov", "url": "https://simpler.grants.gov/search", "body": title})
+        title_lower = title.lower()
+        # Filter: skip short titles
+        if len(title) < 25:
+            continue
+        # Filter: skip non-tech grants via negative keywords
+        if any(kw in title_lower for kw in NEGATIVE_KEYWORDS):
+            continue
+        # Filter: skip navigation/footer titles
+        if any(skip in title_lower for skip in NAV_SKIP_TITLE):
+            continue
+        demands.append({"title": title, "source": "Grants.gov", "url": "https://simpler.grants.gov/search", "body": title})
     return demands
 
 
@@ -314,6 +393,11 @@ def extract_demands_from_xprize(html):
         headings = re.findall(r'>([A-Z][A-Za-z0-9 /\-]{10,80})</a>', html)
     for title in headings:
         title = title.strip()
+        # Skip navigation text
+        if title.lower() in ("grand challenges", "challenges and prize competitions"):
+            continue
+        if any(skip in title.lower() for skip in NAV_SKIP_TITLE):
+            continue
         if any(kw in title.lower() for kw in ["prize", "challenge", "competition", "xpize", "award"]) or len(title) > 15:
             demands.append({"title": title, "source": "XPRIZE竞赛", "url": "https://www.xprize.org/competitions", "body": title})
     return demands
@@ -482,6 +566,8 @@ def seed_suppliers_to_db(suppliers):
                 "trl": 0,
                 "url": s.get("url", ""),
                 "skills": [],
+                "process": [],
+                "contact": {},
             },
         }).encode("utf-8")
         try:
@@ -574,6 +660,20 @@ def crawl_source(src_key):
     
     demands = extractor(html, src_key)
     print(f"  Found {len(demands)} items")
+    
+    # Quality filter: remove anything that matches negative keywords
+    filtered = []
+    for d in demands:
+        text = (d.get("body", "") or d.get("title", "")).lower()
+        # Navigation text / short generic titles
+        if len(text) < 25:
+            continue
+        # Non-tech grants
+        if any(kw in text for kw in NEGATIVE_KEYWORDS):
+            print(f"  🚫 FILTERED (non-tech): {d['title'][:40]}")
+            continue
+        filtered.append(d)
+    demands = filtered
     
     for d in demands:
         d["category"] = classify(d.get("body", "") or d.get("title", ""))
