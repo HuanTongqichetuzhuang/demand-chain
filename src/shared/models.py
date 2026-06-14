@@ -23,6 +23,8 @@ class User(Base):
     country: Mapped[str] = mapped_column(String(128), default="")
     api_key: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
     email_notify: Mapped[bool] = mapped_column(default=True)
+    avatar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now)
     last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

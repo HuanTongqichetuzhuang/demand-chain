@@ -197,7 +197,7 @@ footer .links a:hover{color:var(--text)}
 
   <!-- Filter bar -->
   <div class="filter-bar">
-    <input type="text" id="searchInput" placeholder="搜索需求关键词、技术指标..." oninput="loadDemands()">
+    <input type="text" id="searchInput" placeholder="搜索需求关键词、技术指标..." oninput="debouncedSearch()">
     <select id="industryFilter" onchange="loadDemands()">
       <option value="">全部行业</option>
       <option value="sensor_tech">传感器技术</option><option value="materials_science">材料科学</option>
@@ -263,16 +263,30 @@ footer .links a:hover{color:var(--text)}
 <script>
 const API = "";
 let allDemands = [];
+let currentPage = 1;
+let totalPages = 1;
+let perPage = 20;
 let disciplineFilter = "";
 let activeDemandId = null;
 let followedDemands = JSON.parse(localStorage.getItem("dc_followed")||"[]");
 
-async function fetchDemands() {
+async function fetchDemands(page) {
+  page = page || 1;
+  currentPage = page;
   try {
-    var resp = await fetch(API + "/api/demands");
-    allDemands = await resp.json();
+    var url = API + "/api/demands?page=" + page + "&per_page=" + perPage;
+    var search = (document.getElementById("searchInput")||{}).value || "";
+    var cat = document.getElementById("industryFilter").value || "";
+    if (search) url += "&keyword=" + encodeURIComponent(search);
+    if (cat) url += "&category=" + encodeURIComponent(cat);
+    
+    var resp = await fetch(url);
+    var data = await resp.json();
+    allDemands = data.items || [];
+    totalPages = data.total_pages || 1;
     loadDemands();
-    buildFilters();
+    if (page === 1) buildFilters();
+    renderPagination();
   } catch(e) {
     console.error(e);
     document.getElementById("demandGrid").innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px">无法加载数据，请刷新重试</p>';
@@ -281,13 +295,12 @@ async function fetchDemands() {
 
 function buildFilters() {
   var cats = [];
-  allDemands.forEach(function(d) { if (d.category && d.status === "open" && cats.indexOf(d.category) < 0) cats.push(d.category); });
+  allDemands.forEach(function(d) { if (d.category && cats.indexOf(d.category) < 0) cats.push(d.category); });
   var tags = document.getElementById("disciplineTags");
-  var openCount = allDemands.filter(function(d){ return d.status === "open"; }).length;
-  tags.innerHTML = '<span class="tag active" onclick="filterCategory(\'\')">全部 <span class="count">' + openCount + '</span></span>';
+  var total = document.querySelector("#pagination .page-info");
+  tags.innerHTML = '<span class="tag active" onclick="filterCategory(\'\')">全部</span>';
   cats.forEach(function(c) {
-    var cnt = allDemands.filter(function(d){ return d.category === c && d.status === "open"; }).length;
-    tags.innerHTML += '<span class="tag" onclick="filterCategory(\''+ c.replace(/'/g,"\'") +'\')">'+ c +' <span class="count">'+ cnt +'</span></span>';
+    tags.innerHTML += '<span class="tag" onclick="filterCategory(\''+ c.replace(/'/g,"\'") +'\')">'+ c +'</span>';
   });
 }
 
@@ -296,35 +309,49 @@ function filterCategory(c) {
   var allTags = document.querySelectorAll("#disciplineTags .tag");
   allTags.forEach(function(t) { t.classList.remove("active"); });
   allTags.forEach(function(t) { if (t.textContent.trim().startsWith(c || "全部")) t.classList.add("active"); });
-  loadDemands();
+  fetchDemands(1);
+}
+
+function renderPagination() {
+  var html = '';
+  html += '<button class="page-btn" onclick="fetchDemands('+(currentPage-1)+')" '+(currentPage<=1?'disabled':'')+'>‹ 上一页</button>';
+  var start = Math.max(1, currentPage - 2);
+  var end = Math.min(totalPages, currentPage + 2);
+  if(start > 1){html+='<button class="page-btn" onclick="fetchDemands(1)">1</button>';if(start>2)html+='<span class="page-info">...</span>'}
+  for(var p=start;p<=end;p++){html+='<button class="page-btn'+(p===currentPage?' active':'')+'" onclick="fetchDemands('+p+')">'+p+'</button>'}
+  if(end < totalPages){if(end<totalPages-1)html+='<span class="page-info">...</span>';html+='<button class="page-btn" onclick="fetchDemands('+totalPages+')">'+totalPages+'</button>'}
+  html += '<button class="page-btn" onclick="fetchDemands('+(currentPage+1)+')" '+(currentPage>=totalPages?'disabled':'')+'>下一页 ›</button>';
+  html += '<span class="page-info">第'+currentPage+'/'+totalPages+'页</span>';
+  document.getElementById("pagination").innerHTML = html;
+}
+
+let searchTimeout = null;
+function debouncedSearch() {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(function() { fetchDemands(1); }, 400);
 }
 
 function esc(s) { return String(s||"").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
 function loadDemands() {
-  var search = (document.getElementById("searchInput")||{}).value || "";
   var grid = document.getElementById("demandGrid");
-  var data = allDemands.filter(function(d) {
-    if (search && d.raw_text.toLowerCase().indexOf(search.toLowerCase()) < 0 && (d.category||"").toLowerCase().indexOf(search.toLowerCase()) < 0) return false;
-    if (disciplineFilter && d.category !== disciplineFilter) return false;
-    return d.status === "open";
-  });
-  
-  if (data.length === 0) {
+  if (allDemands.length === 0) {
     grid.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px">没有匹配的需求</p>';
     return;
   }
   
-  grid.innerHTML = data.map(function(d) {
+  grid.innerHTML = allDemands.map(function(d) {
     var title = esc(d.raw_text);
     if (title.length > 70) title = title.substring(0,70) + "...";
     var cat = esc(d.category || "未分类");
     var date = d.created_at ? new Date(d.created_at).toLocaleDateString() : "";
     var body = esc(d.raw_text).slice(0,150);
+    var tags = (d.tags||[]).map(function(t){ return '<span class="d-tag" style="padding:2px 8px;border-radius:4px;font-size:.75em;border:1px solid var(--border);color:var(--text-secondary);background:rgba(108,92,231,.05)">'+esc(t)+'</span>'; }).join("");
     return '<div class="demand-card" onclick="openDetail(\''+ d.id.replace(/'/g,"\'") +'\')">'+
       '<div class="header"><h3>'+ title +'</h3>'+
       '<span class="badge badge-open">open</span></div>'+
       '<div class="meta"><span>'+ cat +'</span><span>'+ date +'</span></div>'+
+      (tags ? '<div class="tags" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">'+tags+'</div>' : '')+
       '<div class="body">'+ body +'</div></div>';
   }).join("");
 }
@@ -333,10 +360,11 @@ function openDetail(id) {
   activeDemandId = id;
   var d = allDemands.find(function(m){ return m.id === id; });
   if (!d) return;
+  var tags = (d.tags||[]).map(function(t){ return '<span class="d-tag" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:.8em;background:rgba(124,110,240,.1);color:var(--purple)">'+esc(t)+'</span>'; }).join("");
   document.getElementById("modalTitle").textContent = esc(d.raw_text).substring(0,60) + (d.raw_text.length>60?'...':'');
   document.getElementById("modalBody").textContent = d.raw_text;
   document.getElementById("modalMeta").innerHTML = "<strong>分类:</strong> "+esc(d.category||"未分类")+"  &nbsp;|&nbsp;  <strong>发布:</strong> "+(d.created_at?new Date(d.created_at).toLocaleDateString():"")+"  &nbsp;|&nbsp;  <strong>ID:</strong> <code style='font-size:.8em'>"+d.id+"</code>";
-  document.getElementById("modalTags").innerHTML = '<span class="d-tag" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:.8em">'+esc(d.category||'未分类')+'</span><span class="d-tag" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:.8em;background:rgba(124,110,240,.1);color:var(--purple)">'+esc(d.status||'open')+'</span>';
+  document.getElementById("modalTags").innerHTML = '<span class="d-tag" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:.8em">'+esc(d.category||'未分类')+'</span><span class="d-tag" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:.8em;background:rgba(0,184,148,.1);color:var(--green)">'+esc(d.status||'open')+'</span>'+ (tags ? ' '+tags : '');
   document.getElementById("modalOverlay").classList.remove("hidden");
 }
 
@@ -351,7 +379,7 @@ function copyDemandPrompt(id) {
   navigator.clipboard.writeText(prompt).then(function(){ alert("已复制到剪贴板"); });
 }
 
-fetchDemands();
+fetchDemands(1);
 </script>
 <footer>
   <div class="links">
