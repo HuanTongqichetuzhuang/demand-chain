@@ -404,9 +404,6 @@ async def api_login(request):
             if not user:
                 return JSONResponse({"error": "邮箱未注册"}, status_code=401)
             
-            if not user.email_verified:
-                return JSONResponse({"error": "邮箱尚未验证，请查收验证邮件并点击验证链接"}, status_code=401)
-            
             # 密码验证（兼容 bcrypt 和旧版 SHA256）
             stored_hash = user.password_hash
             if stored_hash.startswith("$2b$") or stored_hash.startswith("$2a$"):
