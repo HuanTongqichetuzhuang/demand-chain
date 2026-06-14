@@ -7,6 +7,14 @@ import uvicorn
 from starlette.applications import Starlette
 from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Route
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def lifespan(app):
+    from src.shared.database import init_db
+    await init_db()
+    yield
 
 WEB_ROOT = "/app"
 
@@ -897,7 +905,7 @@ routes = [
     Route("/{path:path}", static_file),
 ]
 
-app = Starlette(routes=routes)
+app = Starlette(routes=routes, lifespan=lifespan)
 
 def run():
     uvicorn.run(app, host="0.0.0.0", port=80, log_level="info")
