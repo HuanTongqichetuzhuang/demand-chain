@@ -12,3 +12,11 @@ class Base(DeclarativeBase):
 async def get_db() -> AsyncSession:
     async with async_session() as session:
         yield session
+
+async def init_db():
+    """Initialize database — create all tables if they don't exist"""
+    async with engine.begin() as conn:
+        from src.shared.models import Base
+        await conn.run_sync(Base.metadata.create_all)
+    import logging
+    logging.getLogger(__name__).info("Database tables initialized")

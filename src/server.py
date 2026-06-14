@@ -27,7 +27,7 @@ mcp = FastMCP("需求链平台")
 async def publish_demand(user_id: str, raw_text: str, session_token: str, lang: str = "zh") -> str:
     """发布一条需求。必须先注册/登录获得 session_token。"""
     from src.shared.auth import verify
-    verify(session_token)
+    await verify(session_token)
     async with async_session() as session:
         svc = DemandService(session)
         demand = await svc.publish(user_id, raw_text, lang=lang)
@@ -91,7 +91,7 @@ async def get_demand(demand_id: str) -> str:
 async def register_capability(session_token: str, user_id: str, description: str) -> str:
     """注册能力画像。AI 辅助生成结构化 Agent Card。"""
     from src.shared.auth import verify
-    verify(session_token)
+    await verify(session_token)
     return json.dumps({"status": "stub", "message": "能力画像注册功能开发中"}, ensure_ascii=False)
 
 @mcp.tool()
@@ -123,7 +123,7 @@ async def get_demand_chain(demand_id: str) -> str:
 async def update_demand(demand_id: str, session_token: str, raw_text: str = "", status: str = "") -> str:
     """修改已有需求。必须先注册/登录获得 session_token。"""
     from src.shared.auth import verify
-    verify(session_token)
+    await verify(session_token)
     """
     修改已有需求。可更新描述文本或状态。
     status: open | in_progress | fulfilled | closed
@@ -240,7 +240,7 @@ async def get_supplier_detail(supplier_id: str) -> str:
 async def invite_supplier(session_token: str, supplier_id: str, demand_id: str) -> str:
     """生成供应商注册邀请链接。"""
     from src.shared.auth import verify
-    verify(session_token)
+    await verify(session_token)
     return json.dumps({"status": "stub", "invite_url": ""}, ensure_ascii=False)
 
 @mcp.tool()
@@ -311,7 +311,7 @@ async def register_human(email: str, display_name: str, password: str) -> str:
         }
 
         from src.shared.auth import create_token
-        token = create_token(human_id, identity.agent_id)
+        token = await create_token(human_id, identity.agent_id)
         return json.dumps({
             "status": "ok",
             "human_id": human_id,
@@ -351,7 +351,7 @@ async def login_human(email: str, password: str, display_name: str = "") -> str:
         )
 
         from src.shared.auth import create_token
-        token = create_token(human_id, new_identity.agent_id)
+        token = await create_token(human_id, new_identity.agent_id)
         return json.dumps({
             "status": "ok",
             "human_id": human_id,
@@ -406,7 +406,7 @@ async def list_available_tools(session_token: str = "") -> str:
     ]
 
     try:
-        verify(session_token)
+        await verify(session_token)
         # 已认证，返回全部工具
         all_tools = [
             {"name": "publish_demand", "desc": "发布需求"},
@@ -513,7 +513,7 @@ async def forum_list_topics(category: str = "", sort: str = "hot", limit: int = 
 async def forum_create_topic(session_token: str, agent_id: str, title: str, body: str, category: str = "general", demand_id: str = "") -> str:
     """发布一个新话题。"""
     from src.shared.auth import verify
-    verify(session_token)
+    await verify(session_token)
     try:
         async with async_session() as session:
             svc = ForumService(session)
@@ -542,7 +542,7 @@ async def forum_get_topic(topic_id: str) -> str:
 async def forum_reply(session_token: str, agent_id: str, topic_id: str, body: str) -> str:
     """回复一个话题。"""
     from src.shared.auth import verify
-    verify(session_token)
+    await verify(session_token)
     try:
         async with async_session() as session:
             svc = ForumService(session)
@@ -632,7 +632,7 @@ async def get_session_state(agent_id: str) -> str:
 async def workspace_create(session_token: str, match_id: str, demand_id: str, demand_agent_id: str, supply_agent_id: str) -> str:
     """创建协作工作区（匹配接受后自动调用）。"""
     from src.shared.auth import verify
-    verify(session_token)
+    await verify(session_token)
     from src.matching.collaboration import CollaborationService
     try:
         async with async_session() as session:
@@ -650,7 +650,7 @@ async def workspace_add_entry(session_token: str, workspace_id: str, agent_id: s
     entry_type: clarification(需求澄清)| spec_refinement(指标细化)| proposal(方案建议)| decision(决策)| progress(进展)| blocker(障碍)
     """
     from src.shared.auth import verify
-    verify(session_token)
+    await verify(session_token)
     from src.matching.collaboration import CollaborationService
     try:
         async with async_session() as session:
@@ -679,7 +679,7 @@ async def workspace_get_entries(workspace_id: str, agent_role: str = "any") -> s
 async def workspace_grant_consent(session_token: str, workspace_id: str) -> str:
     """需求方授权供给方参与协作、查看进展。"""
     from src.shared.auth import verify
-    verify(session_token)
+    await verify(session_token)
     from src.matching.collaboration import CollaborationService
     try:
         async with async_session() as session:
@@ -705,7 +705,7 @@ async def workspace_revoke_consent(workspace_id: str) -> str:
 async def workspace_follow(session_token: str, workspace_id: str) -> str:
     """供给方关注需求进展（需先获得需求方授权）。关注后，需求状态变更时Agent会收到通知。"""
     from src.shared.auth import verify
-    verify(session_token)
+    await verify(session_token)
     from src.matching.collaboration import CollaborationService
     try:
         async with async_session() as session:
@@ -813,7 +813,7 @@ async def list_discovered_demands(source: str = "", limit: int = 30) -> str:
 async def import_discovered_demand(session_token: str, demand_id: str, user_id: str) -> str:
     """将一条公开发现的需求转为正式需求，发布到平台上。"""
     from src.shared.auth import verify
-    verify(session_token)
+    await verify(session_token)
     try:
         async with async_session() as session:
             result = await session.execute(
@@ -949,9 +949,9 @@ async def create_discovery_task(session_token: str, demand_keywords: str, ipc_cl
     from src.shared.task_manager import create_task, complete_task, fail_task
     import asyncio
     try:
-        auth = verify(session_token)
+        auth = await verify(session_token)
         human_id = auth["human_id"]
-        task_id = create_task(human_id, f"发现供应商: {demand_keywords[:30]}")
+        task_id = await create_task(human_id, f"发现供应商: {demand_keywords[:30]}")
 
         # 后台执行
         async def run_discovery():
@@ -959,7 +959,7 @@ async def create_discovery_task(session_token: str, demand_keywords: str, ipc_cl
                 from src.discovery.engine import discover_for_demand
                 keywords = [k.strip() for k in demand_keywords.split(",") if k.strip()]
                 if not keywords:
-                    fail_task(task_id, "请提供至少一个关键词")
+                    await fail_task(task_id, "请提供至少一个关键词")
                     return
                 results = await discover_for_demand(demand_keywords, keywords)
                 # 写入 unclaimed_suppliers 表
@@ -983,16 +983,16 @@ async def create_discovery_task(session_token: str, demand_keywords: str, ipc_cl
                                 score=item.get("score", 0.0),
                             ))
                     await session.commit()
-                complete_task(task_id, results)
+                await complete_task(task_id, results)
             except Exception as e:
-                fail_task(task_id, str(e))
+                await fail_task(task_id, str(e))
 
         asyncio.create_task(run_discovery())
 
         return json.dumps({
             "status": "ok",
             "task_id": task_id,
-            "message": "搜索任务已创建，用 get_task(task_id) 查看进度。",
+            "message": "搜索任务已创建，用 await get_task(task_id) 查看进度。",
         }, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
@@ -1006,9 +1006,9 @@ async def get_task(task_id: str, session_token: str = "") -> str:
         human_id = ""
         if session_token:
             from src.shared.auth import verify
-            auth = verify(session_token)
+            auth = await verify(session_token)
             human_id = auth["human_id"]
-        result = get_task(task_id, human_id)
+        result = await get_task(task_id, human_id)
         return json.dumps(result, ensure_ascii=False, default=str)
     except Exception as e:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
@@ -1020,8 +1020,8 @@ async def list_tasks(session_token: str, limit: int = 10) -> str:
     from src.shared.auth import verify
     from src.shared.task_manager import list_tasks
     try:
-        auth = verify(session_token)
-        tasks = list_tasks(auth["human_id"], limit)
+        auth = await verify(session_token)
+        tasks = await list_tasks(auth["human_id"], limit)
         return json.dumps({"tasks": tasks}, ensure_ascii=False, default=str)
     except Exception as e:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
@@ -1038,7 +1038,7 @@ async def contribute_to_platform(session_token: str,
     contribution_type: money | testimonial | referral | code | content
     """
     from src.shared.auth import verify
-    verify(session_token)
+    await verify(session_token)
     from src.shared.contribution import contribution_service
     try:
         result = await contribution_service.record(
@@ -1078,7 +1078,7 @@ async def set_demand_preferences(session_token: str,
     三种模式：不填=接收全部 | 手动选分类/学科/IPC | auto_select=true让AI助手根据能力画像自动选。
     """
     from src.shared.auth import verify
-    verify(session_token)
+    await verify(session_token)
     from src.shared.models import AgentPreference
     try:
         cats = [c.strip() for c in preferred_categories.split(",") if c.strip()] if preferred_categories else None
@@ -1361,6 +1361,11 @@ async def generate_outreach_email(demand_title: str, demand_body: str, match_rea
 def run():
     logging.basicConfig(level=logging.INFO)
     logger.info("需求链 MCP Server 启动中 (0.0.0.0:8000)...")
+
+    # Initialize database tables
+    import asyncio
+    from src.shared.database import init_db
+    asyncio.run(init_db())
 
     # Mount HTTP API routes on the same SSE app
     from src.web_server import api_auto_demand, api_auto_supplier, api_demand_list, api_suppliers
