@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>供应商 - 需求链平台</title>
+<link rel="icon" href="logo.jpg" type="image/jpeg">
+<link rel="stylesheet" href="shared.css?v=1">
+<style>
+h1{font-size:1.6em;margin:20px 0 4px}
+.sub{color:var(--ts);font-size:.9em;margin-bottom:20px}
+.row{display:flex;gap:10px;margin:12px 0;flex-wrap:wrap}
+
+/* Cards */
+.supplier-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px;margin-top:16px}
+.card{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:20px;transition:border-color .2s;position:relative}
+.card:hover{border-color:var(--purple)}
+.card .card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+.card .card-header-left{flex:1}
+.card .name{font-weight:700;font-size:1.1em;margin-bottom:2px;color:var(--text)}
+.card .name-sub{font-size:.78em;color:var(--ts);margin-bottom:6px}
+.card .badge-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.card .type-badge{font-size:.72em;padding:3px 10px;border-radius:5px;background:rgba(124,110,240,.12);color:var(--purple);font-weight:500}
+.card .country-badge{padding:2px 8px;border-radius:4px;font-size:.72em;background:rgba(0,184,148,.1);color:var(--green)}
+.card .trl-badge{padding:2px 8px;border-radius:4px;font-size:.72em;background:rgba(253,203,110,.1);color:var(--amber)}
+.card .verified-badge{padding:2px 8px;border-radius:4px;font-size:.72em;background:rgba(0,184,148,.12);color:var(--green);font-weight:500}
+.card .claimed-badge{padding:2px 8px;border-radius:4px;font-size:.72em;background:rgba(124,110,240,.12);color:var(--purple);font-weight:500}
+.card .unclaimed-badge{padding:2px 8px;border-radius:4px;font-size:.72em;background:rgba(226,75,74,.12);color:var(--red);font-weight:500}
+.card .desc{color:var(--ts);font-size:.85em;margin:8px 0;line-height:1.7}
+
+/* Field rows */
+.field-row{display:flex;gap:8px;margin:6px 0;flex-wrap:wrap}
+.field-row .field-label{font-size:.75em;color:var(--ts);min-width:48px;flex-shrink:0;padding-top:2px}
+.field-row .field-value{font-size:.8em;color:var(--text);flex:1}
+.field-row .field-value .cell{display:inline-block;padding:2px 8px;border-radius:4px;background:rgba(108,92,231,.06);border:1px solid var(--border);font-size:.9em;margin:2px 3px}
+.card .skill-tags{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0}
+.card .skill-tag{padding:3px 9px;border-radius:5px;background:rgba(108,92,231,.08);border:1px solid var(--border);font-size:.78em;color:var(--ts)}
+
+/* Contact section */
+.contact-section{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;padding:10px;border-radius:8px;background:rgba(0,0,0,.15)}
+.contact-item{font-size:.78em;color:var(--ts);display:flex;align-items:center;gap:6px}
+.contact-item .icon{flex-shrink:0;width:18px;text-align:center}
+.contact-item a{color:var(--purple)}
+
+/* Detail modal */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center}
+.modal{background:var(--card-bg);border:1px solid var(--border);border-radius:18px;width:90%;max-width:750px;max-height:85vh;overflow-y:auto;padding:28px}
+.modal h2{font-size:1.3em;margin-bottom:8px}
+.modal .close{float:right;cursor:pointer;font-size:1.4em;color:var(--ts)}.modal .close:hover{color:var(--text)}
+.modal-section{margin:16px 0}
+.modal-section h4{font-size:.82em;color:var(--ts);margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px}
+.modal-desc{color:var(--ts);font-size:.9em;white-space:pre-wrap;line-height:1.7}
+.modal-skills{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.modal-skills .ms{padding:4px 10px;border-radius:6px;background:rgba(108,92,231,.08);border:1px solid var(--border);font-size:.82em;color:var(--ts)}
+.modal-process{display:flex;gap:6px;flex-wrap:wrap}
+.modal-process .mp{padding:4px 10px;border-radius:6px;background:rgba(0,184,148,.08);border:1px solid var(--border);font-size:.82em;color:var(--green)}
+.modal-contact{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.modal-contact .mc{padding:8px 12px;border-radius:8px;background:rgba(108,92,231,.05);border:1px solid var(--border);font-size:.85em}
+.modal-contact .mc .mc-label{font-size:.72em;color:var(--ts);display:block;margin-bottom:2px}
+.modal-contact .mc .mc-val{color:var(--text)}
+.modal-footer{display:flex;gap:10px;margin-top:20px}
+.btn-claim{display:inline-block;padding:10px 22px;border-radius:8px;font-size:.9em;font-weight:600;cursor:pointer;border:none;background:var(--purple);color:#fff;text-decoration:none;transition:background .15s}
+.btn-claim:hover{background:#8c7ef5}
+
+.empty{text-align:center;padding:60px 20px;color:var(--ts)}
+.empty h3{font-size:1.2em;margin-bottom:8px}
+
+/* Pagination */
+.pagination{display:flex;gap:8px;justify-content:center;margin:24px 0;flex-wrap:wrap}
+.page-btn{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--ts);font-size:.85em;cursor:pointer;transition:all .15s}
+.page-btn:hover{border-color:var(--purple);color:var(--text)}
+.page-btn.active{border-color:var(--purple);color:#fff;background:var(--purple)}
+.page-btn:disabled{opacity:.35;cursor:default}
+.page-info{padding:8px 14px;color:var(--ts);font-size:.82em}
+
+@media(max-width:768px){
+  .supplier-grid{grid-template-columns:1fr}
+  .contact-section{grid-template-columns:1fr}
+  .modal-contact{grid-template-columns:1fr}
+}
+</style>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {"@type":"SoftwareApplication","name":"需求链平台","alternateName":"Demand Chain Platform","description":"AI驱动的开源需求匹配基础设施，基于MCP协议连接全球需求与供应商","url":"http://8.154.26.92:8080","applicationCategory":"BusinessApplication","operatingSystem":"Web","offers":{"@type":"Offer","price":"0","priceCurrency":"CNY"},"author":{"@type":"Organization","name":"需求链平台"}},
+    {"@type":"Organization","name":"需求链平台","url":"http://8.154.26.92:8080","logo":"http://8.154.26.92:8080/logo.jpg","description":"AI驱动的开源创新基础设施，连接全球需求与供应商"},
+    {"@type":"WebSite","name":"需求链平台","url":"http://8.154.26.92:8080","potentialAction":{"@type":"SearchAction","target":"http://8.154.26.92:8080/suppliers.html?q={search_term_string}","query-input":"required name=search_term_string"}},
+    {"@type":"CollectionPage","name":"供应商","description":"公开的供应商能力档案，AI助手通过匹配引擎自动为每条需求寻找最佳供应商","url":"http://8.154.26.92:8080/suppliers.html","isPartOf":{"@type":"WebSite","name":"需求链平台","url":"http://8.154.26.92:8080"}}
+  ]
+}
+</script>
+</head>
+<body>
+<nav>
+  <a class="brand" href="/"><img src="logo.jpg" alt="">需求链平台</a>
+  <div class="links" id="navLinks">
+    <a href="demand_square.html">需求广场</a>
+    <a href="suppliers.html" style="color:var(--purple);font-weight:600">供应商</a>
+    <a href="forum.html">论坛</a>
+    <a href="login.html" class="btn-nav">登录</a>
+  </div>
+</nav>
+<div class="container">
+<h1>供应商 <span id="totalCount" style="font-size:.6em;color:var(--ts)">0</span></h1>
+<p class="sub">公开的供应商能力档案，涵盖行业、学科、工艺和联系方式。AI助手自动匹配最佳供应商。</p>
+<div class="row">
+  <input class="search-box" id="searchInput" placeholder="搜索名称/行业/学科/工艺/技能..." oninput="debouncedSearch()" style="max-width:400px">
+</div>
+<div class="category-bar" id="catBar">
+  <span class="cat-btn active" onclick="filterCat('')">全部 <span class="count" id="catAllCount">0</span></span>
+</div>
+<div class="supplier-grid" id="grid">
+  <div class="skeleton-row"><div class="skeleton" style="height:80px"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+  <div class="skeleton-row"><div class="skeleton" style="height:80px"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+</div>
+<div class="pagination" id="pagination"></div>
+</div>
+
+<!-- Detail modal -->
+<div id="modal" class="modal-overlay" style="display:none" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <span class="close" onclick="closeModal()">&times;</span>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<footer>
+  <div class="links">
+    <a href="demand_square.html">需求广场</a>
+    <a href="suppliers.html">供应商</a><a href="forum.html">论坛</a>
+    <a href="docs/tutorial.html">教程</a>
+    <a href="login.html">登录</a>
+    <a href="https://github.com/HuanTongqichetuzhuang/demand-chain">GitHub</a>
+  </div>
+  <p>需求链平台 v5.0 · Apache 2.0 · 永久开源 · 中立 · 免费</p>
+</footer>
+<script src="/nav.js?v=1"></script>
+<script>
+var allSuppliers = [];
+var currentCat = "";
+var currentPage = 1;
+var totalPages = 1;
+var perPage = 50;
+var searchTimer = null;
+function debouncedSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(function() { load(1); }, 400);
+}
+var typeLabel = {"COMPANY":"企业","RESEARCH":"研究机构","INDIVIDUAL":"个人","TEAM":"团队","GOVERNMENT":"政府"};
+
+function esc(s){return String(s||"").replace(/</g,"&lt;")}
+
+async function load(page){
+  page = page || 1;
+  currentPage = page;
+  var keyword = (document.getElementById("searchInput").value || "").trim();
+  var url = "/api/suppliers?page="+page+"&per_page="+perPage;
+  if(keyword) url += "&keyword=" + encodeURIComponent(keyword);
+  var r = await fetch(url);
+  var data = await r.json();
+  allSuppliers = data.items || [];
+  totalPages = data.total_pages || 1;
+
+  document.getElementById("catAllCount").textContent = data.total || 0;
+  document.getElementById("totalCount").textContent = data.total || 0;
+
+  // Build categories from first load only
+  if(page === 1){
+    var cats = {};
+    allSuppliers.forEach(function(s){var c=s.category||"其他";cats[c]=(cats[c]||0)+1});
+    var bar=document.getElementById("catBar");
+    bar.innerHTML = '<span class="cat-btn active" onclick="filterCat(\'\')">全部 <span class="count" id="catAllCount">0</span></span>';
+    Object.keys(cats).sort(function(a,b){return cats[b]-cats[a]}).forEach(function(c){
+      bar.innerHTML+='<span class="cat-btn" onclick="filterCat(\''+c.replace(/'/g,"\\'")+'\')">'+c+' <span class="count">'+cats[c]+'</span></span>';
+    });
+  }
+
+  render();
+  renderPagination();
+}
+
+function filterCat(c){
+  currentCat=c;
+  document.querySelectorAll("#catBar .cat-btn").forEach(function(b){
+    b.classList.toggle("active",b.textContent.trim().indexOf(c||"全部")===0);
+  });
+  load(1);
+}
+
+function render(){
+  var q=(document.getElementById("searchInput").value||"").toLowerCase();
+  var filtered=allSuppliers;
+  if(currentCat)filtered=filtered.filter(function(s){return s.category===currentCat});
+  if(q)filtered=filtered.filter(function(s){
+    return [s.name,s.description,s.industry,s.discipline].some(function(f){return(f||"").toLowerCase().indexOf(q)>=0})||
+      (s.skills||[]).some(function(sk){return sk.toLowerCase().indexOf(q)>=0})||
+      (s.process||[]).some(function(p){return p.toLowerCase().indexOf(q)>=0});
+  });
+  var grid=document.getElementById("grid");
+  grid.innerHTML=filtered.length===0
+    ?'<div class="empty"><h3>没有匹配的供应商</h3><p>尝试其他关键词</p></div>'
+    :filtered.map(function(s){return renderCard(s)}).join("");
+}
+
+function renderPagination(){
+  var html = '';
+  // Prev
+  html += '<button class="page-btn" onclick="load('+(currentPage-1)+')" '+(currentPage<=1?'disabled':'')+'>‹ 上一页</button>';
+  // Page numbers
+  var start = Math.max(1, currentPage - 2);
+  var end = Math.min(totalPages, currentPage + 2);
+  if(start > 1){html+='<button class="page-btn" onclick="load(1)">1</button>';if(start>2)html+='<span class="page-info">...</span>'}
+  for(var p=start;p<=end;p++){html+='<button class="page-btn'+(p===currentPage?' active':'')+'" onclick="load('+p+')">'+p+'</button>'}
+  if(end < totalPages){if(end<totalPages-1)html+='<span class="page-info">...</span>';html+='<button class="page-btn" onclick="load('+totalPages+')">'+totalPages+'</button>'}
+  // Next
+  html += '<button class="page-btn" onclick="load('+(currentPage+1)+')" '+(currentPage>=totalPages?'disabled':'')+'>下一页 ›</button>';
+  html += '<span class="page-info">第'+currentPage+'/'+totalPages+'页</span>';
+  document.getElementById("pagination").innerHTML = html;
+}
+
+function renderCard(s){
+  var skills=(s.skills||[]).map(function(t){return '<span class="skill-tag">'+esc(t)+'</span>'}).join("");
+  var process=(s.process||[]).map(function(p){return '<span class="cell">'+esc(p)+'</span>'}).join("");
+  var contact=s.contact||{};
+  var contactHtml='';
+  if(contact.email||contact.phone||contact.website||contact.wechat){
+    contactHtml='<div class="contact-section">'+
+      (contact.website?'<div class="contact-item"><span class="icon">🌐</span><a href="'+esc(contact.website)+'" target="_blank">网站</a></div>':'')+
+      (contact.email?'<div class="contact-item"><span class="icon">✉️</span>'+esc(contact.email)+'</div>':'')+
+      (contact.phone?'<div class="contact-item"><span class="icon">📞</span>'+esc(contact.phone)+'</div>':'')+
+      (contact.wechat?'<div class="contact-item"><span class="icon">💬</span>微信: '+esc(contact.wechat)+'</div>':'')+
+    '</div>';
+  }
+
+  var trl=s.trl?'TRL '+s.trl:'';
+  return '<div class="card" onclick="showDetail(\''+esc(s.id)+'\')">'+
+    '<div class="card-header">'+
+      '<div class="card-header-left">'+
+        '<div class="name">'+esc(s.name)+'</div>'+
+        (s.industry?'<div class="name-sub"><span style="color:var(--purple)">■</span> '+esc(s.industry)+'</div>':'')+
+      '</div>'+
+      '<div class="badge-row" style="justify-content:flex-end;margin:0">'+
+        (s.verified?'<span class="verified-badge">✅ 已验证</span>':'')+
+        '<span class="claimed-badge">📋 Public Information</span>'+
+      '</div>'+
+    '</div>'+
+    '<div class="badge-row">'+
+      '<span class="type-badge">'+(typeLabel[s.profile_type]||s.profile_type)+'</span>'+
+      (s.country?'<span class="country-badge">'+esc(s.country)+'</span>':'')+
+      (trl?'<span class="trl-badge">'+trl+'</span>':'')+
+    '</div>'+
+    (s.description?'<div class="desc">'+esc(s.description.substring(0,120))+'...</div>':'')+
+    (s.discipline?'<div class="field-row"><span class="field-label">学科</span><div class="field-value">'+esc(s.discipline)+'</div></div>':'')+
+    (process?'<div class="field-row"><span class="field-label">工艺</span><div class="field-value">'+process+'</div></div>':'')+
+    (skills?'<div class="skill-tags">'+skills+'</div>':'')+
+    contactHtml+
+  '</div>';
+}
+
+function showDetail(id){
+  // Find supplier in current page by id
+  var s = allSuppliers.find(function(item){return item.id===id});
+  if(!s)return;
+  var skills=(s.skills||[]).map(function(t){return '<span class="ms">'+esc(t)+'</span>'}).join("");
+  var process=(s.process||[]).map(function(p){return '<span class="mp">'+esc(p)+'</span>'}).join("");
+  var contact=s.contact||{};
+  var contactHtml=Object.keys(contact).length?Object.entries(contact).map(function(e){
+    var label={website:"网站",email:"邮箱",phone:"电话",wechat:"微信"};
+    var val=e[1];if(!val)return'';
+    var link='';if(e[0]==='website')link='<a href="'+esc(val)+'" target="_blank">'+esc(val)+'</a>';
+    return '<div class="mc"><span class="mc-label">'+(label[e[0]]||e[0])+'</span><div class="mc-val">'+(link||esc(val))+'</div></div>';
+  }).filter(function(h){return h}).join(""):'<div class="mc"><span class="mc-label">暂无公开联系方式</span></div>';
+
+  document.getElementById("modalBody").innerHTML=
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">'+
+      '<div><h2>'+esc(s.name)+'</h2></div>'+
+      (s.verified?'<span class="verified-badge">✅ 已验证</span>':'')+
+    '</div>'+
+    '<div class="badge-row" style="margin-bottom:12px">'+
+      '<span class="type-badge">'+(typeLabel[s.profile_type]||s.profile_type)+'</span>'+
+      (s.country?'<span class="country-badge">'+esc(s.country)+'</span>':'')+
+      (s.trl?'<span class="trl-badge">TRL '+s.trl+'</span>':'')+
+      '<span class="claimed-badge">📋 Public Information</span>'+
+    '</div>'+
+
+    (s.description?'<div class="modal-section"><h4>简介</h4><div class="modal-desc">'+esc(s.description)+'</div></div>':'')+
+
+    '<div class="modal-section"><h4>行业 · 学科 · 分类</h4>'+
+      '<div class="modal-skills">'+
+        (s.industry?'<span class="ms">🏭 '+esc(s.industry)+'</span>':'')+
+        (s.discipline?'<span class="ms">🔬 '+esc(s.discipline)+'</span>':'')+
+        (s.category?'<span class="ms">📂 '+esc(s.category)+'</span>':'')+
+      '</div>'+
+    '</div>'+
+
+    (skills?'<div class="modal-section"><h4>核心能力</h4><div class="modal-skills">'+skills+'</div></div>':'')+
+    (process?'<div class="modal-section"><h4>涉及工艺</h4><div class="modal-process">'+process+'</div></div>':'')+
+
+    '<div class="modal-section"><h4>联系方式</h4><div class="modal-contact">'+contactHtml+'</div></div>'+
+
+    '<div class="modal-footer">'+
+      (s.url?'<a href="'+esc(s.url)+'" target="_blank" class="btn-claim" style="background:transparent;border:1px solid var(--border);color:var(--text)">🔗 官网</a>':'')+
+      '<span class="btn-claim" style="background:var(--teal);cursor:default">📋 Public Information Source</span>'+
+    '</div>';
+
+  document.getElementById("modal").style.display="flex";
+}
+
+function closeModal(e){
+  if(!e||e.target.classList.contains("modal-overlay")){
+    document.getElementById("modal").style.display="none";
+  }
+}
+
+load(1);
+</script>
+</body>
+</html>

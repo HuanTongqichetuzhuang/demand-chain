@@ -1,0 +1,101 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: dc-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: demand_chain
+      POSTGRES_USER: dc
+      POSTGRES_PASSWORD: dc_dev_2026
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dc -d demand_chain"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - dc-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: dc-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - dc-net
+
+  mcp:
+    image: demand-chain:slim
+    container_name: dc-mcp
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+asyncpg://dc:dc_dev_2026@db:5432/demand_chain
+      DEEPSEEK_API_KEY: sk-c32415bb5ae44cdc844f1b95f99e4544
+      FIRECRAWL_API_KEY: fc-e97094049296412bb87cc3946d515649
+      LOG_LEVEL: INFO
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    networks:
+      - dc-net
+
+  web:
+    image: demand-chain:slim
+    container_name: dc-web
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+asyncpg://dc:dc_dev_2026@db:5432/demand_chain
+      REDIS_URL: redis://redis:6379/0
+    command: ["python", "-m", "src.web_server"]
+    ports:
+      - "8080:80"
+    volumes:
+      - avatar_data:/app/avatars
+    networks:
+      - dc-net
+
+  worker:
+    image: demand-chain:slim
+    container_name: dc-worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+asyncpg://dc:dc_dev_2026@db:5432/demand_chain
+      DEEPSEEK_API_KEY: sk-c32415bb5ae44cdc844f1b95f99e4544
+      LOG_LEVEL: INFO
+      REDIS_URL: redis://redis:6379/0
+      ALERT_WEBHOOK_URL: ""
+    command: ["python", "-m", "src.worker"]
+    networks:
+      - dc-net
+
+networks:
+  dc-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  avatar_data:

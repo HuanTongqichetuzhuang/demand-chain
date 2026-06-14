@@ -11,6 +11,22 @@ from src.shared.database import Base
 import enum
 
 
+
+
+class User(Base):
+    __tablename__ = "users"
+    
+    human_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    display_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    country: Mapped[str] = mapped_column(String(128), default="")
+    api_key: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    email_notify: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now)
+    last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class DemandStatus(str, enum.Enum):
     NEW = "new"
     STRUCTURING = "structuring"
@@ -18,6 +34,7 @@ class DemandStatus(str, enum.Enum):
     MATCHING = "matching"
     IN_PROGRESS = "in_progress"
     RESOLVED = "resolved"
+    CANCELLED = "cancelled"
     UNRESOLVABLE = "unresolvable"
     CLOSED = "closed"
 
