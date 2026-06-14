@@ -668,6 +668,9 @@ async def api_auto_demand(request):
             )
             session.add(demand)
             await session.commit()
+            # 缓存失效：首页统计
+            from src.shared.cache import delete_pattern
+            await delete_pattern("cache:home:*")
             return JSONResponse({"status": "ok", "id": demand.id})
     except Exception as e:
         import logging, traceback
@@ -894,29 +897,28 @@ async def api_demand_list(request):
         return JSONResponse({"error": str(e), "demands": []}, status_code=500)
 
 async def api_matches(request):
-    """GET /api/matches — 匹配结果列表"""
-    from src.shared.database import async_session
-    from src.shared.models import Match, Demand, CapabilityProfile
-    try:
-        demand_id = request.query_params.get("demand_id", "").strip()
-        # demand_id 为可选的 UUID 格式过滤，非 UUID 时忽略
-        limit = int(request.query_params.get("limit", "100"))
-        import uuid as _uuid
-        valid_demand_id = demand_id if re.match(r'^[a-fA-F0-9\-]{32,36}$', demand_id) else ""
+    """GET /api/matches — 匹配结果列表（缓存 30 分钟）"""
+    from src.shared.cache import remember
 
+    demand_id = request.query_params.get("demand_id", "").strip()
+    limit = int(request.query_params.get("limit", "100"))
+    valid_demand_id = demand_id if re.match(r'^[a-fA-F0-9\-]{32,36}$', demand_id) else ""
+    cache_key = f"cache:matches:{valid_demand_id or 'all'}:{limit}"
+
+    async def _fetch_matches():
+        from src.shared.database import async_session
+        from src.shared.models import Match, Demand, CapabilityProfile
+        from sqlalchemy import select
+        import uuid as _uuid
         async with async_session() as session:
-            from sqlalchemy import select
             query = select(Match).order_by(Match.score.desc()).limit(limit)
             if valid_demand_id:
                 query = query.where(Match.demand_id == valid_demand_id)
             result = await session.execute(query)
             matches = list(result.scalars().all())
 
-        # Collect parent demand/profile IDs
         demand_ids = {m.demand_id for m in matches}
         profile_ids = {m.profile_id for m in matches}
-
-        # Fetch demands and profiles in bulk
         demand_map = {}
         profile_map = {}
         async with async_session() as session:
@@ -927,7 +929,7 @@ async def api_matches(request):
                 r = await session.execute(select(CapabilityProfile).where(CapabilityProfile.id.in_(profile_ids)))
                 for p in r.scalars(): profile_map[p.id] = p
 
-        return JSONResponse([{
+        return [{
             "id": m.id,
             "demand_id": m.demand_id,
             "profile_id": m.profile_id,
@@ -938,25 +940,86 @@ async def api_matches(request):
             "supplier_name": (profile_map.get(m.profile_id).agent_card_json.get("name", "") if m.profile_id in profile_map else ""),
             "supplier_category": (profile_map.get(m.profile_id).agent_card_json.get("category", "") if m.profile_id in profile_map else ""),
             "created_at": m.created_at.isoformat() if m.created_at else "",
-        } for m in matches])
+        } for m in matches]
+
+    try:
+        data = await remember(cache_key, 1800, _fetch_matches)
+        return JSONResponse(data)
     except Exception as e:
         return JSONResponse({"error": str(e), "matches": []}, status_code=500)
 
-async def api_home_stats(request):
-    """GET /api/home/stats — 首页实时统计"""
+
+async def api_agent_card(request):
+    """GET /.well-known/agent.json — Agent Card 发现端点
+
+    返回指定 Agent 的公开能力画像，或平台总览。
+    遵循 A2A Agent Card 规范，支持 Agent 发现和握手。
+    """
     from src.shared.database import async_session
-    from src.shared.models import Demand, CapabilityProfile, ForumTopic
+    from src.shared.models import CapabilityProfile
+    from sqlalchemy import select, func
+
+    agent_id = request.query_params.get("agent_id", "").strip()
+
     try:
+        if agent_id:
+            async with async_session() as session:
+                result = await session.execute(
+                    select(CapabilityProfile).where(CapabilityProfile.id == agent_id)
+                )
+                profile = result.scalar_one_or_none()
+                if not profile:
+                    return JSONResponse({"error": "Agent not found"}, status_code=404)
+                card = profile.agent_card_json or {}
+                return JSONResponse({
+                    "@context": "https://a2a.demand-chain.ai/schemas/agent-card",
+                    "agent_id": profile.id,
+                    "name": card.get("name", "Unknown Agent"),
+                    "description": card.get("description", ""),
+                    "category": card.get("category", ""),
+                    "industry": card.get("industry", ""),
+                    "discipline": card.get("discipline", ""),
+                    "skills": card.get("skills", []),
+                    "trust_score": profile.trust_score or 0.0,
+                    "profile_type": profile.profile_type.value if profile.profile_type else "",
+                    "country": profile.country or "",
+                    "url": card.get("url", ""),
+                    "trl": card.get("trl", ""),
+                })
+
         async with async_session() as session:
-            from sqlalchemy import select, desc
+            count_r = await session.execute(select(func.count(CapabilityProfile.id)))
+            total = count_r.scalar() or 0
+
+        return JSONResponse({
+            "@context": "https://a2a.demand-chain.ai/schemas/agent-card",
+            "name": "需求链平台 Demand Chain",
+            "description": "AI 驱动的开放式创新基础设施，连接全球需求与供应商",
+            "total_agents": total,
+            "protocol": "mcp+sse",
+            "endpoints": {"mcp": "/sse", "api": "/api", "web": "/"},
+            "well_known": "/.well-known/agent.json",
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_home_stats(request):
+    """GET /api/home/stats — 首页实时统计（缓存 5 分钟）"""
+    from src.shared.cache import remember
+
+    async def _fetch_home_stats():
+        from src.shared.database import async_session
+        from src.shared.models import Demand, CapabilityProfile, ForumTopic
+        from sqlalchemy import select, desc
+        async with async_session() as session:
             r = await session.execute(select(Demand).order_by(desc(Demand.created_at)).limit(6))
             demands = list(r.scalars().all())
             r = await session.execute(select(CapabilityProfile).order_by(desc(CapabilityProfile.trust_score)).limit(5))
             suppliers = list(r.scalars().all())
             r = await session.execute(select(ForumTopic).order_by(desc(ForumTopic.upvotes)).limit(5))
             topics = list(r.scalars().all())
-
-        return JSONResponse({
+        return {
             "latest_demands": [{
                 "id": d.id,
                 "title": (d.structured_json.get("summary","") if d.structured_json else "") or (d.raw_text or "")[:60],
@@ -976,7 +1039,11 @@ async def api_home_stats(request):
                 "upvotes": t.upvotes,
                 "reply_count": len(t.replies) if t.replies else 0,
             } for t in topics],
-        })
+        }
+
+    try:
+        data = await remember("cache:home:stats", 300, _fetch_home_stats)
+        return JSONResponse(data)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -1061,6 +1128,7 @@ routes = [
     Route("/api/matches", api_matches),
     Route("/api/matches/{match_id}/email", api_match_email),
     Route("/api/home/stats", api_home_stats),
+    Route("/.well-known/agent.json", api_agent_card),
     # Catch-all static
     Route("/{path:path}", static_file),
 ]

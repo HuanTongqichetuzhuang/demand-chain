@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     smtp_port: int = 465
     smtp_user: str = ""
     smtp_password: str = ""
+    alert_webhook_url: str = ""  # Server酱/企业微信 Webhook URL，Worker 连续失败时告警
+    redis_url: str = "redis://localhost:6379/0"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

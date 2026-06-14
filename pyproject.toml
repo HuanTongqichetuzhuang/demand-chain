@@ -17,6 +17,7 @@ dependencies = [
     "mcp>=1.0",
     "crawl4ai>=0.5",
     "passlib[bcrypt]>=1.7",
+    "redis[hiredis]>=5.0",
 ]
 
 [project.optional-dependencies]

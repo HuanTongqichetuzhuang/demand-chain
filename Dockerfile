@@ -19,6 +19,6 @@ COPY *.png ./
 COPY *.js ./
 COPY docs/ ./docs/
 
-EXPOSE 8000
+EXPOSE 8000 80
 
 CMD ["python", "-m", "src.server"]

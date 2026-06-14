@@ -18,10 +18,13 @@ from sqlalchemy import select
 logger = logging.getLogger(__name__)
 
 
-async def build_supplier_index() -> tuple[dict[str, CapabilityProfile], TfidfSearch]:
+async def build_supplier_index(max_profiles: int | None = None) -> tuple[dict[str, CapabilityProfile], TfidfSearch]:
     """构建供应商 TF-IDF 索引"""
     async with async_session() as session:
-        result = await session.execute(select(CapabilityProfile).limit(500))
+        q = select(CapabilityProfile)
+        if max_profiles is not None:
+            q = q.limit(max_profiles)
+        result = await session.execute(q)
         profiles = list(result.scalars().all())
 
     idx = TfidfSearch()
@@ -112,7 +115,7 @@ async def match_one_demand(
     return deduped[:top_k]
 
 
-async def run_matching(dry_run: bool = False) -> dict:
+async def run_matching(dry_run: bool = False, max_profiles: int | None = None) -> dict:
     """对全部 OPEN 需求执行匹配"""
     async with async_session() as session:
         result = await session.execute(
@@ -126,7 +129,7 @@ async def run_matching(dry_run: bool = False) -> dict:
         return {"matched": 0, "total": 0, "message": "没有 OPEN 需求"}
 
     print(f"需求: {len(demands)} 条 OPEN")
-    id_to_profile, sidx = await build_supplier_index()
+    id_to_profile, sidx = await build_supplier_index(max_profiles=max_profiles)
     print(f"供应商: {len(id_to_profile)} 家已索引")
 
     results = []
