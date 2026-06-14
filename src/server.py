@@ -430,7 +430,7 @@ async def accept_match(session_token: str, match_id: str, action: str, outcome_d
                 return json.dumps({"status": "error", "message": "匹配记录不存在"}, ensure_ascii=False)
 
             new_status = MatchStatus.ACCEPTED if action == "accept" else MatchStatus.REJECTED
-            outcome_status = OutcomeStatus.SUCCESS if action == "accept" else OutcomeStatus.FAILED
+            outcome_status = "success" if action == "accept" else "failed"
 
             match.status = new_status
 
@@ -471,7 +471,7 @@ async def accept_match(session_token: str, match_id: str, action: str, outcome_d
             await session.commit()
 
         # Update trust score asynchronously (fire & forget)
-        if outcome_status in (OutcomeStatus.SUCCESS, OutcomeStatus.FAILED):
+        if outcome_status in ("success", "failed"):
             try:
                 # Reload outcome with supplier info
                 async with async_session() as s:
@@ -523,10 +523,10 @@ async def report_match_outcome(
     from sqlalchemy import select
     from uuid import uuid4
 
-    valid_statuses = {"contacted": OutcomeStatus.CONTACTED,
-                      "negotiating": OutcomeStatus.NEGOTIATING,
-                      "success": OutcomeStatus.SUCCESS,
-                      "failed": OutcomeStatus.FAILED}
+    valid_statuses = {"contacted": "contacted",
+                      "negotiating": "negotiating",
+                      "success": "success",
+                      "failed": "failed"}
 
     if status not in valid_statuses:
         return json.dumps({

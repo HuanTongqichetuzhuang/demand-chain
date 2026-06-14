@@ -215,7 +215,7 @@ class MatchOutcome(Base):
     match_id: Mapped[str] = mapped_column(String(36), ForeignKey("matches.id"), index=True, nullable=False)
     demand_id: Mapped[str] = mapped_column(String(36), ForeignKey("demands.id"), index=True, nullable=False)
     supplier_id: Mapped[str] = mapped_column(String(36), ForeignKey("capability_profiles.id"), index=True, nullable=False)
-    status: Mapped[OutcomeStatus] = mapped_column(SAEnum(OutcomeStatus), default=OutcomeStatus.MATCHED, index=True)
+    status: Mapped[str] = mapped_column(String(32), default=OutcomeStatus.MATCHED.value, index=True)
     outcome_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

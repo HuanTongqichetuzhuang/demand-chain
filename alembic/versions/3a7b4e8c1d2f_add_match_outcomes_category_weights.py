@@ -16,18 +16,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade():
-    # Create enum type for outcome status
-    outcome_status = sa.Enum("matched", "contacted", "negotiating", "success", "failed", name="outcomestatus")
-    outcome_status.create(op.get_bind())
-
-    # MatchOutcome table
+    # MatchOutcome table (status as String, not Enum — avoid asyncpg enum serialization issues)
     op.create_table(
         "match_outcomes",
         sa.Column("id", sa.String(36), primary_key=True),
         sa.Column("match_id", sa.String(36), sa.ForeignKey("matches.id"), nullable=False, index=True),
         sa.Column("demand_id", sa.String(36), sa.ForeignKey("demands.id"), nullable=False, index=True),
         sa.Column("supplier_id", sa.String(36), sa.ForeignKey("capability_profiles.id"), nullable=False, index=True),
-        sa.Column("status", outcome_status, nullable=False, index=True, server_default="matched"),
+        sa.Column("status", sa.String(32), nullable=False, index=True, server_default="matched"),
         sa.Column("outcome_detail", sa.Text, nullable=True),
         sa.Column("created_at", sa.DateTime, nullable=False, server_default=sa.text("now()")),
         sa.Column("updated_at", sa.DateTime, nullable=False, server_default=sa.text("now()")),
@@ -47,4 +43,3 @@ def upgrade():
 def downgrade():
     op.drop_table("category_weights")
     op.drop_table("match_outcomes")
-    sa.Enum("matched", "contacted", "negotiating", "success", "failed", name="outcomestatus").drop(op.get_bind())
