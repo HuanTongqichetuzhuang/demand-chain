@@ -20,7 +20,9 @@ from src.shared.flywheel import run_learning_cycle
 
 logger = logging.getLogger(__name__)
 
-MATCH_INTERVAL = 900  # 15 minutes
+# 支持环境变量覆盖（兼容旧版配置）
+import os as _os
+MATCH_INTERVAL = int(_os.environ.get("WORKER_INTERVAL_SECONDS", "900"))  # 15 minutes
 FLYWHEEL_INTERVAL = 3600  # 1 hour — 数据飞轮学习周期
 HEALTH_PORT = 8003
 MAX_CONSECUTIVE_FAILURES = 3

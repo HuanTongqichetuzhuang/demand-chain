@@ -1,7 +1,18 @@
+# 需求链平台 — Docker Compose
+# 使用方式：
+#   开发：  docker compose up -d                        # 从源码构建
+#   生产：  IMAGE_TAG=demand-chain:slim docker compose up -d  # 用预构建镜像
+#
+# 环境变量：
+#   DEEPSEEK_API_KEY   必需，LLM 调用
+#   REDIS_URL          可选，缓存加速（不设置则缓存静默降级）
+#   ALERT_WEBHOOK_URL  可选，Worker 告警
+
 services:
   db:
     image: pgvector/pgvector:pg16
     container_name: dc-db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: demand_chain
       POSTGRES_USER: dc
@@ -19,6 +30,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: dc-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     healthcheck:
@@ -26,70 +38,65 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    profiles:
+      - with-redis  # 默认不启动，docker compose --profile with-redis up -d
 
   mcp:
+    image: ${IMAGE_TAG:-demand-chain:local}
     build: .
     container_name: dc-mcp
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_started
     environment:
       DATABASE_URL: postgresql+asyncpg://dc:dc_dev_2026@db:5432/demand_chain
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:?请设置 DEEPSEEK_API_KEY 环境变量}
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
       LOG_LEVEL: INFO
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: ${REDIS_URL:-}
     ports:
       - "8000:8000"
-    volumes:
-      - ./src:/app/src
-      - ./prompts:/app/prompts
-
-  worker:
-    build: .
-    container_name: dc-worker
-    command: python -m src.worker
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    environment:
-      DATABASE_URL: postgresql+asyncpg://dc:dc_dev_2026@db:5432/demand_chain
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      LOG_LEVEL: INFO
-      WORKER_INTERVAL_SECONDS: 60
-      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
-      REDIS_URL: redis://redis:6379/0
-    volumes:
-      - ./src:/app/src
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,json; r=urllib.request.urlopen('http://localhost:8003/health'); b=r.read(); d=json.loads(b); exit(0 if d['status']=='ok' else 1)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
   web:
+    image: ${IMAGE_TAG:-demand-chain:local}
     build: .
     container_name: dc-web
-    command: python -m src.web_server
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_started
     environment:
       DATABASE_URL: postgresql+asyncpg://dc:dc_dev_2026@db:5432/demand_chain
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:?请设置 DEEPSEEK_API_KEY 环境变量}
       LOG_LEVEL: INFO
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: ${REDIS_URL:-}
     ports:
       - "8080:80"
+    command: ["python", "-m", "src.web_server"]
     volumes:
-      - ./src:/app/src
       - avatar_data:/app/avatars
+
+  worker:
+    image: ${IMAGE_TAG:-demand-chain:local}
+    build: .
+    container_name: dc-worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://dc:dc_dev_2026@db:5432/demand_chain
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:?请设置 DEEPSEEK_API_KEY 环境变量}
+      LOG_LEVEL: INFO
+      REDIS_URL: ${REDIS_URL:-}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+    command: ["python", "-m", "src.worker"]
+    profiles:
+      - with-worker  # 默认不启动，docker compose --profile with-worker up -d
+
+networks:
+  default:
 
 volumes:
   pgdata:

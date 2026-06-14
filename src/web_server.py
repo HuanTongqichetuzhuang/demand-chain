@@ -12,10 +12,6 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app):
-    from src.shared.database import init_db
-    await init_db()
-    # 清理7天未验证的账号
-    await _cleanup_unverified_accounts()
     yield
 
 WEB_ROOT = "/app"
@@ -390,6 +386,7 @@ async def api_register(request):
 async def api_login(request):
     """POST /api/login — 人类登录（数据库验证，需已验证邮箱）"""
     from passlib.hash import bcrypt
+    import hashlib as _hashlib
     from src.shared.database import async_session
     from src.shared.models import User
     from sqlalchemy import select
@@ -410,8 +407,20 @@ async def api_login(request):
             if not user.email_verified:
                 return JSONResponse({"error": "邮箱尚未验证，请查收验证邮件并点击验证链接"}, status_code=401)
             
-            if not bcrypt.verify(password, user.password_hash):
-                return JSONResponse({"error": "密码错误"}, status_code=401)
+            # 密码验证（兼容 bcrypt 和旧版 SHA256）
+            stored_hash = user.password_hash
+            if stored_hash.startswith("$2b$") or stored_hash.startswith("$2a$"):
+                # bcrypt hash
+                if not bcrypt.verify(password, stored_hash):
+                    return JSONResponse({"error": "密码错误"}, status_code=401)
+            else:
+                # 旧版 SHA256 hash — 验证后升级到 bcrypt
+                if _hashlib.sha256(password.encode()).hexdigest() != stored_hash:
+                    return JSONResponse({"error": "密码错误"}, status_code=401)
+                # 升级为 bcrypt
+                new_hash = bcrypt.hash(password)
+                user.password_hash = new_hash
+                await session.commit()
             
             return JSONResponse({
                 "status": "ok",
