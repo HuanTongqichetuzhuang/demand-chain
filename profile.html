@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>个人主页 - 需求链平台</title>
+<link rel="icon" href="logo.jpg" type="image/jpeg">
+<style>
+:root{--bg:#0c0c1d;--card-bg:#14142b;--text:#e8e8f0;--ts:#9090b0;--accent:#7c6ef0;--border:#2a2a4a;--green:#00b894}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.container{max-width:800px;margin:0 auto;padding:20px}
+.card{background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:24px;margin:16px 0}
+label{display:block;font-size:.85em;color:var(--ts);margin:12px 0 4px}
+input,select,textarea{width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.95em}
+input:focus,textarea:focus{border-color:var(--accent);outline:none}
+.btn{padding:10px 20px;border-radius:10px;font-size:.9em;font-weight:600;cursor:pointer;border:none;transition:all .2s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#8c7ef5}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--accent)}
+.msg{padding:10px;border-radius:8px;margin:12px 0;font-size:.85em}
+.msg-ok{background:rgba(0,184,148,.1);border:1px solid var(--green);color:#9FE1CB}
+.msg-err{background:rgba(226,75,74,.1);border:1px solid #e24b4a;color:#f7c1c1}
+.profile-header{display:flex;align-items:center;gap:20px;margin-bottom:24px}
+.avatar{width:80px;height:80px;border-radius:50%;border:3px solid var(--accent);object-fit:cover;background:var(--bg)}
+.avatar-placeholder{width:80px;height:80px;border-radius:50%;border:3px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:var(--accent);background:var(--bg)}
+.stats{display:flex;gap:30px;margin:16px 0}
+.stat{text-align:center}
+.stat .num{font-size:28px;font-weight:700;color:var(--accent)}
+.stat .label{font-size:.8em;color:var(--ts)}
+.hidden{display:none}
+
+nav{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;max-width:1100px;margin:0 auto;border-bottom:1px solid var(--border)}
+nav .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:17px;color:var(--text);text-decoration:none}
+nav .brand:hover{text-decoration:none}
+nav .brand img{width:36px;height:36px;border-radius:8px}
+nav .links{display:flex;gap:20px;align-items:center}
+nav .links a{font-size:14px;color:var(--ts)}
+nav .links a:hover{color:var(--text);text-decoration:none}
+nav .links .btn-nav{background:var(--accent);color:#fff;padding:7px 18px;border-radius:8px;font-size:14px;font-weight:500}
+nav .links .btn-nav:hover{background:#8c7ef5;text-decoration:none}
+nav .links .user-info{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text)}
+nav .links .user-info img{width:28px;height:28px;border-radius:50%}
+@media(max-width:768px){nav{flex-direction:column;gap:10px;padding:12px}}
+</style>
+
+<meta property="og:title" content="需求链平台 — AI 驱动创新基础设施">
+<meta property="og:description" content="用 AI 助手自动匹配需求与供应商。注册即用，永久开源。">
+<meta property="og:image" content="https://8.154.26.92:8080/logo.jpg">
+<meta property="og:url" content="https://8.154.26.92:8080/">
+<meta name="twitter:card" content="summary_large_image">
+
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+</head>
+<body>
+<nav>
+  <a class="brand" href="/"><img src="logo.jpg" alt="">需求链平台</a>
+  <div class="links" id="navLinks">
+    <a href="demand_square.html">需求广场</a>
+    <a href="suppliers.html">供应商</a><a href="forum.html">论坛</a>
+    <a href="docs/tutorial.html">教程</a>
+    <a href="login.html" class="btn-nav" id="navLoginBtn">登录</a>
+  </div>
+</nav>
+
+<div class="container">
+  <!-- Header -->
+  <div class="card" id="profileCard">
+    <div class="profile-header">
+      <div id="avatarContainer">
+        <div class="avatar-placeholder" id="avatarPlaceholder">?</div>
+        <img class="avatar hidden" id="avatarImg" alt="头像">
+      </div>
+      <div>
+        <h2 id="profileName" style="font-size:1.3em">未登录</h2>
+        <p style="color:var(--ts);font-size:.9em" id="profileEmail"></p>
+        <p style="color:var(--ts);font-size:.85em" id="profileCountry"></p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="num" id="statDemands">0</div><div class="label">我的需求</div></div>
+      <div class="stat"><div class="num" id="statTopics">0</div><div class="label">论坛发帖</div></div>
+      <div class="stat"><div class="num" id="statReplies">0</div><div class="label">回复</div></div>
+    </div>
+  </div>
+
+  <!-- Edit Profile -->
+  <div class="card">
+    <h3 style="margin-bottom:16px">编辑资料</h3>
+    <label>头像</label>
+    <input type="file" id="avatarInput" accept="image/*" style="padding:8px">
+    <button class="btn btn-outline" onclick="uploadAvatar()" style="margin-top:8px">上传头像</button>
+    
+    <label>姓名 / 昵称</label>
+    <input id="editName" placeholder="你的名字">
+    
+    <label>国家 / 地区</label>
+    <input id="editCountry" placeholder="中国">
+    
+    <label>个人简介</label>
+    <textarea id="editBio" placeholder="介绍一下你自己..." rows="3"></textarea>
+    
+    <button class="btn btn-primary" onclick="saveProfile()" style="margin-top:16px">保存资料</button>
+    <div id="editMsg"></div>
+  </div>
+
+  <!-- Change Password -->
+  <div class="card">
+    <h3 style="margin-bottom:16px">更改密码</h3>
+    <label>旧密码</label>
+    <input type="password" id="oldPassword" placeholder="输入旧密码">
+    <label>新密码</label>
+    <input type="password" id="newPassword" placeholder="至少6位">
+    <label>确认新密码</label>
+    <input type="password" id="newPassword2" placeholder="再输一次">
+    <button class="btn btn-primary" onclick="changePassword()" style="margin-top:16px">修改密码</button>
+    <div id="pwdMsg"></div>
+  </div>
+
+  <!-- 通知设置 -->
+  <div class="card">
+    <h3 style="margin-bottom:16px">通知设置</h3>
+    <div class="checkbox-row" style="margin:12px 0;display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="notifyMatches" checked style="width:auto" onchange="saveNotify()">
+      <label for="notifyMatches" style="margin:0;font-size:.9em">需求匹配时邮件通知我</label>
+    </div>
+    <p style="font-size:.8em;color:var(--ts)">当 AI 匹配引擎为你的需求找到合适的供应商时，自动发送邮件到 {{currentUser.email}}</p>
+    <div id="notifyMsg"></div>
+  </div>
+
+  <!-- 我的匹配 -->
+  <div class="card">
+    <h3 style="margin-bottom:16px">我的匹配</h3>
+    <div id="myMatches" style="color:var(--ts);font-size:.9em">
+      <div class="skeleton" style="height:20px;margin:8px 0"></div>
+      <div class="skeleton" style="height:20px;margin:8px 0;width:60%"></div>
+      <div class="skeleton" style="height:20px;margin:8px 0;width:80%"></div>
+    </div>
+  </div>
+
+  <!-- My Activity -->
+  <div class="card">
+    <h3 style="margin-bottom:16px">我的活动</h3>
+    <div id="myActivity" style="color:var(--ts);font-size:.9em">登录后查看...</div>
+  </div>
+
+  <button class="btn btn-outline" onclick="doLogout()" style="width:100%;margin:16px 0">退出登录</button>
+</div>
+
+<script>
+const API = "";
+let currentUser = JSON.parse(localStorage.getItem("dc_session")||"null");
+let userData = null;
+
+function checkLogin() {
+  if (!currentUser || !currentUser.email) {
+    document.getElementById("profileName").textContent = "请先登录";
+    document.getElementById("profileEmail").textContent = "";
+    return;
+  }
+  loadUserData();
+  loadUserStats();
+}
+
+async function loadUserData() {
+  try {
+    const resp = await fetch(API + "/api/user/profile?email=" + encodeURIComponent(currentUser.email));
+    userData = await resp.json();
+    if (userData.error) return;
+    
+    document.getElementById("profileName").textContent = userData.display_name || currentUser.email;
+    document.getElementById("profileEmail").textContent = "邮箱: " + (userData.email || currentUser.email);
+    document.getElementById("profileCountry").textContent = (userData.country ? "地区: " + userData.country : "");
+    document.getElementById("editName").value = userData.display_name || "";
+    document.getElementById("editCountry").value = userData.country || "";
+    document.getElementById("editBio").value = userData.bio || "";
+    
+    if (userData.avatar) {
+      document.getElementById("avatarPlaceholder").classList.add("hidden");
+      document.getElementById("avatarImg").classList.remove("hidden");
+      // avatar is stored as relative path e.g. "avatars/xxx.jpg"
+      document.getElementById("avatarImg").src = userData.avatar.startsWith("data:") ? userData.avatar : (API + "/" + userData.avatar);
+    } else {
+      document.getElementById("avatarPlaceholder").textContent = (userData.display_name||currentUser.email).charAt(0).toUpperCase();
+    }
+    
+    updateNav(userData.display_name || currentUser.email, userData.avatar);
+  } catch(e) { console.error("loadUserData:", e); showError("userDataMsg", "加载用户数据失败"); }
+}
+
+async function loadUserStats() {
+  try {
+    const resp = await fetch(API + "/api/user/stats?email=" + encodeURIComponent(currentUser.email));
+    const s = await resp.json();
+    document.getElementById("statDemands").textContent = s.demands || 0;
+    document.getElementById("statTopics").textContent = s.topics || 0;
+    document.getElementById("statReplies").textContent = s.replies || 0;
+  } catch(e) { console.error("loadUserStats:", e); }
+  loadMyMatches();
+}
+
+async function loadMyMatches() {
+  try {
+    var r = await fetch(API + "/api/matches?limit=10");
+    var matches = await r.json();
+    var div = document.getElementById("myMatches");
+    if (!matches || !matches.length) {
+      div.innerHTML = '<p style="color:var(--ts);padding:12px">暂无匹配结果。发布需求后 AI 将自动为你匹配合适的供应商。</p>';
+      return;
+    }
+    var h = '';
+    for (var i = 0; i < matches.length; i++) {
+      var m = matches[i];
+      h += '<div style="padding:10px 0;border-bottom:1px solid var(--border)" id="matchRow_'+m.id+'">';
+      h += '<div style="font-weight:600;color:var(--text);margin-bottom:4px">'+esc(m.demand_title||"需求")+'</div>';
+      h += '<div style="display:flex;gap:12px;font-size:.8em;flex-wrap:wrap;align-items:center">';
+      h += '<span>→ <strong style="color:var(--green)">'+esc(m.supplier_name||"")+'</strong></span>';
+      h += '<span style="color:var(--amber)">匹配度 '+Math.round((m.score||0)*100)+'%</span>';
+      h += '<span>'+esc(m.supplier_category||"")+'</span>';
+      h += '<button class="btn btn-outline" style="padding:2px 10px;font-size:.75em;margin-left:auto" onclick="getEmailTemplate(\''+m.id+'\')">📧 联系邮件模板</button>';
+      h += '</div>';
+      h += '<div id="emailTmpl_'+m.id+'" style="display:none;margin-top:12px;background:rgba(108,92,231,.05);border:1px solid var(--border);border-radius:8px;padding:12px"></div>';
+      h += '</div>';
+    }
+    div.innerHTML = h;
+  } catch(e) { document.getElementById("myMatches").innerHTML = '<p style="color:var(--ts)">加载失败</p>'; }
+}
+
+async function getEmailTemplate(matchId) {
+  var tmplDiv = document.getElementById("emailTmpl_"+matchId);
+  if (tmplDiv.style.display !== 'none') { tmplDiv.style.display = 'none'; return; }
+  tmplDiv.style.display = 'block';
+  tmplDiv.innerHTML = '<div class="skeleton" style="height:60px"></div>';
+  try {
+    var r = await fetch(API + '/api/matches/' + matchId + '/email');
+    var t = await r.json();
+    if (t.error) { tmplDiv.innerHTML = '<p style="color:var(--red)">加载失败: '+t.error+'</p>'; return; }
+    var body = (t.body||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+    tmplDiv.innerHTML =
+      '<div style="font-size:.85em;margin-bottom:8px"><strong>主题:</strong> '+esc(t.subject||'')+'</div>'+
+      '<div style="font-size:.8em;color:var(--ts);line-height:1.8;max-height:300px;overflow-y:auto;background:var(--bg);border-radius:6px;padding:10px;margin-bottom:8px">'+body+'</div>'+
+      '<div style="display:flex;gap:8px">'+
+        '<button class="btn btn-primary" onclick="copyEmailBody(\''+matchId+'\')" style="font-size:.8em;padding:6px 14px">📋 一键复制全文</button>'+
+        '<span style="font-size:.75em;color:var(--ts);align-self:center">复制后粘贴到你的邮箱客户端发送即可</span>'+
+      '</div>'+
+      '<p style="font-size:.7em;color:var(--ts);margin-top:8px">💡 用自己的邮箱发送更可信、不会被拦截。如需平台代发，去通知设置里开启。</p>';
+  } catch(e) { tmplDiv.innerHTML = '<p style="color:var(--red)">加载失败</p>'; }
+}
+
+function copyEmailBody(matchId) {
+  var tmplDiv = document.getElementById("emailTmpl_"+matchId);
+  var text = (tmplDiv.textContent||'').replace(/📋 一键复制全文复制后粘贴到你的邮箱客户端发送即可|💡[^]*/g,'').trim();
+  navigator.clipboard.writeText(text).then(function(){
+    alert('已复制到剪贴板！打开你的邮箱（Gmail/QQ邮箱/Outlook），粘贴即可发送。');
+  });
+}
+
+async function saveNotify() {
+  var checked = document.getElementById("notifyMatches").checked;
+  try {
+    await fetch(API + "/api/user/profile", {
+      method: "PUT", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({email:currentUser.email, email_notify:checked})
+    });
+    document.getElementById("notifyMsg").innerHTML = '<div class="msg msg-ok">通知设置已保存</div>';
+    setTimeout(function(){ document.getElementById("notifyMsg").innerHTML = ''; }, 2000);
+  } catch(e) { console.error("saveNotify:", e); }
+}
+
+function updateNav(name, avatar) {
+  const links = document.getElementById("navLinks");
+  links.innerHTML = 
+    '<a href="demand_square.html">需求广场</a>'+
+    '<a href="suppliers.html">供应商</a><a href="forum.html">论坛</a>'+
+    '<a href="docs/tutorial.html">教程</a>'+
+    '<a href="profile.html" class="user-info">'+
+      (avatar ? '<img src="'+avatar+'">' : '')+
+      '<span>'+esc(name)+'</span>'+
+    '</a>';
+}
+
+async function uploadAvatar() {
+  const file = document.getElementById("avatarInput").files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function() {
+    const resp = await fetch(API + "/api/user/avatar", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({email:currentUser.email, avatar:reader.result})
+    });
+    const d = await resp.json();
+    if (d.avatar_url) {
+      document.getElementById("avatarPlaceholder").classList.add("hidden");
+      document.getElementById("avatarImg").classList.remove("hidden");
+      document.getElementById("avatarImg").src = API + "/" + d.avatar_url;
+      updateNav(userData?.display_name || currentUser.email, API + "/" + d.avatar_url);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveProfile() {
+  const resp = await fetch(API + "/api/user/profile", {
+    method: "PUT", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      email: currentUser.email,
+      display_name: document.getElementById("editName").value,
+      country: document.getElementById("editCountry").value,
+      bio: document.getElementById("editBio").value,
+    })
+  });
+  const d = await resp.json();
+  showMsg("editMsg", d.status==="ok" ? "资料已保存":"保存失败", d.status==="ok");
+}
+
+async function changePassword() {
+  const oldPwd = document.getElementById("oldPassword").value;
+  const newPwd = document.getElementById("newPassword").value;
+  const newPwd2 = document.getElementById("newPassword2").value;
+  if (newPwd.length < 6) { showMsg("pwdMsg","新密码至少6位",false); return; }
+  if (newPwd !== newPwd2) { showMsg("pwdMsg","两次密码不一致",false); return; }
+  
+  const resp = await fetch(API + "/api/user/password", {
+    method: "PUT", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({email:currentUser.email, old_password:oldPwd, new_password:newPwd})
+  });
+  const d = await resp.json();
+  showMsg("pwdMsg", d.status==="ok" ? "密码已修改":"错误: "+(d.error||""), d.status==="ok");
+}
+
+function showMsg(id, text, ok) {
+  document.getElementById(id).innerHTML = '<div class="msg msg-'+(ok?"ok":"err")+'">'+text+'</div>';
+}
+
+function doLogout() {
+  localStorage.removeItem("dc_session");
+  currentUser = null;
+  window.location.href = "login.html";
+}
+
+function esc(s) { return String(s||"").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+checkLogin();
+</script>
+<script src="/nav.js?v=1"></script>
+<script src="/i18n.js?v=1"></script>
+</body>
+</html>
