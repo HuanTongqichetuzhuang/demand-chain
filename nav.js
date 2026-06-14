@@ -22,6 +22,7 @@
     '} body{background:var(--bg-gradient)}' +
     'nav{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(10,10,26,0.7);border-bottom:1px solid var(--border-light);position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:14px 28px;max-width:1140px;margin:0 auto}' +
     'nav .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;color:var(--text);text-decoration:none}' +
+    'nav .brand img{width:34px;height:34px;border-radius:8px;object-fit:cover}' +
     'nav .links{display:flex;gap:6px;align-items:center;flex-wrap:wrap}' +
     'nav .links a{font-size:13.5px;color:var(--ts);padding:6px 14px;border-radius:8px;transition:all 0.25s ease;text-decoration:none}' +
     'nav .links a:hover{background:rgba(124,110,240,0.08);color:var(--text)}' +
@@ -55,7 +56,7 @@
     try { session = JSON.parse(localStorage.getItem('dc_session')); } catch(e) {}
     var loggedIn = !!(session && session.email);
 
-    var brandHtml = '<a class="brand" href="/"><img src="/logo.jpg" alt="">需求链平台</a>';
+    var brandHtml = '<a class="brand" href="/"><img src="/logo.jpg" width="34" height="34" style="width:34px;height:34px;border-radius:8px;object-fit:cover" alt="">需求链平台</a>';
     var linksHtml = '<div class="links">';
     linksHtml += '<a href="/demand_square.html">需求广场</a>';
     linksHtml += '<a href="/suppliers.html">供应商</a>';
