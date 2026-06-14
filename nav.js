@@ -1,140 +1,79 @@
-// 需求链平台 - 共享导航脚本 v3（统一全站导航 + 设计注入）
-// 根据登录状态显示/隐藏导航项
-(function(){
-  // 注入 shared.css（若页面未加载）
-  if (!document.querySelector('link[href*="shared.css"]')) {
-    var link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = '/shared.css?v=3';
-    document.head.appendChild(link);
-  }
-  // 注入设计变量覆盖（覆盖页面内联 :root 的旧值）
-  var styleOverride = document.createElement('style');
-  styleOverride.textContent = ':root{' +
-    '--bg:#0a0a1a;--card-bg:rgba(20,20,43,0.8);--card-bg-solid:#14142b;' +
-    '--text:#e8e8f0;--ts:#9090b0;--muted:#8888aa;' +
-    '--purple:#7c6ef0;--purple-light:#9b8ff5;--purple-dark:#5a4ed8;' +
-    '--accent:#7c6ef0;' +
-    '--border:rgba(42,42,74,0.6);--border-light:rgba(42,42,74,0.3);' +
-    '--green:#00d4a0;--amber:#f0b429;--red:#e85454;--blue:#4a8cf7;' +
-    '--radius:12px;--radius-sm:8px;--radius-lg:16px;' +
-    '--shadow:0 4px 24px rgba(0,0,0,0.3);' +
-    '--glow-purple:rgba(124,110,240,0.15);' +
-    '--transition:0.25s cubic-bezier(0.4,0,0.2,1);' +
-  '} body{background:var(--bg-gradient)}' +
-  'nav{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(10,10,26,0.7);border-bottom:1px solid var(--border-light)}' +
-  'nav .links a{border-radius:8px;transition:all var(--transition)}' +
-  'nav .links a:hover{background:rgba(124,110,240,0.08)}' +
-  'nav .links .btn-nav{background:linear-gradient(135deg,var(--purple),var(--purple-dark));box-shadow:0 2px 12px var(--glow-purple)}' +
-  '.card{border-radius:16px;transition:all 0.25s ease}.card:hover{box-shadow:0 8px 32px rgba(0,0,0,0.2);transform:translateY(-2px)}' +
-  '.btn-primary{background:linear-gradient(135deg,var(--purple),var(--purple-dark));box-shadow:0 2px 12px var(--glow-purple)}' +
-  '.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 20px var(--glow-purple)}' +
-  '::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}' +
-  '::selection{background:rgba(124,110,240,0.3);color:#fff}';
-  document.head.appendChild(styleOverride);
+// 需求链平台 — 统一导航脚本 v4
+// 接管所有页面的导航，无论登录状态，确保全站导航一致
+(function() {
+  'use strict';
 
-  // 注入装饰性背景光晕
+  // 注入 CSS 变量覆盖（若页面内联 :root 用了旧值）
+  if (!document.getElementById('dc-design-inject')) {
+    var s = document.createElement('style');
+    s.id = 'dc-design-inject';
+    s.textContent = ':root{' +
+      '--bg:#0a0a1a;--card-bg:rgba(20,20,43,0.8);--card-bg-solid:#14142b;' +
+      '--text:#e8e8f0;--ts:#9090b0;--muted:#8888aa;' +
+      '--purple:#7c6ef0;--purple-light:#9b8ff5;--purple-dark:#5a4ed8;' +
+      '--accent:#7c6ef0;' +
+      '--border:rgba(42,42,74,0.6);--border-light:rgba(42,42,74,0.3);' +
+      '--green:#00d4a0;--amber:#f0b429;--red:#e85454;--blue:#4a8cf7;' +
+      '--radius:12px;--radius-sm:8px;--radius-lg:16px;' +
+      '--shadow:0 4px 24px rgba(0,0,0,0.3);' +
+      '--glow-purple:rgba(124,110,240,0.15);' +
+      '--transition:0.25s cubic-bezier(0.4,0,0.2,1);' +
+    '} body{background:var(--bg-gradient)}' +
+    'nav{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(10,10,26,0.7);border-bottom:1px solid var(--border-light);position:sticky;top:0;z-index:100}' +
+    'nav .links a{border-radius:8px;padding:6px 14px;transition:all 0.25s ease}' +
+    'nav .links a:hover{background:rgba(124,110,240,0.08);color:var(--text)}' +
+    'nav .links .btn-nav{background:linear-gradient(135deg,var(--purple),var(--purple-dark));box-shadow:0 2px 12px var(--glow-purple);padding:7px 20px;font-weight:600}' +
+    'nav .links .btn-nav:hover{transform:translateY(-1px);box-shadow:0 4px 20px var(--glow-purple)}' +
+    '.card{border-radius:16px;transition:all 0.25s ease}.card:hover{box-shadow:0 8px 32px rgba(0,0,0,0.2);transform:translateY(-2px)}' +
+    '::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}' +
+    '::selection{background:rgba(124,110,240,0.3);color:#fff}';
+    document.head.appendChild(s);
+  }
+
+  // 注入背景光晕
   if (!document.querySelector('.bg-glow')) {
-    var div1 = document.createElement('div');
-    div1.className = 'bg-glow';
-    document.body.appendChild(div1);
-    var div2 = document.createElement('div');
-    div2.className = 'bg-glow-2';
-    document.body.appendChild(div2);
-  }
-  var PAGES = {
-    main: [
-      { href: "/demand_square.html", label: "需求广场" },
-      { href: "/suppliers.html", label: "供应商" },
-      { href: "/forum.html", label: "论坛" },
-      { href: "/docs/tutorial.html", label: "教程" },
-    ],
-    tools: [
-      { href: "/flywheel_dashboard.html", label: "飞轮" },
-      { href: "/global_search.html", label: "全局搜索" },
-      { href: "/targeted_demand.html", label: "定向需求" },
-      { href: "/discovered_demands.html", label: "发现需求" },
-      { href: "/batch_export.html", label: "批量导出" },
-      { href: "/timeline.html", label: "动态" },
-      { href: "/leaderboard.html", label: "排行榜" },
-      { href: "/zones.html", label: "专区" },
-      { href: "/tools_extra.html", label: "翻译·搜索·审核" },
-      { href: "/api_docs.html", label: "API文档" },
-    ],
-  };
-
-  function esc(s) { return String(s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-  function buildNavLinks(loggedIn) {
-    var html = '';
-    // Main pages
-    PAGES.main.forEach(function(p) {
-      html += '<a href="' + p.href + '">' + esc(p.label) + '</a>';
-    });
-    // Tools dropdown or inline (show fewer when not logged in)
-    if (loggedIn) {
-      PAGES.tools.forEach(function(p) {
-        html += '<a href="' + p.href + '">' + esc(p.label) + '</a>';
-      });
-    } else {
-      // Show just a few tools for non-logged-in
-      html += '<a href="/api_docs.html">API文档</a>';
-    }
-    return html;
+    var g1 = document.createElement('div'); g1.className = 'bg-glow'; document.body.appendChild(g1);
+    var g2 = document.createElement('div'); g2.className = 'bg-glow-2'; document.body.appendChild(g2);
   }
 
-  function updateNav() {
+  function esc(s) { return String(s || '').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // 统一导航
+  function renderNav() {
     var nav = document.querySelector('nav');
     if (!nav) return;
-    
-    var linksDiv = nav.querySelector('.links');
-    if (!linksDiv) return;
-    
-    var session = localStorage.getItem('dc_session');
-    var user = null;
-    try { user = JSON.parse(session); } catch(e) {}
-    
-    var loggedIn = !!(user && user.email);
-    var links = buildNavLinks(loggedIn);
-    
+
+    var session = null;
+    try { session = JSON.parse(localStorage.getItem('dc_session')); } catch(e) {}
+    var loggedIn = !!(session && session.email);
+
+    // 标准导航链接（所有页面一致）
+    var links = [
+      { href: '/demand_square.html', label: '需求广场' },
+      { href: '/suppliers.html', label: '供应商' },
+      { href: '/forum.html', label: '论坛' },
+      { href: '/docs/tutorial.html', label: '教程' },
+      { href: '/api_docs.html', label: 'API文档' },
+    ];
+
+    var brandHtml = '<a class="brand" href="/"><img src="/logo.jpg" alt="">需求链平台</a>';
+    var linksHtml = '<div class="links">';
+    links.forEach(function(l) {
+      linksHtml += '<a href="' + l.href + '">' + esc(l.label) + '</a>';
+    });
     if (loggedIn) {
-      links += '<a href="profile.html" class="user-info" style="display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--text);text-decoration:none;margin-left:4px">' +
-        '<span>' + esc(user.name || user.email) + '</span></a>' +
-        '<a href="#" onclick="localStorage.removeItem(\'dc_session\');location.reload()" style="font-size:13px;color:var(--ts);text-decoration:none">退出</a>';
+      linksHtml += '<a href="/flywheel_dashboard.html" style="font-size:12.5px;opacity:0.7">飞轮</a>';
+      linksHtml += '<a href="/profile.html" class="user-info" style="display:inline-flex;align-items:center;gap:4px;font-size:14px;color:var(--text);text-decoration:none;margin-left:4px">' +
+        '<span>' + esc(session.name || session.email) + '</span></a>';
+      linksHtml += '<a href="#" onclick="localStorage.removeItem(\'dc_session\');location.reload()" style="font-size:13px;color:var(--ts);text-decoration:none">退出</a>';
     } else {
-      links += '<a href="/login.html" class="btn-nav">登录</a>';
+      linksHtml += '<a href="/login.html" class="btn-nav">登录</a>';
     }
-    
-    linksDiv.innerHTML = links;
+    linksHtml += '</div>';
+
+    nav.innerHTML = brandHtml + linksHtml;
   }
-  
-  // Run on DOM ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', updateNav);
-  } else {
-    updateNav();
-  }
+
+  // 立即执行
+  renderNav();
 })();
-
-// ── 全局错误处理 ────────────────────────────────────────────
-window.onerror = function(msg, source, line, col, err) {
-  console.error("[Global] " + msg, source + ":" + line);
-  return true;
-};
-
-window.addEventListener("unhandledrejection", function(e) {
-  console.error("[Global] Unhandled Promise rejection:", e.reason);
-  e.preventDefault();
-});
-
-// 统一错误提示
-function showError(containerId, message) {
-  var el = document.getElementById(containerId);
-  if (!el) return;
-  el.innerHTML = '<div class="msg msg-err" style="margin:8px 0;padding:10px 14px;border-radius:8px">' +
-    encodeHTML(message) + '</div>';
-}
-
-function encodeHTML(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
