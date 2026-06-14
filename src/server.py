@@ -294,11 +294,11 @@ async def register_human(email: str, display_name: str, password: str) -> str:
     人类告诉Agent：名字+邮箱+密码 → Agent调此工具。
     返回 human_id，人类换AI助手时用邮箱+密码登录即可继续。
     """
-    import hashlib, binascii
+    from passlib.hash import bcrypt
     from src.shared.agent_identity import agent_registry, generate_ulid
     try:
         human_id = generate_ulid()
-        hashed = hashlib.sha256(password.encode()).hexdigest()
+        hashed = bcrypt.hash(password)
 
         identity, _ = agent_registry.register(
             human_id=human_id,
@@ -330,15 +330,14 @@ async def login_human(email: str, password: str, display_name: str = "") -> str:
     返回 human_id，拿到后可以正常使用所有功能。
     换AI助手时用这个登录，之前的需求、匹配、工作区都还在。
     """
-    import hashlib
+    from passlib.hash import bcrypt
     from src.shared.agent_identity import agent_registry
     try:
         entry = agent_registry._email_to_human.get(email)
         if not entry:
             return json.dumps({"error": "邮箱未注册。请先注册。"}, ensure_ascii=False)
 
-        hashed = hashlib.sha256(password.encode()).hexdigest()
-        if hashed != entry["password_hash"]:
+        if not bcrypt.verify(password, entry["password_hash"]):
             return json.dumps({"error": "密码错误"}, ensure_ascii=False)
 
         human_id = entry["human_id"]

@@ -143,7 +143,7 @@ async def api_user_avatar(request):
 
 async def api_user_password(request):
     """PUT /api/user/password — 修改密码"""
-    import hashlib
+    from passlib.hash import bcrypt
     from src.shared.database import async_session
     from src.shared.models import User
     from sqlalchemy import select
@@ -163,10 +163,9 @@ async def api_user_password(request):
             u = result.scalar_one_or_none()
             if not u:
                 return JSONResponse({"error": "not found"}, status_code=404)
-            old_hash = hashlib.sha256(old_pwd.encode()).hexdigest()
-            if old_hash != u.password_hash:
+            if not bcrypt.verify(old_pwd, u.password_hash):
                 return JSONResponse({"error": "旧密码错误"}, status_code=401)
-            u.password_hash = hashlib.sha256(new_pwd.encode()).hexdigest()
+            u.password_hash = bcrypt.hash(new_pwd)
             await session.commit()
             return JSONResponse({"status": "ok"})
     except Exception as e:
@@ -202,7 +201,8 @@ async def api_user_stats(request):
 
 async def api_register(request):
     """POST /api/register — 注册新人类用户（数据库持久化）"""
-    import hashlib, secrets
+    import secrets, hashlib
+    from passlib.hash import bcrypt
     from src.shared.database import async_session
     from src.shared.models import User
     from sqlalchemy import select
@@ -230,7 +230,7 @@ async def api_register(request):
                 return JSONResponse({"error": "该邮箱已注册"}, status_code=409)
             
             human_id = secrets.token_hex(16)  # 32 chars
-            hashed = hashlib.sha256(password.encode()).hexdigest()
+            hashed = bcrypt.hash(password)
             api_key = hashlib.sha256((human_id + secrets.token_urlsafe(16)).encode()).hexdigest()[:32]
             
             user = User(
@@ -257,7 +257,7 @@ async def api_register(request):
 
 async def api_login(request):
     """POST /api/login — 人类登录（数据库验证）"""
-    import hashlib
+    from passlib.hash import bcrypt
     from src.shared.database import async_session
     from src.shared.models import User
     from sqlalchemy import select
@@ -275,8 +275,7 @@ async def api_login(request):
             if not user:
                 return JSONResponse({"error": "邮箱未注册"}, status_code=401)
             
-            hashed = hashlib.sha256(password.encode()).hexdigest()
-            if hashed != user.password_hash:
+            if not bcrypt.verify(password, user.password_hash):
                 return JSONResponse({"error": "密码错误"}, status_code=401)
             
             return JSONResponse({
