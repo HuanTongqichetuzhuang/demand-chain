@@ -1291,7 +1291,7 @@ async def register_human(email: str, display_name: str, password: str) -> str:
                 email=email,
                 display_name=display_name,
                 password_hash=hashed,
-                email_verified=True,  # MCP Agent 注册视为已验证
+                email_verified=True,
             )
             session.add(user)
             await session.commit()
