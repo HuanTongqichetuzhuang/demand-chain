@@ -56,10 +56,10 @@ async def update_trust_score(supplier_id: str, delta: float) -> float:
 async def update_trust_by_outcome(outcome: MatchOutcome):
     """根据结果状态自动调整信任分。"""
     delta = {
-        OutcomeStatus.SUCCESS: TRUST_DELTA_SUCCESS,
-        OutcomeStatus.FAILED: TRUST_DELTA_FAILED,
-        OutcomeStatus.CONTACTED: TRUST_DELTA_CONTACTED,
-        OutcomeStatus.NEGOTIATING: TRUST_DELTA_NEGOTIATING,
+        "success": TRUST_DELTA_SUCCESS,
+        "failed": TRUST_DELTA_FAILED,
+        "contacted": TRUST_DELTA_CONTACTED,
+        "negotiating": TRUST_DELTA_NEGOTIATING,
     }.get(outcome.status, 0.0)
 
     if delta != 0.0:
@@ -127,9 +127,9 @@ async def update_category_weight_by_outcome(outcome: MatchOutcome):
         return
 
     delta = {
-        OutcomeStatus.SUCCESS: CATEGORY_WEIGHT_DELTA_SUCCESS,
-        OutcomeStatus.FAILED: CATEGORY_WEIGHT_DELTA_FAILED,
-    }.get(outcome.status, 0.0)
+        "success": CATEGORY_WEIGHT_DELTA_SUCCESS,
+        "failed": CATEGORY_WEIGHT_DELTA_FAILED,
+    }.get(outcome.status.value if hasattr(outcome.status, 'value') else outcome.status, 0.0)
 
     if delta != 0.0:
         await adjust_category_weight(pair[0], pair[1], delta)
@@ -162,7 +162,8 @@ async def run_learning_cycle(batch_size: int = 100) -> dict:
             stats["trust_updated"] += 1
 
             # 对 success/failed 额外调整分类权重
-            if outcome.status in (OutcomeStatus.SUCCESS, OutcomeStatus.FAILED):
+            st = outcome.status.value if hasattr(outcome.status, 'value') else outcome.status
+            if st in ("success", "failed"):
                 await update_category_weight_by_outcome(outcome)
                 stats["weight_updated"] += 1
 
@@ -212,11 +213,11 @@ async def get_flywheel_stats() -> dict:
     async with async_session() as session:
         # 各阶段计数
         status_counts = {}
-        for s in OutcomeStatus:
+        for val in ("matched", "contacted", "negotiating", "success", "failed"):
             r = await session.execute(
-                select(func.count(MatchOutcome.id)).where(MatchOutcome.status == s)
+                select(func.count(MatchOutcome.id)).where(MatchOutcome.status == val)
             )
-            status_counts[s.value] = r.scalar() or 0
+            status_counts[val] = r.scalar() or 0
 
         # 成功率
         total_resolved = status_counts.get("success", 0) + status_counts.get("failed", 0)

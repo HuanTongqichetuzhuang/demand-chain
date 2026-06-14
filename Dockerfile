@@ -4,10 +4,8 @@ WORKDIR /app
 
 RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
 
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential curl && rm -rf /var/lib/apt/lists/*
-
-# 只装核心依赖，不装 crawl4ai（太重）
-RUN pip install --no-cache-dir fastapi "uvicorn[standard]<0.30" sqlalchemy[asyncio] asyncpg pgvector pydantic pydantic-settings python-dotenv httpx mcp alembic
+# 只装核心依赖，不装 crawl4ai（太重）和 build-essential（不需要编译）
+RUN pip install --no-cache-dir fastapi "uvicorn[standard]<0.30" sqlalchemy[asyncio] asyncpg pgvector pydantic pydantic-settings python-dotenv httpx mcp alembic "passlib[bcrypt]" "redis[hiredis]"
 
 COPY src/ ./src/
 COPY prompts/ ./prompts/
