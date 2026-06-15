@@ -642,6 +642,42 @@ async def api_suppliers(request):
         return JSONResponse({'error':str(e)}, status_code=500)
 
 
+async def api_suppliers_filters(request):
+    """GET /api/suppliers/filters — 获取供应商分类/行业/学科聚合信息（用于前端筛选栏）"""
+    from src.shared.database import async_session
+    from src.shared.models import CapabilityProfile
+    from sqlalchemy import select, func, text
+    try:
+        async with async_session() as session:
+            r = await session.execute(select(CapabilityProfile))
+            rows = list(r.scalars().all())
+
+        cats = {}
+        inds = {}
+        discs = {}
+        for p in rows:
+            card = p.agent_card_json or {}
+            c = (card.get("category", "") or "").strip()
+            i = (card.get("industry", "") or "").strip()
+            d = (card.get("discipline", "") or "").strip()
+            if c: cats[c] = cats.get(c, 0) + 1
+            if i: inds[i] = inds.get(i, 0) + 1
+            if d: discs[d] = discs.get(d, 0) + 1
+
+        def top_items(d, n=50):
+            items = sorted(d.items(), key=lambda x: -x[1])
+            return [{"name": k, "count": v} for k, v in items[:n]]
+
+        return JSONResponse({
+            "categories": top_items(cats),
+            "industries": top_items(inds),
+            "disciplines": top_items(discs),
+            "total": len(rows),
+        })
+    except Exception as e:
+        return JSONResponse({'error': str(e)}, status_code=500)
+
+
 async def api_auto_demand(request):
     """POST /api/auto-demand — 自动添加需求（爬虫用），带内容去重"""
     from src.shared.database import async_session
@@ -1212,6 +1248,7 @@ routes = [
     Route("/api/auto-demand", api_auto_demand, methods=["POST"]),
     Route("/api/auto-supplier", api_auto_supplier, methods=["POST"]),
     Route("/api/suppliers", api_suppliers),
+    Route("/api/suppliers/filters", api_suppliers_filters),
     Route("/api/register", api_register, methods=["POST"]),
     Route("/api/login", api_login, methods=["POST"]),
     Route("/api/verify-email", api_verify_email),

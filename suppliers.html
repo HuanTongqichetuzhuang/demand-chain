@@ -65,6 +65,22 @@ h1{font-size:1.6em;margin:20px 0 4px}
 .empty{text-align:center;padding:60px 20px;color:var(--ts)}
 .empty h3{font-size:1.2em;margin-bottom:8px}
 
+/* Filter bars */
+.filter-section{margin:8px 0 4px}
+.filter-bar{display:flex;gap:8px;margin:6px 0;align-items:flex-start}
+.filter-label{font-size:.78em;color:var(--ts);min-width:36px;padding:6px 0;flex-shrink:0;font-weight:500}
+.filter-tags{display:flex;gap:5px;flex-wrap:wrap;flex:1}
+.filter-tags .cat-btn{font-size:.78em;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--ts);cursor:pointer;transition:all .15s;white-space:nowrap}
+.filter-tags .cat-btn:hover{border-color:var(--purple);color:var(--text)}
+.filter-tags .cat-btn.active{border-color:var(--purple);color:#fff;background:var(--purple)}
+.filter-tags .cat-btn .count{font-size:.85em;opacity:.7;margin-left:2px}
+
+/* Classification tags on cards */
+.classify-row{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0}
+.tag-ind{font-size:.72em;padding:2px 8px;border-radius:5px;background:rgba(124,110,240,.1);border:1px solid rgba(124,110,240,.2);color:var(--purple);font-weight:500;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.tag-disc{font-size:.72em;padding:2px 8px;border-radius:5px;background:rgba(0,184,148,.08);border:1px solid rgba(0,184,148,.2);color:var(--green);font-weight:500;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.tag-cat{font-size:.72em;padding:2px 8px;border-radius:5px;background:rgba(253,203,110,.08);border:1px solid rgba(253,203,110,.2);color:var(--amber);font-weight:500;white-space:nowrap}
+
 /* Pagination */
 .pagination{display:flex;gap:8px;justify-content:center;margin:24px 0;flex-wrap:wrap}
 .page-btn{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--ts);font-size:.85em;cursor:pointer;transition:all .15s}
@@ -108,8 +124,25 @@ h1{font-size:1.6em;margin:20px 0 4px}
 <div class="row">
   <input class="search-box" id="searchInput" placeholder="搜索名称/行业/学科/工艺/技能..." oninput="debouncedSearch()" style="max-width:400px">
 </div>
-<div class="category-bar" id="catBar">
-  <span class="cat-btn active" onclick="filterCat('')">全部 <span class="count" id="catAllCount">0</span></span>
+<div class="filter-section" id="filterSection">
+  <div class="filter-bar">
+    <span class="filter-label">分类</span>
+    <div class="filter-tags" id="catBar">
+      <span class="cat-btn active" onclick="filterCat('')">全部 <span class="count" id="catAllCount">0</span></span>
+    </div>
+  </div>
+  <div class="filter-bar">
+    <span class="filter-label">行业</span>
+    <div class="filter-tags" id="indBar">
+      <span class="cat-btn active" onclick="filterInd('')">全部</span>
+    </div>
+  </div>
+  <div class="filter-bar">
+    <span class="filter-label">学科</span>
+    <div class="filter-tags" id="discBar">
+      <span class="cat-btn active" onclick="filterDisc('')">全部</span>
+    </div>
+  </div>
 </div>
 <div class="supplier-grid" id="grid">
   <div class="skeleton-row"><div class="skeleton" style="height:80px"></div><div class="skeleton"></div><div class="skeleton"></div></div>
@@ -140,6 +173,8 @@ h1{font-size:1.6em;margin:20px 0 4px}
 <script>
 var allSuppliers = [];
 var currentCat = "";
+var currentInd = "";
+var currentDisc = "";
 var currentPage = 1;
 var totalPages = 1;
 var perPage = 50;
@@ -152,6 +187,37 @@ var typeLabel = {"COMPANY":"企业","RESEARCH":"研究机构","INDIVIDUAL":"个�
 
 function esc(s){return String(s||"").replace(/</g,"&lt;")}
 
+// Load filter data (categories/industries/disciplines) from full dataset
+async function loadFilters(){
+  try{
+    var r=await fetch("/api/suppliers/filters");
+    var data=await r.json();
+    document.getElementById("totalCount").textContent=data.total||0;
+    document.getElementById("catAllCount").textContent=data.total||0;
+
+    // Categories
+    var bar=document.getElementById("catBar");
+    bar.innerHTML='<span class="cat-btn active" onclick="filterCat(\'\')">全部 <span class="count" id="catAllCount">'+data.total+'</span></span>';
+    (data.categories||[]).forEach(function(c){
+      bar.innerHTML+='<span class="cat-btn" onclick="filterCat(\''+esc(String(c.name).replace(/'/g,"\\'"))+'\')">'+esc(c.name)+' <span class="count">'+c.count+'</span></span>';
+    });
+
+    // Industries
+    var indBar=document.getElementById("indBar");
+    indBar.innerHTML='<span class="cat-btn active" onclick="filterInd(\'\')">全部</span>';
+    (data.industries||[]).forEach(function(i){
+      indBar.innerHTML+='<span class="cat-btn" onclick="filterInd(\''+esc(String(i.name).replace(/'/g,"\\'"))+'\')">'+esc(i.name)+' <span class="count">'+i.count+'</span></span>';
+    });
+
+    // Disciplines
+    var discBar=document.getElementById("discBar");
+    discBar.innerHTML='<span class="cat-btn active" onclick="filterDisc(\'\')">全部</span>';
+    (data.disciplines||[]).forEach(function(d){
+      discBar.innerHTML+='<span class="cat-btn" onclick="filterDisc(\''+esc(String(d.name).replace(/'/g,"\\'"))+'\')">'+esc(d.name)+' <span class="count">'+d.count+'</span></span>';
+    });
+  }catch(e){}
+}
+
 async function load(page){
   page = page || 1;
   currentPage = page;
@@ -162,21 +228,6 @@ async function load(page){
   var data = await r.json();
   allSuppliers = data.items || [];
   totalPages = data.total_pages || 1;
-
-  document.getElementById("catAllCount").textContent = data.total || 0;
-  document.getElementById("totalCount").textContent = data.total || 0;
-
-  // Build categories from first load only
-  if(page === 1){
-    var cats = {};
-    allSuppliers.forEach(function(s){var c=s.category||"其他";cats[c]=(cats[c]||0)+1});
-    var bar=document.getElementById("catBar");
-    bar.innerHTML = '<span class="cat-btn active" onclick="filterCat(\'\')">全部 <span class="count" id="catAllCount">0</span></span>';
-    Object.keys(cats).sort(function(a,b){return cats[b]-cats[a]}).forEach(function(c){
-      bar.innerHTML+='<span class="cat-btn" onclick="filterCat(\''+c.replace(/'/g,"\\'")+'\')">'+c+' <span class="count">'+cats[c]+'</span></span>';
-    });
-  }
-
   render();
   renderPagination();
 }
@@ -188,11 +239,27 @@ function filterCat(c){
   });
   load(1);
 }
+function filterInd(i){
+  currentInd=i;
+  document.querySelectorAll("#indBar .cat-btn").forEach(function(b){
+    b.classList.toggle("active",b.textContent.trim().indexOf(i||"全部")===0);
+  });
+  load(1);
+}
+function filterDisc(d){
+  currentDisc=d;
+  document.querySelectorAll("#discBar .cat-btn").forEach(function(b){
+    b.classList.toggle("active",b.textContent.trim().indexOf(d||"全部")===0);
+  });
+  load(1);
+}
 
 function render(){
   var q=(document.getElementById("searchInput").value||"").toLowerCase();
   var filtered=allSuppliers;
   if(currentCat)filtered=filtered.filter(function(s){return s.category===currentCat});
+  if(currentInd)filtered=filtered.filter(function(s){return s.industry===currentInd});
+  if(currentDisc)filtered=filtered.filter(function(s){return s.discipline===currentDisc});
   if(q)filtered=filtered.filter(function(s){
     return [s.name,s.description,s.industry,s.discipline].some(function(f){return(f||"").toLowerCase().indexOf(q)>=0})||
       (s.skills||[]).some(function(sk){return sk.toLowerCase().indexOf(q)>=0})||
@@ -239,7 +306,6 @@ function renderCard(s){
     '<div class="card-header">'+
       '<div class="card-header-left">'+
         '<div class="name">'+esc(s.name)+'</div>'+
-        (s.industry?'<div class="name-sub"><span style="color:var(--purple)">■</span> '+esc(s.industry)+'</div>':'')+
       '</div>'+
       '<div class="badge-row" style="justify-content:flex-end;margin:0">'+
         (s.verified?'<span class="verified-badge">✅ 已验证</span>':'')+
@@ -249,10 +315,14 @@ function renderCard(s){
     '<div class="badge-row">'+
       '<span class="type-badge">'+(typeLabel[s.profile_type]||s.profile_type)+'</span>'+
       (s.country?'<span class="country-badge">'+esc(s.country)+'</span>':'')+
-      (trl?'<span class="trl-badge">'+trl+'</span>':'')+
+      (s.trl?'<span class="trl-badge">TRL '+s.trl+'</span>':'')+
+    '</div>'+
+    '<div class="classify-row">'+
+      (s.industry?'<span class="tag-ind">🏭 '+esc(s.industry)+'</span>':'')+
+      (s.discipline?'<span class="tag-disc">🔬 '+esc(s.discipline)+'</span>':'')+
+      (s.category?'<span class="tag-cat">📂 '+esc(s.category)+'</span>':'')+
     '</div>'+
     (s.description?'<div class="desc">'+esc(s.description.substring(0,120))+'...</div>':'')+
-    (s.discipline?'<div class="field-row"><span class="field-label">学科</span><div class="field-value">'+esc(s.discipline)+'</div></div>':'')+
     (process?'<div class="field-row"><span class="field-label">工艺</span><div class="field-value">'+process+'</div></div>':'')+
     (skills?'<div class="skill-tags">'+skills+'</div>':'')+
     contactHtml+
@@ -287,11 +357,11 @@ function showDetail(id){
 
     (s.description?'<div class="modal-section"><h4>简介</h4><div class="modal-desc">'+esc(s.description)+'</div></div>':'')+
 
-    '<div class="modal-section"><h4>行业 · 学科 · 分类</h4>'+
-      '<div class="modal-skills">'+
-        (s.industry?'<span class="ms">🏭 '+esc(s.industry)+'</span>':'')+
-        (s.discipline?'<span class="ms">🔬 '+esc(s.discipline)+'</span>':'')+
-        (s.category?'<span class="ms">📂 '+esc(s.category)+'</span>':'')+
+    '<div class="modal-section"><h4>分类信息</h4>'+
+      '<div class="classify-row">'+
+        (s.industry?'<span class="tag-ind">🏭 '+esc(s.industry)+'</span>':'')+
+        (s.discipline?'<span class="tag-disc">🔬 '+esc(s.discipline)+'</span>':'')+
+        (s.category?'<span class="tag-cat">📂 '+esc(s.category)+'</span>':'')+
       '</div>'+
     '</div>'+
 
@@ -315,6 +385,7 @@ function closeModal(e){
 }
 
 load(1);
+loadFilters();
 </script>
 </body>
 </html>
