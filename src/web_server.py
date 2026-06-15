@@ -269,7 +269,7 @@ async def api_user_avatar(request):
 
 async def api_user_password(request):
     """PUT /api/user/password — 修改密码"""
-    from passlib.hash import bcrypt
+    import bcrypt as _bcr1
     from src.shared.database import async_session
     from src.shared.models import User
     from sqlalchemy import select
@@ -289,9 +289,15 @@ async def api_user_password(request):
             u = result.scalar_one_or_none()
             if not u:
                 return JSONResponse({"error": "not found"}, status_code=404)
-            if not bcrypt.verify(old_pwd, u.password_hash):
-                return JSONResponse({"error": "旧密码错误"}, status_code=401)
-            u.password_hash = bcrypt.hash(new_pwd)
+            stored = u.password_hash
+            if stored.startswith("$2b$") or stored.startswith("$2a$"):
+                if not _bcr1.checkpw(old_pwd.encode(), stored.encode()):
+                    return JSONResponse({"error": "旧密码错误"}, status_code=401)
+            else:
+                import hashlib as _hl1
+                if _hl1.sha256(old_pwd.encode()).hexdigest() != stored:
+                    return JSONResponse({"error": "旧密码错误"}, status_code=401)
+            u.password_hash = _bcr1.hashpw(new_pwd.encode(), _bcr1.gensalt()).decode()
             await session.commit()
             return JSONResponse({"status": "ok"})
     except Exception as e:
@@ -365,7 +371,7 @@ async def api_register(request):
                 return JSONResponse({"error": "该邮箱已注册"}, status_code=409)
             
             human_id = secrets.token_hex(16)  # 32 chars
-            hashed = bcrypt.hash(password)
+            hashed = _bcrypt3.hashpw(password.encode(), _bcrypt3.gensalt()).decode()
             api_key = hashlib.sha256((human_id + secrets.token_urlsafe(16)).encode()).hexdigest()[:32]
             verify_token = secrets.token_urlsafe(32)
             
