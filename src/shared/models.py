@@ -76,6 +76,7 @@ class Demand(Base):
     structured_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
     category: Mapped[str | None] = mapped_column(String(128), index=True, nullable=True)
+    sub_category: Mapped[str | None] = mapped_column(String(128), nullable=True)
     classification_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     search_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     discipline_path: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
