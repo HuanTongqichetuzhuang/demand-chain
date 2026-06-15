@@ -594,19 +594,19 @@ async def api_suppliers(request):
             # 分类筛选（精确匹配）
             if category:
                 query = query.where(
-                    CapabilityProfile.agent_card_json['category'].as_string() == category
+                    CapabilityProfile.agent_card_json['category'].astext == category
                 )
 
             # 行业筛选（精确匹配）
             if industry:
                 query = query.where(
-                    CapabilityProfile.agent_card_json['industry'].as_string() == industry
+                    CapabilityProfile.agent_card_json['industry'].astext == industry
                 )
 
             # 学科筛选（精确匹配）
             if discipline:
                 query = query.where(
-                    CapabilityProfile.agent_card_json['discipline'].as_string() == discipline
+                    CapabilityProfile.agent_card_json['discipline'].astext == discipline
                 )
 
             # 关键词搜索（转义 LIKE 特殊字符）
@@ -614,10 +614,10 @@ async def api_suppliers(request):
                 safe_kw = _sanitize_like(keyword)
                 pattern = f'%{safe_kw}%'
                 query = query.where(
-                    CapabilityProfile.agent_card_json['name'].as_string().ilike(pattern) |
-                    CapabilityProfile.agent_card_json['description'].as_string().ilike(pattern) |
-                    CapabilityProfile.agent_card_json['industry'].as_string().ilike(pattern) |
-                    CapabilityProfile.agent_card_json['discipline'].as_string().ilike(pattern)
+                    CapabilityProfile.agent_card_json['name'].astext.ilike(pattern) |
+                    CapabilityProfile.agent_card_json['description'].astext.ilike(pattern) |
+                    CapabilityProfile.agent_card_json['industry'].astext.ilike(pattern) |
+                    CapabilityProfile.agent_card_json['discipline'].astext.ilike(pattern)
                 )
             
             # 总数
