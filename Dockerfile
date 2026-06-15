@@ -15,6 +15,7 @@ COPY *.html ./
 COPY *.jpg ./
 COPY *.png ./
 COPY *.js ./
+COPY scripts/ ./scripts/
 COPY docs/ ./docs/
 
 EXPOSE 8000 80
