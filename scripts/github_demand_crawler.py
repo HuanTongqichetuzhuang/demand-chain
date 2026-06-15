@@ -42,7 +42,11 @@ async def save_demand(raw_text):
     cat, sub = classify_text(raw_text)
 
     async with async_session() as s:
-        cnt = (await s.execute(select(func.count(Demand.id)).where(Demand.raw_text.startswith(raw_text[:60])))).scalar()
+        prefix = raw_text[:60].replace("'", "''")
+        r = await s.execute(
+            select(func.count(Demand.id)).where(Demand.raw_text.ilike(prefix[:40] + "%"))
+        )
+        cnt = r.scalar()
         if cnt and cnt > 0:
             return None
 
