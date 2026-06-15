@@ -17,6 +17,8 @@ COPY *.png ./
 COPY *.js ./
 COPY scripts/ ./scripts/
 COPY docs/ ./docs/
+COPY alembic.ini ./
+COPY alembic/ ./alembic/
 
 EXPOSE 8000 80
 
