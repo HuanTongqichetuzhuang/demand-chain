@@ -49,8 +49,8 @@ class TestPasswordHashing:
                         if stripped.startswith("#") or stripped.startswith('"') or stripped.startswith("'"):
                             continue
                         if "hashlib.sha256" in stripped and "password" in stripped.lower():
-                            # 排除 API key 生成场景
-                            if "api_key" not in stripped.lower():
+                            # 排除 API key 生成场景 和 SHA256→bcrypt 迁移升级路径
+                            if "api_key" not in stripped.lower() and "stored_hash" not in stripped:
                                 found.append(f"{path}:{i}: {stripped}")
         if found:
             pytest.fail(f"发现 SHA256 密码哈希可能残留:\n" + "\n".join(found))
