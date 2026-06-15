@@ -903,11 +903,10 @@ async def api_forum_topic_detail(request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 async def api_demand_list(request):
-    """GET /api/demands — 需求列表，支持分页、语义搜索、分类筛选"""
+    """GET /api/demands — 需求列表，支持分页、全文搜索、分类筛选"""
     from src.shared.database import async_session
     from src.shared.models import Demand
-    from src.shared.semantic_search import demand_search, TfidfSearch
-    from sqlalchemy import select, func
+    from sqlalchemy import select, func, text as sa_text
     try:
         keyword = request.query_params.get("keyword", "").strip()
         category = request.query_params.get("category", "")
@@ -917,60 +916,46 @@ async def api_demand_list(request):
         per_page = int(request.query_params.get("per_page", 50))
         page = max(1, page)
         per_page = max(1, min(200, per_page))
-        offset = (page - 1) * per_page
 
         async with async_session() as session:
-            # Build query with filters
-            query_filter = True  # placeholder
+            # Build base query
+            base = select(Demand)
+            count_base = select(func.count(Demand.id))
 
-            # Get total count (filtered)
-            count_query = select(func.count(Demand.id))
             if category:
-                count_query = count_query.where(Demand.category == category)
+                base = base.where(Demand.category == category)
+                count_base = count_base.where(Demand.category == category)
             if sub_category:
-                from sqlalchemy import text as sa_text
-                count_query = count_query.where(Demand.sub_category == sub_category)
-            count_result = await session.execute(count_query)
-            total = count_result.scalar()
+                base = base.where(Demand.sub_category == sub_category)
+                count_base = count_base.where(Demand.sub_category == sub_category)
 
+            # PostgreSQL full-text search
+            if keyword:
+                # Escape single quotes for tsquery
+                safe_q = keyword.replace("'", "''")
+                tsquery = f"plainto_tsquery('simple', '{safe_q}')"
+                base = base.where(
+                    Demand.search_vector.op("@@")(sa_text(tsquery))
+                ).order_by(
+                    sa_text(f"ts_rank({Demand.search_vector.key}, {tsquery}) DESC")
+                )
+                count_base = count_base.where(
+                    Demand.search_vector.op("@@")(sa_text(tsquery))
+                )
+            else:
+                base = base.order_by(Demand.created_at.desc())
+
+            # Get total
+            count_result = await session.execute(count_base)
+            total = count_result.scalar() or 0
+
+            # Get page
             result = await session.execute(
-                select(Demand).order_by(Demand.created_at.desc()).limit(2000)
+                base.limit(per_page).offset((page - 1) * per_page)
             )
             all_demands = list(result.scalars().all())
 
-        # Filter by category
-        if category:
-            all_demands = [d for d in all_demands if d.category == category]
-
-        # Semantic search
-        if keyword:
-            search = TfidfSearch()
-            for d in all_demands:
-                text = (d.raw_text or "") + " " + (d.category or "")
-                if d.search_text:
-                    text += " " + d.search_text
-                if d.structured_json:
-                    s = d.structured_json
-                    text += " " + (s.get("summary", "") or "")
-                    text += " " + " ".join(s.get("tags", []))
-                search.add(d.id, text)
-            search.build_index()
-            scored = search.search(keyword, top_k=len(all_demands))
-            id_to_d = {d.id: d for d in all_demands}
-            ranked = [id_to_d[did] for did, score in scored if did in id_to_d]
-            seen = {d.id for d in ranked}
-            for d in all_demands:
-                if d.id not in seen and keyword.lower() in (d.raw_text or "").lower():
-                    ranked.append(d)
-            all_demands = ranked
-
-        # Sort
-        if sort == "old":
-            all_demands.reverse()
-
-        total = len(all_demands)
         total_pages = (total + per_page - 1) // per_page if total > 0 else 0
-        page_items = all_demands[offset:offset + per_page]
 
         return JSONResponse({
             "items": [{
@@ -982,7 +967,7 @@ async def api_demand_list(request):
                 "summary": (d.structured_json.get("summary", "") if d.structured_json else ""),
                 "tags": (d.structured_json.get("tags", []) if d.structured_json else []),
                 "created_at": d.created_at.isoformat() if d.created_at else "",
-            } for d in page_items],
+            } for d in all_demands],
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -1487,6 +1472,92 @@ async def api_flywheel_weights(request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+async def api_global_search(request):
+    """GET /api/global_search — 跨表全文搜索（需求、供应商、论坛）"""
+    from src.shared.database import async_session
+    from src.shared.models import Demand, CapabilityProfile, ForumTopic
+    from sqlalchemy import select, func, text as sa_text
+    try:
+        q = request.query_params.get("q", "").strip()
+        page = max(1, int(request.query_params.get("page", 1)))
+        per_page = max(1, min(50, int(request.query_params.get("per_page", 10))))
+
+        if not q:
+            return JSONResponse({"demands": [], "suppliers": [], "forum_topics": [], "total": 0})
+
+        safe_q = q.replace("'", "''")
+        tsquery = f"plainto_tsquery('simple', '{safe_q}')"
+
+        results = {"demands": [], "suppliers": [], "forum_topics": [], "total": 0}
+
+        async with async_session() as session:
+            # Search demands
+            d_query = select(Demand).where(
+                Demand.search_vector.op("@@")(sa_text(tsquery))
+            ).order_by(
+                sa_text(f"ts_rank({Demand.search_vector.key}, {tsquery}) DESC")
+            ).limit(per_page)
+            d_result = await session.execute(d_query)
+            for d in d_result.scalars().all():
+                results["demands"].append({
+                    "id": d.id,
+                    "raw_text": d.raw_text[:200],
+                    "category": d.category or "",
+                    "status": d.status.value if d.status else "open",
+                    "created_at": d.created_at.isoformat() if d.created_at else "",
+                })
+
+            # Search capability profiles
+            p_query = select(CapabilityProfile).where(
+                CapabilityProfile.search_vector.op("@@")(sa_text(tsquery))
+            ).order_by(
+                sa_text(f"ts_rank({CapabilityProfile.search_vector.key}, {tsquery}) DESC")
+            ).limit(per_page)
+            p_result = await session.execute(p_query)
+            for p in p_result.scalars().all():
+                results["suppliers"].append({
+                    "id": p.id,
+                    "name": p.agent_card_json.get("name", "") if p.agent_card_json else "",
+                    "description": (p.agent_card_json.get("description", "") or "")[:200],
+                    "profile_type": p.profile_type.value if p.profile_type else "",
+                    "country": p.country or "",
+                })
+
+            # Search forum topics (using title + body ilike as fallback for now)
+            like_pattern = f"%{q}%"
+            t_result = await session.execute(
+                select(ForumTopic).where(
+                    (ForumTopic.title.ilike(like_pattern)) |
+                    (ForumTopic.body.ilike(like_pattern))
+                ).order_by(ForumTopic.created_at.desc()).limit(per_page)
+            )
+            for t in t_result.scalars().all():
+                results["forum_topics"].append({
+                    "id": t.id,
+                    "title": t.title,
+                    "body": t.body[:200],
+                    "category": t.category or "",
+                    "created_at": t.created_at.isoformat() if t.created_at else "",
+                })
+
+            # Total count across tables
+            d_count = (await session.execute(
+                select(func.count()).select_from(Demand).where(
+                    Demand.search_vector.op("@@")(sa_text(tsquery))
+                )
+            )).scalar() or 0
+            p_count = (await session.execute(
+                select(func.count()).select_from(CapabilityProfile).where(
+                    CapabilityProfile.search_vector.op("@@")(sa_text(tsquery))
+                )
+            )).scalar() or 0
+            results["total"] = d_count + p_count + len(results["forum_topics"])
+
+        return JSONResponse(results)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 routes = [
     Route("/", index),
     Route("/login.html", login_page),
@@ -1544,6 +1615,7 @@ routes = [
     Route("/api/admin/suppliers/{id}", api_admin_suppliers_delete, methods=["DELETE"]),
     Route("/api/admin/demands/{id}", api_admin_demands_delete, methods=["DELETE"]),
     Route("/api/home/stats", api_home_stats),
+    Route("/api/global_search", api_global_search),
     Route("/.well-known/agent.json", api_agent_card),
     # Catch-all static
     Route("/{path:path}", static_file),

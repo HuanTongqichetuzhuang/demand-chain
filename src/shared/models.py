@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from sqlalchemy import String, Text, DateTime, Float, Integer, ForeignKey, Enum as SAEnum
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID, JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
 
@@ -79,6 +79,7 @@ class Demand(Base):
     sub_category: Mapped[str | None] = mapped_column(String(128), nullable=True)
     classification_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     search_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
     discipline_path: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     ipc_codes: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     process_categories: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
@@ -109,6 +110,7 @@ class CapabilityProfile(Base):
     is_claimed: Mapped[bool] = mapped_column(default=True)
     verified: Mapped[bool] = mapped_column(default=False)
     trust_score: Mapped[float] = mapped_column(Float, default=0.0)
+    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
