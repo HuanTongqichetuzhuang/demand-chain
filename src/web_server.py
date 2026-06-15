@@ -3,12 +3,16 @@
 """
 import json
 import os
+import time as _time
 import uvicorn
 from starlette.applications import Starlette
-from starlette.responses import FileResponse, JSONResponse
+from starlette.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket
 from contextlib import asynccontextmanager
+from collections import defaultdict
 
 
 @asynccontextmanager
@@ -18,7 +22,102 @@ async def lifespan(app):
 WEB_ROOT = "/app"
 
 # ============================================================
-# 安全工具函数
+# API 通用限流（登录 5次/5min，通用 API 60次/min）
+# ============================================================
+
+_login_attempts: dict[str, list[float]] = defaultdict(list)
+_LOGIN_LIMIT = 5
+_LOGIN_WINDOW = 300  # 5 分钟
+
+_api_attempts: dict[str, list[float]] = defaultdict(list)
+_API_LIMIT = 120
+_API_WINDOW = 60  # 1 分钟
+
+
+def _check_api_rate_limit(key: str, limit: int, window: int) -> tuple[bool, int]:
+    now = _time.time()
+    start = now - window
+    attempts = [t for t in _api_attempts[key] if t > start]
+    _api_attempts[key] = attempts
+    if len(attempts) >= limit:
+        return False, 0
+    return True, limit - len(attempts)
+
+
+def _record_api_call(key: str):
+    _api_attempts[key].append(_time.time())
+
+
+# ============================================================
+# 审计日志
+# ============================================================
+
+async def _log_audit(user_id: str | None, action: str, target_type: str,
+                      target_id: str | None = None, detail: str | None = None,
+                      ip: str | None = None, user_agent: str | None = None):
+    try:
+        from src.shared.database import async_session
+        from src.shared.models import AuditLog
+        from uuid import uuid4
+        async with async_session() as session:
+            al = AuditLog(
+                id=str(uuid4()),
+                user_id=user_id,
+                action=action,
+                target_type=target_type,
+                target_id=target_id,
+                detail=str(detail)[:500] if detail else None,
+                ip=ip,
+                user_agent=str(user_agent)[:256] if user_agent else None,
+            )
+            session.add(al)
+            await session.commit()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"[Audit] write failed: {e}")
+
+
+# ============================================================
+# 安全中间件
+# ============================================================
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        # CSP — allow self + inline styles (for nav.js injection)
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "img-src 'self' data:; "
+            "connect-src 'self' ws: wss:; "
+            "font-src 'self' data:"
+        )
+        return response
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """API 通用限流 — 基于 IP"""
+    async def dispatch(self, request, call_next):
+        path = request.url.path
+        # Skip static files and WebSocket
+        if path.startswith("/ws/") or path.startswith("/.well-known/"):
+            return await call_next(request)
+
+        client_ip = request.client.host if request.client else "unknown"
+        allowed, remaining = _check_api_rate_limit(client_ip, _API_LIMIT, _API_WINDOW)
+        if not allowed:
+            return JSONResponse({"error": "请求过于频繁，请稍后再试"}, status_code=429,
+                                headers={"Retry-After": "60", "X-RateLimit-Remaining": "0"})
+        _record_api_call(client_ip)
+        response = await call_next(request)
+        response.headers["X-RateLimit-Remaining"] = str(remaining)
+        return response
 # ============================================================
 
 import re
@@ -427,6 +526,17 @@ async def api_login(request):
         email = body.get("email","").strip()
         if not _validate_email(email):
             return JSONResponse({"error": "邮箱格式不正确"}, status_code=400)
+        
+        # 登录限流
+        client_ip = request.client.host if request.client else "unknown"
+        login_key = f"login:{email}:{client_ip}"
+        now = _time.time()
+        start = now - _LOGIN_WINDOW
+        _login_attempts[login_key] = [t for t in _login_attempts[login_key] if t > start]
+        if len(_login_attempts[login_key]) >= _LOGIN_LIMIT:
+            return JSONResponse({"error": "登录尝试过于频繁，请5分钟后再试"}, status_code=429)
+        _login_attempts[login_key].append(now)
+        
         password = body.get("password","")
         
         async with async_session() as session:
@@ -2272,7 +2382,12 @@ routes = [
     Route("/{path:path}", static_file),
 ]
 
-app = Starlette(routes=routes, lifespan=lifespan)
+app = Starlette(routes=routes, lifespan=lifespan,
+                middleware=[
+                    Middleware(SecurityHeadersMiddleware),
+                    Middleware(RateLimitMiddleware),
+                ],
+                max_request_body_size=10 * 1024 * 1024)  # 10MB
 
 def run():
     uvicorn.run(app, host="0.0.0.0", port=80, log_level="info")

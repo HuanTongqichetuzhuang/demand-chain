@@ -81,6 +81,22 @@ class Message(Base):
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class AuditLog(Base):
+    """审计日志 — 记录所有用户操作"""
+    __tablename__ = "audit_logs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    action: Mapped[str] = mapped_column(String(64), nullable=False, index=True)  # create/update/delete/login/register
+    target_type: Mapped[str] = mapped_column(String(64), nullable=False)  # demand/supplier/forum/message/user
+    target_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(45), nullable=True)  # IPv6 max 45
+    user_agent: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, index=True)
+
+
 class DemandStatus(str, enum.Enum):
     NEW = "new"
     STRUCTURING = "structuring"
