@@ -31,3 +31,7 @@ Dockerfile.db
 .workbuddy/memory/
 LOGO/
 需求链宣传.txt
+
+# Workflow files — push manually via GitHub web UI
+
+# GitHub workflow files — pushed via web UI only.github/workflows/
