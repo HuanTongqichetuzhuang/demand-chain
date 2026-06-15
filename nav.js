@@ -66,10 +66,6 @@
     if (loggedIn) {
       linksHtml += '<a href="/profile.html" style="display:inline-flex;align-items:center;gap:4px;font-size:14px;color:var(--text);margin-left:4px">' +
         esc(session.name || session.email) + '</a>';
-      // 管理员入口（仅创始人邮箱可见）
-      if (session.email === '477570216@qq.com') {
-        linksHtml += '<a href="/admin.html" style="font-size:12.5px;color:var(--blue)">🔧 管理</a>';
-      }
       linksHtml += '<a href="#" onclick="localStorage.removeItem(\'dc_session\');location.reload()" style="font-size:13px;color:var(--ts)">退出</a>';
     } else {
       linksHtml += '<a href="/login.html" class="btn-nav">登录</a>';
