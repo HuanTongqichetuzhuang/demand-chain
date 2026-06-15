@@ -158,6 +158,13 @@ class Demand(Base):
     interest_count: Mapped[int] = mapped_column(Integer, default=1)
     duplicate_group_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     interest_users: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True, default=list)
+    # 来源信息
+    source: Mapped[str | None] = mapped_column(String(128), nullable=True)  # 来源名称（如 USA.gov 联邦挑战）
+    source_url: Mapped[str | None] = mapped_column(String(512), nullable=True)  # 源链接
+    organization: Mapped[str | None] = mapped_column(String(256), nullable=True)  # 发布单位
+    deadline: Mapped[str | None] = mapped_column(String(32), nullable=True)  # 截止日期
+    budget_hint: Mapped[str | None] = mapped_column(String(128), nullable=True)  # 预算/奖金
+    location: Mapped[str | None] = mapped_column(String(128), nullable=True)  # 地点/区域
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -606,6 +606,12 @@ def seed_demands_to_db(demands):
             "raw_text": d.get("body", d.get("title", "")),
             "category": d.get("category", "其他"),
             "email": "crawler",
+            "source": d.get("source", ""),
+            "source_url": d.get("url", ""),
+            "organization": d.get("organization", ""),
+            "deadline": d.get("deadline", ""),
+            "budget_hint": d.get("budget_hint", ""),
+            "location": d.get("location", ""),
         }).encode("utf-8")
         try:
             req = urllib.request.Request(

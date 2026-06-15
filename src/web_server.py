@@ -855,6 +855,14 @@ async def api_auto_demand(request):
         if not raw_text:
             return JSONResponse({"error": "empty"}, status_code=400)
 
+        # 扩展信息（爬虫/来源）
+        source = body.get("source", "")
+        source_url = body.get("source_url", "")
+        organization = body.get("organization", "")
+        deadline = body.get("deadline", "")
+        budget_hint = body.get("budget_hint", "")
+        location = body.get("location", "")
+
         prefix = raw_text[:100]
         async with async_session() as session:
             # 去重：用 raw_text 前 100 字符做前缀匹配
@@ -871,6 +879,12 @@ async def api_auto_demand(request):
                 category=category,
                 status=DemandStatus.OPEN,
                 visibility="PUBLIC",
+                source=source or None,
+                source_url=source_url or None,
+                organization=organization or None,
+                deadline=deadline or None,
+                budget_hint=budget_hint or None,
+                location=location or None,
             )
             session.add(demand)
             await session.commit()
@@ -1088,6 +1102,12 @@ async def api_demand_list(request):
                 "status": d.status.value if d.status else "open",
                 "summary": (d.structured_json.get("summary", "") if d.structured_json else ""),
                 "tags": (d.structured_json.get("tags", []) if d.structured_json else []),
+                "source": d.source or "",
+                "source_url": d.source_url or "",
+                "organization": d.organization or "",
+                "deadline": d.deadline or "",
+                "budget_hint": d.budget_hint or "",
+                "location": d.location or "",
                 "created_at": d.created_at.isoformat() if d.created_at else "",
             } for d in all_demands],
             "total": total,
