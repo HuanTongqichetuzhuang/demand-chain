@@ -93,9 +93,9 @@ async def scan_and_match():
         start = time.monotonic()
         try:
             async with async_session() as session:
-                r = await session.execute(
-                    select(func.count(Demand.id)).where(Demand.status == DemandStatus.OPEN)
-                )
+                from sqlalchemy import func as sa_func, select as sa_select
+                stmt = sa_select(sa_func.count()).select_from(Demand).where(Demand.status == DemandStatus.OPEN)
+                r = await session.execute(stmt)
                 open_count = r.scalar() or 0
 
                 if open_count > 0:
