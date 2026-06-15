@@ -572,7 +572,7 @@ async def api_forum_replies(request):
 
 
 async def api_suppliers(request):
-    """GET /api/suppliers — 获取公开供应商资料（支持分页+搜索）"""
+    """GET /api/suppliers — 获取公开供应商资料（支持分页+搜索+分类/行业/学科筛选）"""
     from src.shared.database import async_session
     from src.shared.models import CapabilityProfile
     from sqlalchemy import select, func
@@ -581,13 +581,34 @@ async def api_suppliers(request):
         page = int(request.query_params.get('page', 1))
         per_page = int(request.query_params.get('per_page', 50))
         keyword = request.query_params.get('keyword', '').strip()
+        category = request.query_params.get('category', '').strip()
+        industry = request.query_params.get('industry', '').strip()
+        discipline = request.query_params.get('discipline', '').strip()
         page = max(1, page)
         per_page = max(1, min(200, per_page))
         offset = (page - 1) * per_page
 
         async with async_session() as session:
             query = select(CapabilityProfile)
-            
+
+            # 分类筛选（精确匹配）
+            if category:
+                query = query.where(
+                    CapabilityProfile.agent_card_json['category'].as_string() == category
+                )
+
+            # 行业筛选（精确匹配）
+            if industry:
+                query = query.where(
+                    CapabilityProfile.agent_card_json['industry'].as_string() == industry
+                )
+
+            # 学科筛选（精确匹配）
+            if discipline:
+                query = query.where(
+                    CapabilityProfile.agent_card_json['discipline'].as_string() == discipline
+                )
+
             # 关键词搜索（转义 LIKE 特殊字符）
             if keyword:
                 safe_kw = _sanitize_like(keyword)
