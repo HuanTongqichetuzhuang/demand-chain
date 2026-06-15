@@ -8,158 +8,271 @@
   :root{--purple:#7c6ef0;--muted:#8888aa;--bg:#0c0c1d;--card:#14142b;--text:#e8e8f0;--ts:#9090b0;--ac:#6c5ce7;--br:#2a2a4a;--gn:#00b894;--am:#fdcb6e;--rd:#e24b4a}
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column}
-  .chat-header{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--card);border-bottom:1px solid var(--br)}
+  .chat-header{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--card);border-bottom:1px solid var(--br);flex-shrink:0}
   .chat-header .back{color:var(--ts);text-decoration:none;font-size:.9em;cursor:pointer}.chat-header .back:hover{color:var(--text)}
-  .chat-header h2{font-size:1.05em;flex:1}.online-dot{width:8px;height:8px;border-radius:50%;background:var(--gn);margin-right:2px}.online-dot.offline{background:var(--ts)}
+  .chat-header h2{font-size:1.05em;flex:1}
+  .online-dot{width:8px;height:8px;border-radius:50%;background:var(--gn);margin-right:2px;display:inline-block}.online-dot.offline{background:var(--ts)}
   .chat-msgs{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
   .msg{max-width:75%;padding:10px 14px;border-radius:14px;font-size:.92em;line-height:1.55;word-break:break-word}
   .msg.me{align-self:flex-end;background:var(--ac);color:#fff;border-bottom-right-radius:4px}
   .msg.other{align-self:flex-start;background:var(--card);border:1px solid var(--br);border-bottom-left-radius:4px}
   .msg.system{align-self:center;font-size:.8em;color:var(--ts);background:transparent;max-width:90%;text-align:center}
   .msg .time{font-size:.7em;opacity:.6;margin-top:4px;display:block}
-  .chat-input{display:flex;gap:8px;padding:12px 20px;background:var(--card);border-top:1px solid var(--br)}
+  .chat-input{display:flex;gap:8px;padding:12px 20px;background:var(--card);border-top:1px solid var(--br);flex-shrink:0}
   .chat-input input{flex:1;padding:10px 16px;border-radius:20px;border:1px solid var(--br);background:var(--bg);color:var(--text);font-size:.9em}
   .chat-input input:focus{border-color:var(--ac);outline:none}
   .chat-input button{padding:10px 20px;border-radius:20px;background:var(--ac);color:#fff;border:none;font-weight:600;cursor:pointer;font-size:.9em}
   .chat-input button:hover{background:#7c6ef0}
   .empty{text-align:center;padding:40px;color:var(--ts)}
-  .typing{font-size:.75em;color:var(--ts);padding:4px 16px;height:20px}
-  @media(max-width:500px){.msg{max-width:90%}}
-
-@media(max-width:768px){
-  nav{flex-direction:column;gap:10px;padding:12px}
-  nav .links{flex-wrap:wrap;justify-content:center}
-  .hero{padding:40px 16px 30px}
-  .hero h1{font-size:28px}
-  .stats{gap:16px;flex-wrap:wrap}
-  .stats .stat .number{font-size:24px}
-  .features,.agents-grid{grid-template-columns:1fr}
-  .section{padding:30px 16px}
-}
-
-nav{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;max-width:1100px;margin:0 auto;border-bottom:1px solid var(--border)}
-nav .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:17px;color:var(--text);text-decoration:none}
-nav .brand:hover{text-decoration:none}
-nav .brand img{width:36px;height:36px;border-radius:8px}
-nav .links{display:flex;gap:20px;align-items:center}
-nav .links a{font-size:14px;color:var(--muted);transition:color .15s}
-nav .links a:hover{color:var(--text);text-decoration:none}
-nav .links .btn-nav{background:var(--purple);color:#fff;padding:7px 18px;border-radius:8px;font-size:14px;font-weight:500;transition:background .15s}
-nav .links .btn-nav:hover{background:#8c7ef5;text-decoration:none;color:#fff}
-footer{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;border-top:1px solid var(--border)}
-footer .links{margin-bottom:12px;display:flex;justify-content:center;gap:24px;flex-wrap:wrap}
-footer .links a{color:var(--muted);font-size:13px}
-footer .links a:hover{color:var(--text)}
-
+  .typing{font-size:.75em;color:var(--ts);padding:4px 16px;height:20px;flex-shrink:0}
+  .conn-status{font-size:.75em;padding:2px 12px;border-radius:4px;margin-left:8px}
+  .conn-status.ok{color:var(--gn)}.conn-status.err{color:var(--rd)}
+  .conversations{width:280px;border-right:1px solid var(--br);overflow-y:auto;flex-shrink:0;display:none}
+  .conversations .conv{padding:12px 16px;border-bottom:1px solid var(--br);cursor:pointer;font-size:.85em}
+  .conversations .conv:hover,.conversations .conv.active{background:rgba(108,92,231,0.08)}
+  .chat-layout{display:flex;flex:1;overflow:hidden}
+  .chat-main{flex:1;display:flex;flex-direction:column}
+  @media(max-width:600px){
+    .msg{max-width:90%}
+    .conversations{width:100%;max-height:200px;border-right:none;border-bottom:1px solid var(--br)}
+    .chat-layout{flex-direction:column}
+  }
 </style>
-
-<meta property="og:title" content="需求链平台 — AI 驱动创新基础设施">
-<meta property="og:description" content="用 AI 助手自动匹配需求与供应商。注册即用，永久开源。">
-<meta property="og:image" content="https://8.154.26.92:8080/logo.jpg">
-<meta property="og:url" content="https://8.154.26.92:8080/">
-<meta name="twitter:card" content="summary_large_image">
-
 </head>
 <body>
-<nav>
-  <a class="brand" href="/">
-    <img src="logo.jpg" alt="">
-    需求链平台
-  </a>
-  <div class="links">
-    <a href="demand_square.html">需求广场</a>
-    <a href="forum.html">论坛</a>
-    <a href="docs/tutorial.html">教程</a>
-    <a href="login.html" class="btn-nav">登录</a>
-  </div>
-</nav>
-  <div class="chat-header">
-    <a class="back" onclick="history.back()">← 返回</a>
-    <div><span class="online-dot" id="onlineDot"></span><span id="onlineText">离线</span></div>
-    <h2 id="chatTitle">协作聊天</h2>
-  </div>
-
-  <div class="chat-msgs" id="messages">
-    <div class="msg system">协作工作区聊天已就绪。你可以直接和对方人类对话。</div>
-  </div>
-
-  <div class="typing" id="typing"></div>
-
-  <div class="chat-input">
-    <input type="text" id="input" placeholder="输入消息..." onkeydown="if(event.key==='Enter')send()">
-    <button onclick="send()">发送</button>
+<nav></nav>
+<div class="chat-layout">
+  <div class="conversations" id="convList"></div>
+  <div class="chat-main">
+    <div class="chat-header">
+      <a class="back" onclick="history.back()">← 返回</a>
+      <div><span class="online-dot" id="onlineDot"></span><span id="onlineText">离线</span></div>
+      <h2 id="chatTitle">消息</h2>
+      <span class="conn-status" id="connStatus">连接中...</span>
+    </div>
+    <div class="chat-msgs" id="messages">
+      <div class="msg system">选择左侧对话开始聊天，或发送消息给对方。</div>
+    </div>
+    <div class="typing" id="typing"></div>
+    <div class="chat-input">
+      <input type="text" id="input" placeholder="输入消息..." onkeydown="if(event.key==='Enter')send()" disabled>
+      <button onclick="send()">发送</button>
+    </div>
   </div>
 </div>
 
 <script>
-const wsId = new URLSearchParams(window.location.search).get("workspace") || "demo-ws";
-const myName = "我";
+const currentUser = JSON.parse(localStorage.getItem("dc_session") || "null");
+let ws = null;
+let wsConnected = false;
+let activeConv = null; // { to_human_id, to_name, to_email }
+let conversations = [];
 
-// Simulated messages
-let messages = [
-  {from:"other",name:"需求方",text:"你好，我是这个传感器需求的技术负责人。想确认几个细节。",time:"14:30"},
-  {from:"me",name:"我",text:"好的，请说。我这边是传感器研究所的工程团队。",time:"14:31"},
-  {from:"other",name:"需求方",text:"800°C是持续工作温度还是短时峰值？",time:"14:32"},
-  {from:"me",name:"我",text:"持续工作温度。我们的材料方案可以稳定工作在800°C，瞬时峰值到900°C没问题。",time:"14:33"},
-  {from:"system",text:"—— 需求方开始输入 ——",time:""},
-  {from:"other",name:"需求方",text:"寿命指标呢？需要≥5000小时持续工作。",time:"14:35"},
-];
+// ── Connect WebSocket ──────────────────────────────────────
+function connectWS() {
+  if (!currentUser || !currentUser.email) {
+    document.getElementById("connStatus").textContent = "未登录";
+    document.getElementById("connStatus").className = "conn-status err";
+    return;
+  }
 
-function render() {
+  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  const wsUrl = protocol + "//" + location.host + "/ws/chat";
+
+  try {
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = function() {
+      ws.send(JSON.stringify({ type: "auth", email: currentUser.email }));
+    };
+
+    ws.onmessage = function(event) {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "auth_ok") {
+          wsConnected = true;
+          document.getElementById("connStatus").textContent = "已连接";
+          document.getElementById("connStatus").className = "conn-status ok";
+          document.getElementById("input").disabled = false;
+          loadConversations();
+        } else if (data.type === "message") {
+          // Incoming real-time message
+          addMessage({
+            from: data.from,
+            content: data.content,
+            created_at: data.created_at || new Date().toISOString(),
+          }, false);
+          // Refresh conversations
+          loadConversations();
+        } else if (data.type === "pong") {
+          // heartbeat ok
+        }
+      } catch(e) {}
+    };
+
+    ws.onclose = function() {
+      wsConnected = false;
+      document.getElementById("connStatus").textContent = "已断开";
+      document.getElementById("connStatus").className = "conn-status err";
+      document.getElementById("input").disabled = true;
+      setTimeout(connectWS, 3000); // reconnect
+    };
+
+    ws.onerror = function() {
+      document.getElementById("connStatus").textContent = "连接失败";
+      document.getElementById("connStatus").className = "conn-status err";
+    };
+  } catch(e) {
+    document.getElementById("connStatus").textContent = "连接异常";
+  }
+}
+
+// ── Load conversations ─────────────────────────────────────
+function loadConversations() {
+  if (!currentUser || !currentUser.email) return;
+  fetch("/api/messages?email=" + encodeURIComponent(currentUser.email))
+    .then(r => r.json())
+    .then(data => {
+      if (!data.items || !data.items.length) {
+        document.getElementById("convList").innerHTML =
+          '<div class="empty" style="padding:20px;font-size:.85em">暂无对话</div>';
+        return;
+      }
+
+      // Group by other party
+      const convMap = {};
+      data.items.forEach(function(m) {
+        const otherId = m.from_user === currentUser.human_id ? m.to_user : m.from_user;
+        if (!convMap[otherId]) {
+          convMap[otherId] = { other_id: otherId, messages: [], last_time: "" };
+        }
+        convMap[otherId].messages.push(m);
+        if (m.created_at > convMap[otherId].last_time) {
+          convMap[otherId].last_time = m.created_at;
+        }
+      });
+
+      const convs = Object.values(convMap);
+      convs.sort(function(a, b) { return b.last_time.localeCompare(a.last_time); });
+      conversations = convs;
+
+      var html = convs.map(function(c) {
+        const lastMsg = c.messages[c.messages.length - 1];
+        const time = lastMsg && lastMsg.created_at ? new Date(lastMsg.created_at).toLocaleString("zh-CN", {hour:'2-digit',minute:'2-digit'}) : "";
+        const text = lastMsg ? lastMsg.content.slice(0,50) : "";
+        const isActive = activeConv && activeConv.to_human_id === c.other_id;
+        return '<div class="conv' + (isActive ? ' active' : '') + '" onclick="openConv(\'' + c.other_id + '\')">' +
+          '<div style="font-weight:600;font-size:.9em">用户 ' + c.other_id.slice(0,8) + '</div>' +
+          '<div style="color:var(--ts);font-size:.8em;margin-top:2px">' + escHtml(text) + ' · ' + time + '</div></div>';
+      }).join('');
+      document.getElementById("convList").innerHTML = html;
+      document.getElementById("convList").style.display = convs.length ? "block" : "none";
+    })
+    .catch(function() {});
+}
+
+// ── Open conversation ──────────────────────────────────────
+function openConv(otherId) {
+  activeConv = { to_human_id: otherId };
+  document.getElementById("chatTitle").textContent = "用户 " + otherId.slice(0,8);
+  document.getElementById("onlineText").textContent = "未知";
+
+  // Load messages for this conversation
+  if (!currentUser || !currentUser.email) return;
+  fetch("/api/messages?email=" + encodeURIComponent(currentUser.email))
+    .then(r => r.json())
+    .then(data => {
+      if (!data.items) return;
+      const filtered = data.items.filter(function(m) {
+        return (m.from_user === otherId || m.to_user === otherId);
+      });
+      renderMessages(filtered);
+    })
+    .catch(function() {});
+  loadConversations();
+}
+
+// ── Render messages ────────────────────────────────────────
+function renderMessages(msgs) {
   const el = document.getElementById("messages");
-  el.innerHTML = messages.map((m,i) => {
-    if (m.from==="system") return `<div class="msg system">${m.text}</div>`;
-    const cls = m.from==="me"?"me":"other";
-    return `<div class="msg ${cls}"><strong>${m.name}</strong><br>${m.text}<span class="time">${m.time}</span></div>`;
+  if (!msgs || !msgs.length) {
+    el.innerHTML = '<div class="msg system">开始对话吧！发送第一条消息。</div>';
+    return;
+  }
+  el.innerHTML = msgs.map(function(m) {
+    const isMe = m.from_user === (currentUser && currentUser.human_id);
+    const time = m.created_at ? new Date(m.created_at).toLocaleString("zh-CN", {hour:'2-digit',minute:'2-digit'}) : "";
+    return '<div class="msg ' + (isMe ? 'me' : 'other') + '">' +
+      escHtml(m.content) + '<span class="time">' + time + '</span></div>';
   }).join('');
   el.scrollTop = el.scrollHeight;
 }
 
+function addMessage(data, isMe) {
+  const el = document.getElementById("messages");
+  const time = data.created_at ? new Date(data.created_at).toLocaleString("zh-CN", {hour:'2-digit',minute:'2-digit'}) : "";
+  const div = document.createElement("div");
+  div.className = "msg " + (isMe ? "me" : "other");
+  div.innerHTML = escHtml(data.content) + '<span class="time">' + time + '</span>';
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+// ── Send message ───────────────────────────────────────────
 function send() {
   const input = document.getElementById("input");
   const text = input.value.trim();
   if (!text) return;
-  const now = new Date();
-  const time = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
-  messages.push({from:"me",name:"我",text,time});
-  document.getElementById("typing").textContent = "";
-  input.value = "";
-  render();
 
-  // Simulate reply after delay
-  setTimeout(() => {
-    document.getElementById("typing").textContent = "对方正在输入...";
-    setTimeout(() => {
-      document.getElementById("typing").textContent = "";
-      if (text.includes("800")||text.includes("温度")) {
-        messages.push({from:"other",name:"需求方",text:"收到。那响应时间能控制在100ms以内吗？",time:time});
-      } else if (text.includes("寿命")||text.includes("小时")) {
-        messages.push({from:"other",name:"需求方",text:"5000小时是我们的底线。如果你们能保证，我们可以进入正式洽谈。",time:time});
-      } else {
-        messages.push({from:"other",name:"需求方",text:"明白了。我把这些信息发给我的AI助手让它更新需求参数。",time:time});
+  if (wsConnected && ws && activeConv) {
+    ws.send(JSON.stringify({
+      type: "message",
+      to: activeConv.to_human_id,
+      content: text,
+    }));
+    // Optimistic render
+    addMessage({ content: text, created_at: new Date().toISOString() }, true);
+  } else if (activeConv) {
+    // Fallback to REST API
+    fetch("/api/messages/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: currentUser.email,
+        to_human_id: activeConv.to_human_id,
+        content: text,
+      })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      if (d.status === "ok") {
+        addMessage({ content: text, created_at: new Date().toISOString() }, true);
+        loadConversations();
       }
-      render();
-    },2000);
-  },1000);
+    }).catch(function() {});
+  } else {
+    alert("请先选择一个对话");
+    return;
+  }
+
+  input.value = "";
+  document.getElementById("typing").textContent = "";
 }
 
-// Simulate online
-document.getElementById("onlineDot").className = "online-dot";
-document.getElementById("onlineText").textContent = "对方在线";
+// ── Escaping ───────────────────────────────────────────────
+function escHtml(s) {
+  if (!s) return "";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
 
-render();
-document.getElementById("input").focus();
+// ── Init ───────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", function() {
+  if (!currentUser || !currentUser.email) {
+    document.getElementById("chatTitle").textContent = "请先登录";
+    document.getElementById("connStatus").textContent = "未登录";
+    return;
+  }
+  connectWS();
+});
 </script>
-<footer>
-  <div class="links">
-    <a href="demand_square.html">需求广场</a>
-    <a href="forum.html">论坛</a>
-    <a href="docs/tutorial.html">教程</a>
-    <a href="login.html">登录</a>
-    <a href="https://github.com/HuanTongqichetuzhuang/demand-chain">GitHub</a>
-  </div>
-  <p>需求链平台 v5.0 · Apache 2.0 · 永久开源 · 中立 · 免费</p>
-</footer>
 <script src="/nav.js?v=6"></script>
 </body>
 </html>

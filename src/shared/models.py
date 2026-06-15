@@ -66,6 +66,21 @@ class DemandSubscription(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class Message(Base):
+    """站内消息 — 用户间即时通讯"""
+    __tablename__ = "messages"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    from_user: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    to_user: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    match_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("matches.id"), nullable=True, index=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    is_read: Mapped[bool] = mapped_column(default=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class DemandStatus(str, enum.Enum):
     NEW = "new"
     STRUCTURING = "structuring"
