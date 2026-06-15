@@ -49,6 +49,23 @@ class Notification(Base):
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class DemandSubscription(Base):
+    """需求订阅 — 用户订阅关键词/分类，新需求匹配时推送通知"""
+    __tablename__ = "demand_subscriptions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(128), nullable=False, default="默认订阅")
+    keywords: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True, default=list)  # 关键词列表
+    categories: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True, default=list)  # 行业分类
+    notify_email: Mapped[bool] = mapped_column(default=False)  # 是否发邮件
+    notify_web: Mapped[bool] = mapped_column(default=True)  # 站内通知
+    is_active: Mapped[bool] = mapped_column(default=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class DemandStatus(str, enum.Enum):
     NEW = "new"
     STRUCTURING = "structuring"

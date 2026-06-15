@@ -129,6 +129,17 @@ nav .links .user-info img{width:28px;height:28px;border-radius:50%}
     <div id="notifyMsg"></div>
   </div>
 
+  <!-- 需求订阅 -->
+  <div class="card">
+    <h3 style="margin-bottom:16px">📬 需求订阅</h3>
+    <p style="font-size:.85em;color:var(--ts);margin-bottom:12px">订阅关键词或行业分类，当有新需求入库时自动通知你。</p>
+    <div id="subList">
+      <div style="text-align:center;padding:16px;color:var(--ts);font-size:.85em">加载中...</div>
+    </div>
+    <button class="btn btn-outline" onclick="showAddSub()" style="margin-top:8px;width:100%">+ 新建订阅</button>
+    <div id="subMsg" style="margin-top:8px"></div>
+  </div>
+
   <!-- 我的匹配 -->
   <div class="card">
     <h3 style="margin-bottom:16px">我的匹配</h3>
@@ -198,6 +209,7 @@ async function loadUserStats() {
     document.getElementById("statReplies").textContent = s.replies || 0;
   } catch(e) { console.error("loadUserStats:", e); }
   loadMyMatches();
+  loadSubscriptions();
 }
 
 async function loadMyMatches() {
@@ -340,6 +352,84 @@ function doLogout() {
 }
 
 function esc(s) { return String(s||"").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+// ── 需求订阅管理 ─────────────────────────────────────────────
+async function loadSubscriptions() {
+  if (!currentUser || !currentUser.email) return;
+  const div = document.getElementById("subList");
+  try {
+    const r = await fetch("/api/subscriptions?email=" + encodeURIComponent(currentUser.email));
+    const d = await r.json();
+    if (!d.items || !d.items.length) {
+      div.innerHTML = '<div style="text-align:center;padding:16px;color:var(--ts);font-size:.85em">暂无订阅，点击下方按钮创建</div>';
+      return;
+    }
+    div.innerHTML = d.items.map(s => {
+      const kw = (s.keywords||[]).join(", ") || "全部需求";
+      const cats = (s.categories||[]).join(", ") || "全部分类";
+      return '<div style="padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<div><strong>' + esc(s.name) + '</strong>' +
+        (s.is_active ? '' : ' <span style="color:var(--ts);font-size:.75em">[已暂停]</span>') +
+        '</div>' +
+        '<button class="btn btn-outline" style="padding:2px 10px;font-size:.75em" onclick="deleteSub(\'' + s.id + '\')">删除</button></div>' +
+        '<div style="font-size:.8em;color:var(--ts);margin-top:4px">关键词: ' + esc(kw) + ' | 分类: ' + esc(cats) + '</div>' +
+        '</div>';
+    }).join('');
+  } catch(e) {
+    div.innerHTML = '<div style="text-align:center;padding:16px;color:var(--red);font-size:.85em">加载失败</div>';
+  }
+}
+
+function showAddSub() {
+  const name = prompt("订阅名称（如：传感器相关）", "传感器");
+  if (!name) return;
+  const keywords = prompt("关键词（逗号分隔，留空=全部）", "传感器,检测,高温");
+  const categories = prompt("行业分类（逗号分隔，留空=全部）", "sensor_tech,materials_science");
+  createSub(name, keywords, categories);
+}
+
+async function createSub(name, keywords, categories) {
+  if (!currentUser || !currentUser.email) return;
+  const div = document.getElementById("subMsg");
+  try {
+    const kwList = keywords ? keywords.split(",").map(s => s.trim()).filter(Boolean) : [];
+    const catList = categories ? categories.split(",").map(s => s.trim()).filter(Boolean) : [];
+    const r = await fetch("/api/subscriptions/create", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        email: currentUser.email,
+        name: name,
+        keywords: kwList,
+        categories: catList,
+        notify_web: true,
+        notify_email: false,
+      })
+    });
+    const d = await r.json();
+    if (d.status === "ok") {
+      div.innerHTML = '<div class="msg msg-ok">订阅创建成功！当新需求匹配时将推送通知。</div>';
+      setTimeout(() => { div.innerHTML = ''; }, 3000);
+      loadSubscriptions();
+    } else {
+      div.innerHTML = '<div class="msg msg-err">创建失败: ' + (d.error || "") + '</div>';
+    }
+  } catch(e) {
+    div.innerHTML = '<div class="msg msg-err">请求失败: ' + e.message + '</div>';
+  }
+}
+
+async function deleteSub(id) {
+  if (!confirm("确定删除此订阅？")) return;
+  try {
+    const r = await fetch("/api/subscriptions/" + id, { method: "DELETE" });
+    const d = await r.json();
+    if (d.status === "deleted") {
+      loadSubscriptions();
+    }
+  } catch(e) { console.error("deleteSub:", e); }
+}
 
 checkLogin();
 </script>
