@@ -58,6 +58,19 @@ def _sanitize_like(value: str) -> str:
     return value.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
 
 
+# 管理员邮箱
+_ADMIN_EMAIL = "477570216@qq.com"
+
+
+async def _require_admin(request):
+    """检查请求是否来自管理员邮箱"""
+    body = await request.json()
+    email = body.get("email", "").strip()
+    if not email or email != _ADMIN_EMAIL:
+        raise PermissionError("仅管理员可执行此操作")
+    return email
+
+
 # ============================================================
 # 注册限流 (每 IP 每小时 ≤5 次注册)
 # ============================================================
@@ -126,6 +139,7 @@ async def batch_export(request): return await serve_file(request, "batch_export.
 async def api_docs(request): return await serve_file(request, "api_docs.html")
 async def tools_extra(request): return await serve_file(request, "tools_extra.html")
 async def flywheel_dashboard(request): return await serve_file(request, "flywheel_dashboard.html")
+async def admin_page(request): return await serve_file(request, "admin.html")
 async def tutorial(request): return await serve_file(request, "docs/tutorial.html")
 
 async def verify_email_page(request):
@@ -1230,6 +1244,173 @@ async def api_flywheel_stats(request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+# ============================================================
+# 管理员 API
+# ============================================================
+
+async def api_admin_check(request):
+    """POST /api/admin/check — 验证是否为管理员"""
+    try:
+        await _require_admin(request)
+        return JSONResponse({"admin": True, "email": _ADMIN_EMAIL})
+    except PermissionError as e:
+        return JSONResponse({"admin": False, "error": str(e)}, status_code=403)
+
+
+async def api_admin_stats(request):
+    """GET /api/admin/stats — 系统统计（管理员专用）"""
+    from src.shared.database import async_session
+    from src.shared.models import CapabilityProfile, Demand, User, Match, MatchOutcome, ForumTopic, ForumReply
+    from sqlalchemy import select, func
+    try:
+        async with async_session() as session:
+            # 各表总数
+            profiles = (await session.execute(select(func.count()).select_from(CapabilityProfile))).scalar() or 0
+            demands = (await session.execute(select(func.count()).select_from(Demand))).scalar() or 0
+            users = (await session.execute(select(func.count()).select_from(User))).scalar() or 0
+            matches = (await session.execute(select(func.count()).select_from(Match))).scalar() or 0
+            outcomes = (await session.execute(select(func.count()).select_from(MatchOutcome))).scalar() or 0
+            topics = (await session.execute(select(func.count()).select_from(ForumTopic))).scalar() or 0
+            replies = (await session.execute(select(func.count()).select_from(ForumReply))).scalar() or 0
+
+        return JSONResponse({
+            "suppliers": profiles,
+            "demands": demands,
+            "users": users,
+            "matches": matches,
+            "outcomes": outcomes,
+            "topics": topics,
+            "replies": replies,
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_admin_suppliers_delete(request):
+    """DELETE /api/admin/suppliers/{id} — 删除供应商"""
+    from src.shared.database import async_session
+    from src.shared.models import CapabilityProfile, Match, MatchOutcome
+    from sqlalchemy import select, delete
+    from urllib.parse import unquote
+    try:
+        await _require_admin(request)
+        supplier_id = request.path_params.get("id", "")
+
+        async with async_session() as session:
+            # 删除关联记录
+            await session.execute(delete(MatchOutcome).where(MatchOutcome.supplier_id == supplier_id))
+            await session.execute(delete(Match).where(Match.profile_id == supplier_id))
+            r = await session.execute(select(CapabilityProfile).where(CapabilityProfile.id == supplier_id))
+            p = r.scalar_one_or_none()
+            if not p:
+                return JSONResponse({"error": "供应商不存在"}, status_code=404)
+            await session.delete(p)
+            await session.commit()
+
+        return JSONResponse({"status": "deleted", "id": supplier_id})
+    except PermissionError as e:
+        return JSONResponse({"error": str(e)}, status_code=403)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_admin_demands_delete(request):
+    """DELETE /api/admin/demands/{id} — 删除需求"""
+    from src.shared.database import async_session
+    from src.shared.models import Demand, Match, MatchOutcome
+    from sqlalchemy import select, delete
+    try:
+        await _require_admin(request)
+        demand_id = request.path_params.get("id", "")
+
+        async with async_session() as session:
+            # 删除关联记录
+            await session.execute(delete(MatchOutcome).where(MatchOutcome.demand_id == demand_id))
+            await session.execute(delete(Match).where(Match.demand_id == demand_id))
+            r = await session.execute(select(Demand).where(Demand.id == demand_id))
+            d = r.scalar_one_or_none()
+            if not d:
+                return JSONResponse({"error": "需求不存在"}, status_code=404)
+            await session.delete(d)
+            await session.commit()
+
+        return JSONResponse({"status": "deleted", "id": demand_id})
+    except PermissionError as e:
+        return JSONResponse({"error": str(e)}, status_code=403)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_admin_users_list(request):
+    """GET /api/admin/users — 用户列表"""
+    from src.shared.database import async_session
+    from src.shared.models import User
+    from sqlalchemy import select
+    try:
+        page = int(request.query_params.get("page", 1))
+        per_page = int(request.query_params.get("per_page", 50))
+        page = max(1, page)
+        per_page = max(1, min(200, per_page))
+
+        async with async_session() as session:
+            r = await session.execute(
+                select(User).order_by(User.created_at.desc()).limit(per_page).offset((page - 1) * per_page)
+            )
+            users = r.scalars().all()
+
+            total = (await session.execute(select(func.count()).select_from(User))).scalar() or 0
+
+        items = [{
+            "human_id": u.human_id,
+            "email": u.email,
+            "display_name": u.display_name,
+            "country": u.country or "",
+            "email_verified": u.email_verified,
+            "created_at": u.created_at.isoformat() if u.created_at else "",
+            "last_login": u.last_login.isoformat() if u.last_login else "",
+        } for u in users]
+
+        return JSONResponse({
+            "items": items,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": (total + per_page - 1) // per_page if total > 0 else 0,
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_admin_users_update(request):
+    """POST /api/admin/users/{id} — 更新用户（验证/取消验证邮箱）"""
+    from src.shared.database import async_session
+    from src.shared.models import User
+    from sqlalchemy import select
+    try:
+        await _require_admin(request)
+        human_id = request.path_params.get("id", "")
+        body = await request.json()
+        field = body.get("field", "")
+        value = body.get("value")
+
+        async with async_session() as session:
+            r = await session.execute(select(User).where(User.human_id == human_id))
+            u = r.scalar_one_or_none()
+            if not u:
+                return JSONResponse({"error": "用户不存在"}, status_code=404)
+
+            if field == "email_verified":
+                u.email_verified = bool(value)
+
+            await session.commit()
+
+        return JSONResponse({"status": "updated", "human_id": human_id, "field": field, "value": value})
+    except PermissionError as e:
+        return JSONResponse({"error": str(e)}, status_code=403)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 async def api_flywheel_weights(request):
     """GET /api/flywheel/weights — 权重矩阵"""
     from src.shared.flywheel import get_weight_matrix
@@ -1260,6 +1441,8 @@ routes = [
     Route("/flywheel_dashboard.html", flywheel_dashboard),
     Route("/docs/tutorial.html", tutorial),
     Route("/verify-email", verify_email_page),
+    # Admin page
+    Route("/admin.html", admin_page),
     # API Routes
     Route("/api/user/profile", api_user_profile_get),
     Route("/api/user/profile", api_user_profile_update, methods=["PUT"]),
@@ -1286,6 +1469,13 @@ routes = [
     Route("/api/matches/{match_id}/feedback", api_match_feedback, methods=["POST"]),
     Route("/api/flywheel/stats", api_flywheel_stats),
     Route("/api/flywheel/weights", api_flywheel_weights),
+    # Admin API
+    Route("/api/admin/check", api_admin_check, methods=["POST"]),
+    Route("/api/admin/stats", api_admin_stats),
+    Route("/api/admin/users", api_admin_users_list),
+    Route("/api/admin/users/{id}", api_admin_users_update, methods=["POST"]),
+    Route("/api/admin/suppliers/{id}", api_admin_suppliers_delete, methods=["DELETE"]),
+    Route("/api/admin/demands/{id}", api_admin_demands_delete, methods=["DELETE"]),
     Route("/api/home/stats", api_home_stats),
     Route("/.well-known/agent.json", api_agent_card),
     # Catch-all static

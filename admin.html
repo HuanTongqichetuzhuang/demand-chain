@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>管理后台 - 需求链平台</title>
+<link rel="icon" href="logo.jpg" type="image/jpeg">
+<link rel="stylesheet" href="shared.css">
+<style>
+:root{--admin-accent:#4a8cf7;--admin-bg:rgba(74,140,247,.08)}
+h1{font-size:1.5em;margin:16px 0 4px}
+.sub{color:var(--ts);font-size:.9em;margin-bottom:16px}
+
+/* Login gate */
+#adminGate{max-width:400px;margin:80px auto}
+#adminGate .card{text-align:center;padding:40px}
+#adminGate .card h2{margin-bottom:16px}
+#adminGate input{width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);margin:8px 0;font-size:1em}
+#adminGate .error{color:var(--red);font-size:.85em;margin:8px 0}
+
+/* Dashboard */
+#adminPanel{display:none}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin:16px 0}
+.stat-card{background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center}
+.stat-card .num{font-size:1.8em;font-weight:700;color:var(--text)}
+.stat-card .label{font-size:.78em;color:var(--ts);margin-top:4px}
+.stat-card .icon{font-size:1.4em;margin-bottom:4px}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;margin:16px 0;flex-wrap:wrap}
+.tab{padding:8px 18px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--ts);cursor:pointer;font-size:.85em;transition:all .15s}
+.tab:hover{border-color:var(--purple);color:var(--text)}
+.tab.active{border-color:var(--admin-accent);color:#fff;background:var(--admin-accent)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:.82em;margin:8px 0}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)}
+th{color:var(--ts);font-weight:600;font-size:.78em;text-transform:uppercase;letter-spacing:.3px;background:rgba(0,0,0,.2)}
+td{color:var(--text)}
+tr:hover td{background:rgba(108,92,231,.04)}
+.badge-verified{padding:2px 8px;border-radius:4px;font-size:.78em;background:var(--green-bg);color:var(--green)}
+.badge-unverified{padding:2px 8px;border-radius:4px;font-size:.78em;background:var(--red-bg);color:var(--red)}
+.btn-sm{padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--ts);cursor:pointer;font-size:.78em;transition:all .12s}
+.btn-sm:hover{border-color:var(--amber);color:var(--amber)}
+.btn-sm.danger:hover{border-color:var(--red);color:var(--red)}
+.btn-sm.ok:hover{border-color:var(--green);color:var(--green)}
+
+.pagination{display:flex;gap:6px;justify-content:center;margin:12px 0;flex-wrap:wrap}
+.pagination .page-btn{padding:5px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--ts);cursor:pointer;font-size:.78em}
+.pagination .page-btn.active{border-color:var(--admin-accent);color:#fff;background:var(--admin-accent)}
+.pagination .page-btn:disabled{opacity:.35;cursor:default}
+
+.search-row{display:flex;gap:8px;margin:12px 0;align-items:center}
+.search-row input{padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85em;flex:1;max-width:300px}
+
+.toast{position:fixed;bottom:20px;right:20px;padding:12px 20px;border-radius:10px;font-size:.85em;z-index:999;animation:fadeIn .3s}
+.toast.ok{background:var(--green-bg);border:1px solid var(--green);color:var(--green)}
+.toast.err{background:var(--red-bg);border:1px solid var(--red);color:var(--red)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+.footer-info{text-align:center;padding:20px;color:var(--ts);font-size:.78em;border-top:1px solid var(--border);margin-top:24px}
+
+/* Flywheel section inside admin */
+.flywheel-preview{background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;margin:12px 0}
+.flywheel-preview h3{margin-bottom:12px;font-size:1em}
+.flywheel-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin:8px 0}
+.fw-stat{padding:10px;border-radius:8px;background:rgba(124,110,240,.06);text-align:center}
+.fw-stat .fw-num{font-size:1.2em;font-weight:600;color:var(--purple)}
+.fw-stat .fw-label{font-size:.72em;color:var(--ts);margin-top:2px}
+</style>
+</head>
+<body>
+<nav>
+  <a class="brand" href="/"><img src="logo.jpg" alt="">需求链平台</a>
+  <div class="links">
+    <a href="/">首页</a>
+    <a href="/admin.html" style="color:var(--admin-accent);font-weight:600">🔧 管理后台</a>
+  </div>
+</nav>
+<div class="container">
+
+<!-- Gate -->
+<div id="adminGate">
+  <div class="card">
+    <h2>🔐 管理员验证</h2>
+    <p style="color:var(--ts);font-size:.85em;margin-bottom:12px">请输入管理员邮箱和密码</p>
+    <input type="email" id="adminEmail" placeholder="管理员邮箱" value="477570216@qq.com">
+    <input type="password" id="adminPassword" placeholder="登录密码" onkeydown="if(event.key==='Enter')verifyAdmin()">
+    <div id="adminError" class="error"></div>
+    <button class="btn btn-primary" onclick="verifyAdmin()" style="margin-top:8px">验证身份</button>
+  </div>
+</div>
+
+<!-- Admin Panel -->
+<div id="adminPanel">
+  <h1>🔧 管理后台</h1>
+  <p class="sub">系统管理与数据维护（仅管理员可见）</p>
+
+  <div class="tabs" id="adminTabs">
+    <span class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 系统概览</span>
+    <span class="tab" data-tab="suppliers" onclick="switchTab('suppliers')">🏭 供应商管理</span>
+    <span class="tab" data-tab="demands" onclick="switchTab('demands')">📋 需求管理</span>
+    <span class="tab" data-tab="users" onclick="switchTab('users')">👤 用户管理</span>
+    <span class="tab" data-tab="flywheel" onclick="switchTab('flywheel')">🔄 数据飞轮</span>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="panel-dashboard" class="tab-panel active">
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card"><div class="icon">🏭</div><div class="num">-</div><div class="label">供应商</div></div>
+      <div class="stat-card"><div class="icon">📋</div><div class="num">-</div><div class="label">需求</div></div>
+      <div class="stat-card"><div class="icon">👤</div><div class="num">-</div><div class="label">用户</div></div>
+      <div class="stat-card"><div class="icon">🤝</div><div class="num">-</div><div class="label">匹配记录</div></div>
+      <div class="stat-card"><div class="icon">📊</div><div class="num">-</div><div class="label">匹配结果</div></div>
+      <div class="stat-card"><div class="icon">💬</div><div class="num">-</div><div class="label">论坛主题</div></div>
+      <div class="stat-card"><div class="icon">↩️</div><div class="num">-</div><div class="label">论坛回复</div></div>
+    </div>
+  </div>
+
+  <!-- Suppliers -->
+  <div id="panel-suppliers" class="tab-panel">
+    <div class="search-row">
+      <input id="supplierSearch" placeholder="搜索供应商名称..." oninput="debounce(loadSuppliers,400)">
+      <button class="btn btn-primary" onclick="loadSuppliers()" style="padding:8px 16px;font-size:.82em">刷新</button>
+    </div>
+    <table>
+      <thead><tr><th>名称</th><th>分类</th><th>行业</th><th>可信分</th><th>操作</th></tr></thead>
+      <tbody id="supplierTable"></tbody>
+    </table>
+    <div class="pagination" id="supplierPages"></div>
+  </div>
+
+  <!-- Demands -->
+  <div id="panel-demands" class="tab-panel">
+    <div class="search-row">
+      <input id="demandSearch" placeholder="搜索需求文本..." oninput="debounce(loadDemands,400)">
+      <button class="btn btn-primary" onclick="loadDemands()" style="padding:8px 16px;font-size:.82em">刷新</button>
+    </div>
+    <table>
+      <thead><tr><th>需求文本（前40字）</th><th>分类</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody id="demandTable"></tbody>
+    </table>
+    <div class="pagination" id="demandPages"></div>
+  </div>
+
+  <!-- Users -->
+  <div id="panel-users" class="tab-panel">
+    <table>
+      <thead><tr><th>邮箱</th><th>名称</th><th>邮箱验证</th><th>注册时间</th><th>操作</th></tr></thead>
+      <tbody id="userTable"></tbody>
+    </table>
+    <div class="pagination" id="userPages"></div>
+  </div>
+
+  <!-- Flywheel -->
+  <div id="panel-flywheel" class="tab-panel">
+    <div class="flywheel-preview">
+      <h3>🔄 数据飞轮运行状态</h3>
+      <button class="btn btn-primary" onclick="loadFlywheelStats()" style="margin-bottom:12px;padding:8px 16px;font-size:.82em">刷新飞轮数据</button>
+      <div class="flywheel-stats" id="fwStats"></div>
+    </div>
+    <div class="flywheel-preview">
+      <h3>⚙️ 权重矩阵</h3>
+      <table>
+        <thead><tr><th>分类组合</th><th>权重</th><th>更新时间</th></tr></thead>
+        <tbody id="fwWeights"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px">
+      <a href="/flywheel_dashboard.html" target="_blank" class="btn btn-primary" style="padding:10px 20px;font-size:.85em;text-decoration:none">📈 打开飞轮完整仪表盘 →</a>
+    </div>
+  </div>
+</div>
+
+<div class="footer-info">需求链平台 · 管理后台 · 仅管理员可访问</div>
+</div>
+<script src="/nav.js"></script>
+<script>
+var adminEmail = "477570216@qq.com";
+var currentTab = "dashboard";
+var supplierPage = 1, demandPage = 1, userPage = 1;
+
+function qs(s){return document.querySelector(s)}
+function qsa(s){return document.querySelectorAll(s)}
+function esc(s){return String(s||"").replace(/</g,"&lt;")}
+
+var debounceTimer = null;
+function debounce(fn, ms){clearTimeout(debounceTimer);debounceTimer=setTimeout(fn,ms)}
+
+// ---- Admin verification ----
+async function verifyAdmin(){
+  var email = document.getElementById("adminEmail").value.trim();
+  var pwd = document.getElementById("adminPassword").value;
+  if(!email || !pwd){
+    qs("#adminError").textContent="请输入邮箱和密码";
+    return;
+  }
+  // First verify password by logging in
+  try{
+    var r = await fetch("/api/login",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email:email,password:pwd})
+    });
+    var data = await r.json();
+    if(data.error){
+      qs("#adminError").textContent="密码验证失败: "+data.error;
+      return;
+    }
+    // Check admin identity
+    var r2 = await fetch("/api/admin/check",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email:email})
+    });
+    var data2 = await r2.json();
+    if(data2.admin){
+      qs("#adminGate").style.display="none";
+      qs("#adminPanel").style.display="block";
+      loadDashboard();
+      loadSuppliers();
+      loadDemands();
+      loadUsers();
+    }else{
+      qs("#adminError").textContent="该邮箱不是管理员";
+    }
+  }catch(e){
+    qs("#adminError").textContent="验证失败: "+e.message;
+  }
+}
+
+// ---- Tab switching ----
+function switchTab(tab){
+  currentTab=tab;
+  qsa(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===tab)});
+  qsa(".tab-panel").forEach(function(p){p.classList.toggle("active",p.id==="panel-"+tab)});
+  if(tab==="dashboard") loadDashboard();
+  if(tab==="flywheel") loadFlywheelStats();
+}
+
+// ---- Dashboard ----
+async function loadDashboard(){
+  try{
+    var r = await fetch("/api/admin/stats");
+    var d = await r.json();
+    var cards = qs("#statsGrid").querySelectorAll(".stat-card");
+    var keys = ["suppliers","demands","users","matches","outcomes","topics","replies"];
+    keys.forEach(function(k,i){cards[i].querySelector(".num").textContent=d[k]||0});
+  }catch(e){}
+}
+
+// ---- Suppliers ----
+async function loadSuppliers(pg){
+  pg = pg || supplierPage;
+  supplierPage = pg;
+  var kw = qs("#supplierSearch").value.trim();
+  var url = "/api/suppliers?page="+pg+"&per_page=20";
+  if(kw) url += "&keyword="+encodeURIComponent(kw);
+  try{
+    var r = await fetch(url);
+    var d = await r.json();
+    var tbody = qs("#supplierTable");
+    tbody.innerHTML = (d.items||[]).map(function(s){
+      return '<tr><td>'+esc(s.name||"?")+'</td><td><span class="badge-verified">'+esc(s.category||"-")+'</span></td>'+
+        '<td>'+esc(s.industry||"-")+'</td><td>'+(s.trust_score||"0")+'</td>'+
+        '<td><button class="btn-sm danger" onclick="deleteSupplier(\''+esc(s.id)+'\',\''+esc(s.name||"")+'\')">删除</button></td></tr>';
+    }).join("");
+    renderPages("supplierPages", d, function(p){loadSuppliers(p)});
+  }catch(e){}
+}
+async function deleteSupplier(id,name){
+  if(!confirm("确认删除供应商「"+name+"」？此操作不可撤销！")) return;
+  try{
+    var r = await fetch("/api/admin/suppliers/"+id,{
+      method:"DELETE",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email:adminEmail})
+    });
+    var d = await r.json();
+    if(d.status==="deleted"){showToast("✅ 已删除");loadSuppliers()}
+    else showToast("❌ "+d.error,true);
+  }catch(e){showToast("❌ "+e.message,true)}
+}
+
+// ---- Demands ----
+async function loadDemands(pg){
+  pg = pg || demandPage;
+  demandPage = pg;
+  var kw = qs("#demandSearch").value.trim();
+  var url = "/api/demands?page="+pg+"&per_page=20";
+  if(kw) url += "&keyword="+encodeURIComponent(kw);
+  try{
+    var r = await fetch(url);
+    var d = await r.json();
+    var tbody = qs("#demandTable");
+    tbody.innerHTML = (d.items||[]).map(function(dm){
+      var text = (dm.raw_text||"")+" "+(dm.title||"");
+      return '<tr><td>'+esc(text.substring(0,40))+'</td><td>'+esc(dm.category||"-")+'</td>'+
+        '<td><span class="'+(dm.status==="open"?"badge-verified":"badge-unverified")+'">'+esc(dm.status||"-")+'</span></td>'+
+        '<td><button class="btn-sm danger" onclick="deleteDemand(\''+esc(dm.id)+'\')">删除</button></td></tr>';
+    }).join("");
+    renderPages("demandPages", d, function(p){loadDemands(p)});
+  }catch(e){}
+}
+async function deleteDemand(id){
+  if(!confirm("确认删除此需求？")) return;
+  try{
+    var r = await fetch("/api/admin/demands/"+id,{
+      method:"DELETE",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email:adminEmail})
+    });
+    var d = await r.json();
+    if(d.status==="deleted"){showToast("✅ 已删除");loadDemands()}
+    else showToast("❌ "+d.error,true);
+  }catch(e){showToast("❌ "+e.message,true)}
+}
+
+// ---- Users ----
+async function loadUsers(pg){
+  pg = pg || userPage;
+  userPage = pg;
+  try{
+    var r = await fetch("/api/admin/users?page="+pg+"&per_page=20");
+    var d = await r.json();
+    var tbody = qs("#userTable");
+    tbody.innerHTML = (d.items||[]).map(function(u){
+      var verified = u.email_verified;
+      return '<tr><td>'+esc(u.email)+'</td><td>'+esc(u.display_name)+'</td>'+
+        '<td><span class="'+(verified?"badge-verified":"badge-unverified")+'">'+(verified?"已验证":"未验证")+'</span></td>'+
+        '<td style="font-size:.78em;color:var(--ts)">'+(u.created_at||"-").substring(0,10)+'</td>'+
+        '<td><button class="btn-sm ok" onclick="toggleVerify(\''+esc(u.human_id)+'\','+verified+')">'+
+          (verified?"取消验证":"验证邮箱")+'</button></td></tr>';
+    }).join("");
+    renderPages("userPages", d, function(p){loadUsers(p)});
+  }catch(e){}
+}
+async function toggleVerify(humanId,current){
+  try{
+    var r = await fetch("/api/admin/users/"+humanId,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email:adminEmail,field:"email_verified",value:!current})
+    });
+    var d = await r.json();
+    if(d.status==="updated"){showToast("✅ 已更新");loadUsers()}
+    else showToast("❌ "+d.error,true);
+  }catch(e){showToast("❌ "+e.message,true)}
+}
+
+// ---- Flywheel ----
+async function loadFlywheelStats(){
+  try{
+    var r = await fetch("/api/flywheel/stats");
+    var d = await r.json();
+    var html = "";
+    var items = {outcomes:d.outcomes||d.total_outcomes||0,trust:d.trust_updated||0,weight:d.weight_updated||0,errors:d.errors||0};
+    Object.keys(items).forEach(function(k){
+      html += '<div class="fw-stat"><div class="fw-num">'+items[k]+'</div><div class="fw-label">'+k+'</div></div>';
+    });
+    qs("#fwStats").innerHTML = html;
+  }catch(e){qs("#fwStats").innerHTML="<p style='color:var(--ts)'>加载失败</p>"}
+}
+async function loadFlywheelWeights(){
+  try{
+    var r = await fetch("/api/flywheel/weights");
+    var d = await r.json();
+    var tbody = qs("#fwWeights");
+    tbody.innerHTML = (d.weights||[]).slice(0,50).map(function(w){
+      return '<tr><td>'+esc(w.demand_cat+" × "+w.supplier_cat)+'</td><td>'+w.weight+'</td><td style="font-size:.78em;color:var(--ts)">'+(w.updated_at||"-")+'</td></tr>';
+    }).join("");
+  }catch(e){}
+}
+
+// ---- Pagination ----
+function renderPages(id, data, onClick){
+  var html = "";
+  var p = data.page||1, tp = data.total_pages||1;
+  html += '<button class="page-btn" onclick="onClick('+(p-1)+')" '+(p<=1?"disabled":"")+'>‹</button>';
+  var start=Math.max(1,p-2), end=Math.min(tp,p+2);
+  if(start>1){html+='<button class="page-btn" onclick="onClick(1)">1</button>';if(start>2)html+='<span style="color:var(--ts);padding:5px">...</span>'}
+  for(var i=start;i<=end;i++) html+='<button class="page-btn'+(i===p?" active":"")+'" onclick="onClick('+i+')">'+i+'</button>';
+  if(end<tp){if(end<tp-1)html+='<span style="color:var(--ts);padding:5px">...</span>';html+='<button class="page-btn" onclick="onClick('+tp+')">'+tp+'</button>'}
+  html+='<button class="page-btn" onclick="onClick('+(p+1)+')" '+(p>=tp?"disabled":"")+'>›</button>';
+  qs("#"+id).innerHTML = html;
+}
+
+// ---- Toast ----
+function showToast(msg,err){
+  var t=document.createElement("div");
+  t.className="toast "+(err?"err":"ok");
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(function(){t.remove()},2500);
+}
+</script>
+</body>
+</html>
