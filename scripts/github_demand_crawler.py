@@ -56,9 +56,9 @@ async def save_demand(raw_text):
             raw_text=raw_text[:500],
             category=cat,
             sub_category=sub,
-            status=DemandStatus.OPEN,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            status="open",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
         )
         s.add(demand)
         await s.commit()
