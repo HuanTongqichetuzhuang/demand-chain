@@ -224,10 +224,14 @@ async function load(page){
   var keyword = (document.getElementById("searchInput").value || "").trim();
   var url = "/api/suppliers?page="+page+"&per_page="+perPage;
   if(keyword) url += "&keyword=" + encodeURIComponent(keyword);
+  if(currentCat) url += "&category=" + encodeURIComponent(currentCat);
+  if(currentInd) url += "&industry=" + encodeURIComponent(currentInd);
+  if(currentDisc) url += "&discipline=" + encodeURIComponent(currentDisc);
   var r = await fetch(url);
   var data = await r.json();
   allSuppliers = data.items || [];
   totalPages = data.total_pages || 1;
+  document.getElementById("totalCount").textContent = data.total || 0;
   render();
   renderPagination();
 }
@@ -257,9 +261,7 @@ function filterDisc(d){
 function render(){
   var q=(document.getElementById("searchInput").value||"").toLowerCase();
   var filtered=allSuppliers;
-  if(currentCat)filtered=filtered.filter(function(s){return s.category===currentCat});
-  if(currentInd)filtered=filtered.filter(function(s){return s.industry===currentInd});
-  if(currentDisc)filtered=filtered.filter(function(s){return s.discipline===currentDisc});
+  // 后端已按分类/行业/学科过滤，前端只需额外本地关键词过滤
   if(q)filtered=filtered.filter(function(s){
     return [s.name,s.description,s.industry,s.discipline].some(function(f){return(f||"").toLowerCase().indexOf(q)>=0})||
       (s.skills||[]).some(function(sk){return sk.toLowerCase().indexOf(q)>=0})||
