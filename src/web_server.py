@@ -1702,6 +1702,133 @@ async def api_notifications_unread_count(request):
         return JSONResponse({"count": 0})
 
 
+# ============================================================
+# 需求订阅 API
+# ============================================================
+
+async def api_subscriptions_list(request):
+    """GET /api/subscriptions — 获取用户的订阅列表"""
+    from src.shared.database import async_session
+    from src.shared.models import DemandSubscription
+    from sqlalchemy import select, func
+    try:
+        email = request.query_params.get("email", "")
+        if not email:
+            return JSONResponse({"items": []})
+        async with async_session() as session:
+            from src.shared.models import User
+            r = await session.execute(select(User).where(User.email == email))
+            u = r.scalar_one_or_none()
+            if not u:
+                return JSONResponse({"items": []})
+            r = await session.execute(
+                select(DemandSubscription).where(DemandSubscription.user_id == u.human_id)
+                .order_by(DemandSubscription.created_at.desc())
+            )
+            items = [{
+                "id": s.id,
+                "name": s.name,
+                "keywords": s.keywords or [],
+                "categories": s.categories or [],
+                "notify_email": s.notify_email,
+                "notify_web": s.notify_web,
+                "is_active": s.is_active,
+                "created_at": s.created_at.isoformat() if s.created_at else "",
+            } for s in r.scalars().all()]
+        return JSONResponse({"items": items})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "items": []}, status_code=500)
+
+
+async def api_subscriptions_create(request):
+    """POST /api/subscriptions — 创建订阅"""
+    from src.shared.database import async_session
+    from src.shared.models import DemandSubscription
+    from sqlalchemy import select
+    from uuid import uuid4
+    try:
+        body = await request.json()
+        email = body.get("email", "")
+        if not email:
+            return JSONResponse({"error": "缺少邮箱"}, status_code=400)
+
+        async with async_session() as session:
+            from src.shared.models import User
+            r = await session.execute(select(User).where(User.email == email))
+            u = r.scalar_one_or_none()
+            if not u:
+                return JSONResponse({"error": "用户不存在"}, status_code=404)
+
+            sub = DemandSubscription(
+                id=str(uuid4()),
+                user_id=u.human_id,
+                name=body.get("name", "默认订阅"),
+                keywords=body.get("keywords", []),
+                categories=body.get("categories", []),
+                notify_email=body.get("notify_email", False),
+                notify_web=body.get("notify_web", True),
+                is_active=body.get("is_active", True),
+            )
+            session.add(sub)
+            await session.commit()
+
+        return JSONResponse({"status": "ok", "id": sub.id})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_subscriptions_delete(request):
+    """DELETE /api/subscriptions/{sub_id} — 删除订阅"""
+    from src.shared.database import async_session
+    from src.shared.models import DemandSubscription
+    from sqlalchemy import select
+    try:
+        sub_id = request.path_params.get("sub_id", "")
+        if not sub_id:
+            return JSONResponse({"error": "缺少订阅ID"}, status_code=400)
+        async with async_session() as session:
+            r = await session.execute(select(DemandSubscription).where(DemandSubscription.id == sub_id))
+            sub = r.scalar_one_or_none()
+            if not sub:
+                return JSONResponse({"error": "订阅不存在"}, status_code=404)
+            await session.delete(sub)
+            await session.commit()
+        return JSONResponse({"status": "deleted"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_subscriptions_update(request):
+    """PUT /api/subscriptions/{sub_id} — 更新订阅"""
+    from src.shared.database import async_session
+    from src.shared.models import DemandSubscription
+    from sqlalchemy import select
+    try:
+        sub_id = request.path_params.get("sub_id", "")
+        body = await request.json()
+        async with async_session() as session:
+            r = await session.execute(select(DemandSubscription).where(DemandSubscription.id == sub_id))
+            sub = r.scalar_one_or_none()
+            if not sub:
+                return JSONResponse({"error": "订阅不存在"}, status_code=404)
+            if "name" in body:
+                sub.name = body["name"]
+            if "keywords" in body:
+                sub.keywords = body["keywords"]
+            if "categories" in body:
+                sub.categories = body["categories"]
+            if "notify_email" in body:
+                sub.notify_email = body["notify_email"]
+            if "notify_web" in body:
+                sub.notify_web = body["notify_web"]
+            if "is_active" in body:
+                sub.is_active = body["is_active"]
+            await session.commit()
+        return JSONResponse({"status": "updated"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 routes = [
     Route("/", index),
     Route("/login.html", login_page),
@@ -1758,6 +1885,11 @@ routes = [
     Route("/api/notifications/unread-count", api_notifications_unread_count),
     Route("/api/notifications/{notify_id}/read", api_notifications_read, methods=["PUT"]),
     Route("/api/notifications/read-all", api_notifications_read_all, methods=["POST"]),
+    # Subscription API
+    Route("/api/subscriptions", api_subscriptions_list),
+    Route("/api/subscriptions/create", api_subscriptions_create, methods=["POST"]),
+    Route("/api/subscriptions/{sub_id}", api_subscriptions_delete, methods=["DELETE"]),
+    Route("/api/subscriptions/{sub_id}", api_subscriptions_update, methods=["PUT"]),
     # Admin API
     Route("/api/admin/check", api_admin_check, methods=["POST"]),
     Route("/api/admin/stats", api_admin_stats),
