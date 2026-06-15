@@ -38,21 +38,27 @@
     var tutorialText = currentLang === "zh" ? "教程" : "Guide";
     var logoutText = currentLang === "zh" ? "退出" : "Logout";
     
-    if (user && user.email) {
-      nav.innerHTML = 
-        '<a href="demand_square.html">' + demandSquare + '</a>' +
-        '<a href="forum.html">' + forumText + '</a>' +
-        '<a href="docs/tutorial.html">' + tutorialText + '</a>' +
-        '<a href="profile.html" class="user-info" style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--text);text-decoration:none">' +
-        '<span>' + (user.name || user.email) + '</span></a>' +
-        '<a href="#" onclick="localStorage.removeItem(\'dc_session\');location.reload()" style="font-size:13px;color:var(--ts);text-decoration:none">' + logoutText + '</a>';
-    } else {
-      nav.innerHTML = 
-        '<a href="demand_square.html">' + demandSquare + '</a>' +
-        '<a href="forum.html">' + forumText + '</a>' +
-        '<a href="docs/tutorial.html">' + tutorialText + '</a>' +
-        '<a href="login.html" class="btn-nav">' + loginText + '</a>';
-    }
+    // Update link text only — don't rebuild nav (nav.js handles structure)
+    var links = nav.querySelectorAll("a");
+    links.forEach(function(a) {
+      var href = (a.getAttribute("href") || "").toLowerCase();
+      if (href.indexOf("demand_square") >= 0 || href.indexOf("demands") >= 0) {
+        a.textContent = demandSquare;
+      } else if (href.indexOf("forum") >= 0) {
+        a.textContent = forumText;
+      } else if (href.indexOf("tutorial") >= 0 || href.indexOf("guide") >= 0) {
+        a.textContent = tutorialText;
+      } else if (href.indexOf("login") >= 0) {
+        a.textContent = loginText;
+        a.className = "btn-nav";
+      }
+    });
+    // Find and update logout link
+    links.forEach(function(a) {
+      if (a.textContent === "退出" || a.textContent === "Logout" || (a.onclick && a.onclick.toString().indexOf("removeItem") >= 0)) {
+        a.textContent = logoutText;
+      }
+    });
   }
   
   // Add language toggle button

@@ -58,7 +58,7 @@
     try { session = JSON.parse(localStorage.getItem('dc_session')); } catch(e) {}
     var loggedIn = !!(session && session.email);
 
-    var brandHtml = '<a class="brand" href="/"><img src="/logo.jpg" width="34" height="34" style="width:34px;height:34px;border-radius:8px;object-fit:cover" alt="">需求链平台</a>';
+    var brandHtml = '<a class="brand" href="/"><img src="/logo.jpg" width="34" height="34" style="width:34px;height:34px;border-radius:8px;object-fit:cover" alt="" loading="lazy">需求链平台</a>';
     var linksHtml = '<div class="links">';
     linksHtml += '<a href="/demand_square.html">需求广场</a>';
     linksHtml += '<a href="/suppliers.html">供应商</a>';
