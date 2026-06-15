@@ -156,7 +156,16 @@ async def static_file(request):
         return JSONResponse({"error": "forbidden"}, status_code=403)
     filepath = os.path.join(WEB_ROOT, path)
     if os.path.isfile(filepath):
-        return FileResponse(filepath)
+        from starlette.responses import FileResponse as FR
+        import mimetypes
+        mt, _ = mimetypes.guess_type(filepath)
+        # Cache-Control: CSS/JS/images/gifs get 1 year, HTML gets no-cache
+        is_build = ".min." in path or "?v=" in str(request.url)
+        if mt and (mt.startswith("text/css") or mt.startswith("application/javascript") or mt.startswith("image/")):
+            headers = {"Cache-Control": "public, max-age=31536000, immutable"} if is_build else {"Cache-Control": "public, max-age=3600"}
+        else:
+            headers = {"Cache-Control": "no-cache, no-store, must-revalidate"} if path.endswith(".html") else {"Cache-Control": "public, max-age=3600"}
+        return FR(filepath, headers=headers)
     return JSONResponse({"error": "not found"}, status_code=404)
 
 
