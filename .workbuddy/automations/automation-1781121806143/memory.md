@@ -1,6 +1,37 @@
 # Auto-Crawler Automation Memory
 
-Last execution: 2026-06-14
+Last execution: 2026-06-15
+
+## Summary (Round 7)
+- **Demands**: 10 collected, 10 inserted via /api/auto-demand (0 dup, 0 fail)
+- **Suppliers**: 61 collected, 61 inserted via /api/auto-supplier (0 dup, 0 fail)
+- **Total**: 71 new items (stable vs 71 last round)
+
+### Sources results
+| Source | Type | Items | Status |
+|--------|------|-------|--------|
+| USA.gov联邦挑战 | Demand | 7 | ✅ All inserted |
+| XPRIZE竞赛 | Demand | 0 | ✅ No items found |
+| NASA挑战 | Demand | 0 | ✅ No items found |
+| MIT Solve | Demand | 0 | ✅ No items found |
+| DARPA | Demand | - | ❌ DNS failure (getaddrinfo) |
+| 新加坡航空航天挑战 | Demand | 0 | ✅ No items found |
+| Climate-KIC | Demand | 0 | ✅ No items found |
+| 国家自然科学基金委 | Demand | 0 | ✅ No items found |
+| Grants.gov | Demand | 3 | ✅ All inserted (recovered from SSL issue) |
+| HeroX挑战赛 | Demand | - | ❌ HTTP 404 Not Found |
+| 中国各地企业技术需求 | Demand | 0 | ✅ No items found |
+| 宁波创新挑战赛 | Demand | 0 | ✅ No items found |
+| 苏州市揭榜挂帅 | Demand | 0 | ✅ No items found |
+| 碳捕集初创企业 (StartUs) | Supplier | - | ❌ HTTP 403 Forbidden |
+| 氢能初创企业 | Supplier | 60 | ✅ All inserted |
+| 气候科技初创企业 | Supplier | 1 | ✅ Inserted |
+
+### Notes
+- Round 7 results consistent with Round 6: 71 total items, 0 duplicates
+- Grants.gov recovered from previous SSL error, yielded 3 grants
+- DARPA, HeroX, carbon capture sources still failing (no change)
+- Backups saved to crawled_demands_20260615_060231.json / crawled_suppliers_20260615_060231.json
 
 ## Summary (Round 6)
 - **Demands**: 10 collected, 10 inserted via /api/auto-demand (0 dup, 0 fail)
