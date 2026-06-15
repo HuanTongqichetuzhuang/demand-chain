@@ -1282,7 +1282,8 @@ async def register_human(email: str, display_name: str, password: str) -> str:
                 }, ensure_ascii=False)
 
         human_id = generate_ulid()
-        hashed = bcrypt.hash(password)
+        import bcrypt as _bcr
+        hashed = _bcr.hashpw(password.encode(), _bcr.gensalt()).decode()
 
         # 写入数据库 users 表（持久化）
         async with async_session() as session:
@@ -1329,6 +1330,7 @@ async def login_human(email: str, password: str, display_name: str = "") -> str:
     """
     from passlib.hash import bcrypt
     import hashlib as _hashlib
+    import bcrypt as _bcr2
     from src.shared.agent_identity import agent_registry
     from src.shared.database import async_session
     from src.shared.models import User
@@ -1337,7 +1339,7 @@ async def login_human(email: str, password: str, display_name: str = "") -> str:
         # 1. 先查内存注册表（最近MCP注册的用户）
         entry = agent_registry._email_to_human.get(email)
         if entry:
-            if bcrypt.verify(password, entry["password_hash"]):
+            if _bcr2.checkpw(password.encode(), entry["password_hash"].encode()):
                 human_id = entry["human_id"]
             else:
                 return json.dumps({"error": "密码错误"}, ensure_ascii=False)
@@ -1354,14 +1356,14 @@ async def login_human(email: str, password: str, display_name: str = "") -> str:
             stored_hash = user.password_hash
             if stored_hash.startswith("$2b$") or stored_hash.startswith("$2a$"):
                 # bcrypt hash
-                if not bcrypt.verify(password, stored_hash):
+                if not _bcr2.checkpw(password.encode(), stored_hash.encode()):
                     return json.dumps({"error": "密码错误"}, ensure_ascii=False)
             else:
                 # 旧版 SHA256 hash — 验证后升级到 bcrypt
                 if _hashlib.sha256(password.encode()).hexdigest() != stored_hash:
                     return json.dumps({"error": "密码错误"}, ensure_ascii=False)
                 # 升级为 bcrypt
-                new_hash = bcrypt.hash(password)
+                new_hash = _bcr2.hashpw(password.encode(), _bcr2.gensalt()).decode()
                 async with async_session() as session:
                     u = await session.get(User, user.human_id)
                     if u:

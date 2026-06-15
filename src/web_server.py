@@ -58,15 +58,15 @@ def _sanitize_like(value: str) -> str:
     return value.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
 
 
-# 管理员邮箱
-_ADMIN_EMAIL = "477570216@qq.com"
+# 管理员邮箱列表
+_ADMIN_EMAILS = ["477570216@qq.com", "asd4422449@admin.dc"]
 
 
 async def _require_admin(request):
     """检查请求是否来自管理员邮箱"""
     body = await request.json()
     email = body.get("email", "").strip()
-    if not email or email != _ADMIN_EMAIL:
+    if not email or email not in _ADMIN_EMAILS:
         raise PermissionError("仅管理员可执行此操作")
     return email
 
@@ -328,7 +328,7 @@ async def api_user_stats(request):
 async def api_register(request):
     """POST /api/register — 注册新人类用户（数据库持久化，含限流+邮箱验证）"""
     import secrets, hashlib
-    from passlib.hash import bcrypt
+    import bcrypt as _bcrypt3
     from src.shared.database import async_session
     from src.shared.models import User
     from sqlalchemy import select
@@ -399,7 +399,7 @@ async def api_register(request):
 
 async def api_login(request):
     """POST /api/login — 人类登录（数据库验证，需已验证邮箱）"""
-    from passlib.hash import bcrypt
+    import bcrypt as _bcrypt4
     import hashlib as _hashlib
     from src.shared.database import async_session
     from src.shared.models import User
@@ -422,14 +422,14 @@ async def api_login(request):
             stored_hash = user.password_hash
             if stored_hash.startswith("$2b$") or stored_hash.startswith("$2a$"):
                 # bcrypt hash
-                if not bcrypt.verify(password, stored_hash):
+                if not _bcrypt4.checkpw(password.encode(), stored_hash.encode()):
                     return JSONResponse({"error": "密码错误"}, status_code=401)
             else:
                 # 旧版 SHA256 hash — 验证后升级到 bcrypt
                 if _hashlib.sha256(password.encode()).hexdigest() != stored_hash:
                     return JSONResponse({"error": "密码错误"}, status_code=401)
                 # 升级为 bcrypt
-                new_hash = bcrypt.hash(password)
+                new_hash = _bcrypt4.hashpw(password.encode(), _bcrypt4.gensalt()).decode()
                 user.password_hash = new_hash
                 await session.commit()
             
@@ -1252,7 +1252,7 @@ async def api_admin_check(request):
     """POST /api/admin/check — 验证是否为管理员"""
     try:
         await _require_admin(request)
-        return JSONResponse({"admin": True, "email": _ADMIN_EMAIL})
+        return JSONResponse({"admin": True, "email": email})
     except PermissionError as e:
         return JSONResponse({"admin": False, "error": str(e)}, status_code=403)
 
