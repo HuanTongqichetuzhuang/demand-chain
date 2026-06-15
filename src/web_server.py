@@ -903,7 +903,7 @@ async def api_forum_topic_detail(request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 async def api_demand_list(request):
-    """GET /api/demands — 需求列表，支持分页、语义搜索"""
+    """GET /api/demands — 需求列表，支持分页、语义搜索、分类筛选"""
     from src.shared.database import async_session
     from src.shared.models import Demand
     from src.shared.semantic_search import demand_search, TfidfSearch
@@ -911,6 +911,7 @@ async def api_demand_list(request):
     try:
         keyword = request.query_params.get("keyword", "").strip()
         category = request.query_params.get("category", "")
+        sub_category = request.query_params.get("sub_category", "").strip()
         sort = request.query_params.get("sort", "new")
         page = int(request.query_params.get("page", 1))
         per_page = int(request.query_params.get("per_page", 50))
@@ -919,8 +920,17 @@ async def api_demand_list(request):
         offset = (page - 1) * per_page
 
         async with async_session() as session:
-            # Get total count
-            count_result = await session.execute(select(func.count(Demand.id)))
+            # Build query with filters
+            query_filter = True  # placeholder
+
+            # Get total count (filtered)
+            count_query = select(func.count(Demand.id))
+            if category:
+                count_query = count_query.where(Demand.category == category)
+            if sub_category:
+                from sqlalchemy import text as sa_text
+                count_query = count_query.where(Demand.sub_category == sub_category)
+            count_result = await session.execute(count_query)
             total = count_result.scalar()
 
             result = await session.execute(
@@ -967,6 +977,7 @@ async def api_demand_list(request):
                 "id": d.id,
                 "raw_text": d.raw_text[:300] if d.raw_text else "",
                 "category": d.category,
+                "sub_category": getattr(d, "sub_category", None) or "",
                 "status": d.status.value if d.status else "open",
                 "summary": (d.structured_json.get("summary", "") if d.structured_json else ""),
                 "tags": (d.structured_json.get("tags", []) if d.structured_json else []),
@@ -979,6 +990,55 @@ async def api_demand_list(request):
         })
     except Exception as e:
         return JSONResponse({"error": str(e), "demands": []}, status_code=500)
+
+
+async def api_demands_filters(request):
+    """GET /api/demands/filters — 需求分类聚合（用于前端筛选栏）"""
+    from src.shared.database import async_session
+    from src.shared.models import Demand
+    from sqlalchemy import select, func
+    from src.shared.classification import CATEGORY_TREE, CATEGORY_NAMES
+    try:
+        async with async_session() as session:
+            r = await session.execute(select(Demand))
+            rows = list(r.scalars().all())
+
+        cat_counts = {}
+        sub_counts = {}
+        for d in rows:
+            c = d.category or "其他"
+            cat_counts[c] = cat_counts.get(c, 0) + 1
+            sc = getattr(d, "sub_category", None) or ""
+            if sc:
+                sub_counts[(c, sc)] = sub_counts.get((c, sc), 0) + 1
+
+        # 构建树形结构
+        tree = []
+        for cat in CATEGORY_NAMES:
+            subs = []
+            for sub in CATEGORY_TREE.get(cat, []):
+                c = sub_counts.get((cat, sub), 0)
+                if c > 0:
+                    subs.append({"name": sub, "count": c})
+            total = cat_counts.get(cat, 0)
+            if total > 0 or subs:
+                tree.append({
+                    "name": cat,
+                    "count": total,
+                    "children": subs,
+                })
+
+        # 不在CATEGORY_TREE中的分类也加进去
+        for cat, cnt in cat_counts.items():
+            if cat not in CATEGORY_NAMES and cat:
+                tree.append({"name": cat, "count": cnt, "children": []})
+
+        return JSONResponse({
+            "tree": tree,
+            "total": len(rows),
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 async def api_matches(request):
     """GET /api/matches — 匹配结果列表（缓存 30 分钟）"""
@@ -1470,6 +1530,7 @@ routes = [
     Route("/api/forum/topics/{topic_id}/reply", api_forum_reply_post, methods=["POST"]),
     Route("/api/forum/topics/{topic_id}/replies", api_forum_replies),
     Route("/api/demands", api_demand_list),
+    Route("/api/demands/filters", api_demands_filters),
     Route("/api/matches", api_matches),
     Route("/api/matches/{match_id}/email", api_match_email),
     Route("/api/matches/{match_id}/feedback", api_match_feedback, methods=["POST"]),

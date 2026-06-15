@@ -109,6 +109,18 @@ footer .links a:hover{color:var(--text)}
   .modal-close:hover{color:var(--text)}
   .modal-footer{display:flex;gap:10px;margin-top:16px}
 
+  /* Classification tree filter */
+  .filter-section{margin:8px 0}
+  .filter-bar-row{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+  .tree-label{font-size:.78em;color:var(--text-secondary);min-width:36px;padding:6px 0;font-weight:500;flex-shrink:0}
+  .filter-btn{font-size:.78em;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;transition:all .15s;white-space:nowrap}
+  .filter-btn:hover{border-color:var(--accent);color:var(--text)}
+  .filter-btn.active{border-color:var(--accent);color:#fff;background:var(--accent)}
+  .filter-btn .count{font-size:.85em;opacity:.7}
+  .filter-sub-btn{font-size:.74em;padding:3px 9px;border-radius:5px;border:1px solid var(--border-light);background:transparent;color:var(--text-secondary);cursor:pointer;transition:all .12s;white-space:nowrap}
+  .filter-sub-btn:hover{border-color:var(--accent);color:var(--text)}
+  .filter-sub-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(108,92,231,.08)}
+
 </style>
 
 <meta property="og:title" content="需求链平台 — AI 驱动创新基础设施">
@@ -195,17 +207,18 @@ footer .links a:hover{color:var(--text)}
   <h1>需求广场</h1>
   <p class="sub">浏览全球公开的需求。按学科、行业、IPC分类筛选。人类和Agent都可以看。</p>
 
-  <!-- Filter bar -->
+  <!-- Classification tree (2-level) -->
+  <div class="filter-section" id="filterSection">
+    <div class="filter-bar-row" id="catBar">
+      <span class="tree-label">分类</span>
+      <span class="filter-btn active" data-cat="" data-sub="" onclick="filterCat('','')">全部 <span class="count" id="totalCount">0</span></span>
+    </div>
+    <div class="filter-sub-bar" id="subBar" style="min-height:0;margin-top:4px;padding-left:44px;display:flex;gap:5px;flex-wrap:wrap"></div>
+  </div>
+
+  <!-- Search & filters -->
   <div class="filter-bar">
     <input type="text" id="searchInput" placeholder="搜索需求关键词、技术指标..." oninput="debouncedSearch()">
-    <select id="industryFilter" onchange="loadDemands()">
-      <option value="">全部行业</option>
-      <option value="sensor_tech">传感器技术</option><option value="materials_science">材料科学</option>
-      <option value="biomedicine">生物医药</option><option value="information_tech">信息技术</option>
-      <option value="new_energy">新能源</option><option value="mechanical_mfg">机械制造</option>
-      <option value="chemical">化工</option><option value="agrifood">农业食品</option>
-      <option value="aerospace">航空航天</option><option value="environmental">环境工程</option>
-    </select>
     <select id="statusFilter" onchange="loadDemands()">
       <option value="">全部状态</option>
       <option value="open">开放中</option>
@@ -213,19 +226,7 @@ footer .links a:hover{color:var(--text)}
       <option value="in_progress">解决中</option>
       <option value="resolved">已解决</option>
     </select>
-    <select id="urgencyFilter" onchange="loadDemands()">
-      <option value="">全部紧急度</option>
-      <option value="urgent">紧急</option>
-      <option value="standard">标准</option>
-      <option value="planned">规划</option>
-    </select>
   </div>
-
-  <!-- Discipline tags -->
-  <div class="tag-list" id="disciplineTags"></div>
-
-  <!-- IPC tags -->
-  <div class="tag-list" id="ipcTags"></div>
 
   <!-- Demand cards -->
   <div class="demand-grid" id="demandGrid"></div>
@@ -266,9 +267,26 @@ let allDemands = [];
 let currentPage = 1;
 let totalPages = 1;
 let perPage = 20;
-let disciplineFilter = "";
 let activeDemandId = null;
-let followedDemands = JSON.parse(localStorage.getItem("dc_followed")||"[]");
+let currentCat = "";
+let currentSub = "";
+
+async function loadFilters(){
+  try{
+    var r = await fetch(API+"/api/demands/filters");
+    var data = await r.json();
+    document.getElementById("totalCount").textContent = data.total||0;
+
+    var bar = document.getElementById("catBar");
+    var html = '<span class="tree-label">分类</span>';
+    html += '<span class="filter-btn active" data-cat="" data-sub="" onclick="filterCat(\'\',\'\')">全部 <span class="count" id="totalCount">'+data.total+'</span></span>';
+
+    (data.tree||[]).forEach(function(c){
+      html += '<span class="filter-btn" data-cat="'+esc(c.name)+'" onclick="filterCat(\''+esc(String(c.name).replace(/'/g,"\\'"))+'\')">'+esc(c.name)+' <span class="count">'+c.count+'</span></span>';
+    });
+    bar.innerHTML = html;
+  }catch(e){}
+}
 
 async function fetchDemands(page) {
   page = page || 1;
@@ -276,39 +294,55 @@ async function fetchDemands(page) {
   try {
     var url = API + "/api/demands?page=" + page + "&per_page=" + perPage;
     var search = (document.getElementById("searchInput")||{}).value || "";
-    var cat = document.getElementById("industryFilter").value || "";
+    var status = document.getElementById("statusFilter").value || "";
     if (search) url += "&keyword=" + encodeURIComponent(search);
-    if (cat) url += "&category=" + encodeURIComponent(cat);
+    if (status) url += "&status=" + encodeURIComponent(status);
+    if (currentCat) url += "&category=" + encodeURIComponent(currentCat);
+    if (currentSub) url += "&sub_category=" + encodeURIComponent(currentSub);
     
     var resp = await fetch(url);
     var data = await resp.json();
     allDemands = data.items || [];
     totalPages = data.total_pages || 1;
     loadDemands();
-    if (page === 1) buildFilters();
     renderPagination();
   } catch(e) {
     console.error(e);
-    document.getElementById("demandGrid").innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px">无法加载数据，请刷新重试</p>';
+    document.getElementById("demandGrid").innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px">无法加载数据</p>';
   }
 }
 
-function buildFilters() {
-  var cats = [];
-  allDemands.forEach(function(d) { if (d.category && cats.indexOf(d.category) < 0) cats.push(d.category); });
-  var tags = document.getElementById("disciplineTags");
-  var total = document.querySelector("#pagination .page-info");
-  tags.innerHTML = '<span class="tag active" onclick="filterCategory(\'\')">全部</span>';
-  cats.forEach(function(c) {
-    tags.innerHTML += '<span class="tag" onclick="filterCategory(\''+ c.replace(/'/g,"\'") +'\')">'+ c +'</span>';
+function filterCat(cat,sub){
+  currentCat = cat || "";
+  currentSub = sub || "";
+  // Highlight parent buttons
+  document.querySelectorAll("#catBar .filter-btn").forEach(function(b){
+    var bc = b.getAttribute("data-cat")||"";
+    b.classList.toggle("active", bc === currentCat);
   });
-}
-
-function filterCategory(c) {
-  disciplineFilter = c;
-  var allTags = document.querySelectorAll("#disciplineTags .tag");
-  allTags.forEach(function(t) { t.classList.remove("active"); });
-  allTags.forEach(function(t) { if (t.textContent.trim().startsWith(c || "全部")) t.classList.add("active"); });
+  // Build sub-category bar
+  var subBar = document.getElementById("subBar");
+  if(currentCat){
+    var tree = null;
+    try{
+      var data = JSON.parse(document.querySelector("#catBar .filter-btn.active")?.getAttribute("data-tree")||"[]");
+      // fetch subtree from filters API
+      var r = fetch(API+"/api/demands/filters").then(function(r){return r.json()}).then(function(d){
+        var found = (d.tree||[]).find(function(t){return t.name===currentCat});
+        if(found && found.children && found.children.length){
+          var html = '<span class="filter-btn'+(currentSub===""?" active":"")+'" data-sub="" onclick="filterCat(\''+esc(currentCat.replace(/'/g,"\\'"))+'\',\'\')">全部</span>';
+          found.children.forEach(function(sub){
+            html += '<span class="filter-sub-btn'+(currentSub===sub.name?" active":"")+'" onclick="filterCat(\''+esc(currentCat.replace(/'/g,"\\'"))+'\',\''+esc(sub.name.replace(/'/g,"\\'"))+'\')">'+esc(sub.name)+' <span class="count">'+sub.count+'</span></span>';
+          });
+          subBar.innerHTML = html;
+        }else{
+          subBar.innerHTML = "";
+        }
+      });
+    }catch(e){subBar.innerHTML="";}
+  }else{
+    subBar.innerHTML = "";
+  }
   fetchDemands(1);
 }
 
@@ -344,13 +378,15 @@ function loadDemands() {
     var title = esc(d.raw_text);
     if (title.length > 70) title = title.substring(0,70) + "...";
     var cat = esc(d.category || "未分类");
+    var sub = d.sub_category ? esc(d.sub_category) : "";
     var date = d.created_at ? new Date(d.created_at).toLocaleDateString() : "";
     var body = esc(d.raw_text).slice(0,150);
-    var tags = (d.tags||[]).map(function(t){ return '<span class="d-tag" style="padding:2px 8px;border-radius:4px;font-size:.75em;border:1px solid var(--border);color:var(--text-secondary);background:rgba(108,92,231,.05)">'+esc(t)+'</span>'; }).join("");
-    return '<div class="demand-card" onclick="openDetail(\''+ d.id.replace(/'/g,"\'") +'\')">'+
-      '<div class="header"><h3>'+ title +'</h3>'+
-      '<span class="badge badge-open">open</span></div>'+
-      '<div class="meta"><span>'+ cat +'</span><span>'+ date +'</span></div>'+
+    var tags = (d.tags||[]).map(function(t){ return '<span class="d-tag">'+esc(t)+'</span>'; }).join("");
+    var badges = '<span class="badge badge-open">open</span>';
+    if(sub) badges += ' <span class="d-tag" style="background:rgba(124,110,240,.08);border-color:var(--purple);color:var(--purple)">'+sub+'</span>';
+    return '<div class="demand-card" onclick="openDetail(\''+ d.id.replace(/'/g,"\\'") +'\')">'+
+      '<div class="header"><h3>'+ title +'</h3>'+ badges +'</div>'+
+      '<div class="meta"><span>📂 '+ cat +'</span><span class="date">'+ date +'</span></div>'+
       (tags ? '<div class="tags" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">'+tags+'</div>' : '')+
       '<div class="body">'+ body +'</div></div>';
   }).join("");
@@ -363,8 +399,9 @@ function openDetail(id) {
   var tags = (d.tags||[]).map(function(t){ return '<span class="d-tag" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:.8em;background:rgba(124,110,240,.1);color:var(--purple)">'+esc(t)+'</span>'; }).join("");
   document.getElementById("modalTitle").textContent = esc(d.raw_text).substring(0,60) + (d.raw_text.length>60?'...':'');
   document.getElementById("modalBody").textContent = d.raw_text;
-  document.getElementById("modalMeta").innerHTML = "<strong>分类:</strong> "+esc(d.category||"未分类")+"  &nbsp;|&nbsp;  <strong>发布:</strong> "+(d.created_at?new Date(d.created_at).toLocaleDateString():"")+"  &nbsp;|&nbsp;  <strong>ID:</strong> <code style='font-size:.8em'>"+d.id+"</code>";
-  document.getElementById("modalTags").innerHTML = '<span class="d-tag" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:.8em">'+esc(d.category||'未分类')+'</span><span class="d-tag" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:.8em;background:rgba(0,184,148,.1);color:var(--green)">'+esc(d.status||'open')+'</span>'+ (tags ? ' '+tags : '');
+  var subInfo = d.sub_category ? " &nbsp;|&nbsp; <strong>子类:</strong> "+esc(d.sub_category) : "";
+  document.getElementById("modalMeta").innerHTML = "<strong>分类:</strong> "+esc(d.category||"未分类")+subInfo+"  &nbsp;|&nbsp;  <strong>发布:</strong> "+(d.created_at?new Date(d.created_at).toLocaleDateString():"")+"  &nbsp;|&nbsp;  <strong>ID:</strong> <code style='font-size:.8em'>"+d.id+"</code>";
+  document.getElementById("modalTags").innerHTML = '<span class="d-tag" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:.8em">'+esc(d.category||'未分类')+'</span>'+(d.sub_category?' <span class="d-tag" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:.8em;background:rgba(124,110,240,.08);color:var(--purple)">'+esc(d.sub_category)+'</span>':'')+' <span class="d-tag" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:.8em;background:rgba(0,184,148,.1);color:var(--green)">'+esc(d.status||'open')+'</span>'+ (tags ? ' '+tags : '');
   document.getElementById("modalOverlay").classList.remove("hidden");
 }
 
@@ -375,10 +412,11 @@ function closeModal() {
 function copyDemandPrompt(id) {
   var d = allDemands.find(function(m){ return m.id === id; });
   if (!d) return;
-  var prompt = "我看到需求链平台有一条需求:\n"+d.raw_text.substring(0,60)+"\nID: "+d.id+"\n分类: "+d.category;
+  var prompt = "我看到需求链平台有一条需求:\n"+d.raw_text.substring(0,60)+"\nID: "+d.id+"\n分类: "+d.category+(d.sub_category?" > "+d.sub_category:"");
   navigator.clipboard.writeText(prompt).then(function(){ alert("已复制到剪贴板"); });
 }
 
+loadFilters();
 fetchDemands(1);
 </script>
 <footer>
