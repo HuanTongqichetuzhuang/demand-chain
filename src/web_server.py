@@ -140,6 +140,7 @@ async def api_docs(request): return await serve_file(request, "api_docs.html")
 async def tools_extra(request): return await serve_file(request, "tools_extra.html")
 async def flywheel_dashboard(request): return await serve_file(request, "flywheel_dashboard.html")
 async def admin_page(request): return await serve_file(request, "admin.html")
+async def notification_page(request): return await serve_file(request, "notifications.html")
 async def tutorial(request): return await serve_file(request, "docs/tutorial.html")
 
 async def verify_email_page(request):
@@ -1558,6 +1559,149 @@ async def api_global_search(request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+# ============================================================
+# 通知 API
+# ============================================================
+
+async def api_notifications_list(request):
+    """GET /api/notifications — 通知列表（支持分页）"""
+    from src.shared.database import async_session
+    from src.shared.models import Notification
+    from sqlalchemy import select, func
+    try:
+        email = request.query_params.get("email", "")
+        if not email:
+            return JSONResponse({"items": [], "total": 0, "unread": 0})
+        page = max(1, int(request.query_params.get("page", 1)))
+        per_page = max(1, min(50, int(request.query_params.get("per_page", 20))))
+
+        async with async_session() as session:
+            from src.shared.models import User
+            r = await session.execute(select(User).where(User.email == email))
+            u = r.scalar_one_or_none()
+            if not u:
+                return JSONResponse({"items": [], "total": 0, "unread": 0})
+
+            total = (await session.execute(
+                select(func.count()).select_from(Notification).where(Notification.user_id == u.human_id)
+            )).scalar() or 0
+
+            unread = (await session.execute(
+                select(func.count()).select_from(Notification).where(
+                    Notification.user_id == u.human_id, Notification.is_read == False
+                )
+            )).scalar() or 0
+
+            r = await session.execute(
+                select(Notification).where(Notification.user_id == u.human_id)
+                .order_by(Notification.created_at.desc())
+                .limit(per_page).offset((page - 1) * per_page)
+            )
+            items = [{
+                "id": n.id,
+                "title": n.title,
+                "body": n.body,
+                "channel": n.channel,
+                "urgency": n.urgency,
+                "action_url": n.action_url,
+                "is_read": n.is_read,
+                "created_at": n.created_at.isoformat() if n.created_at else "",
+            } for n in r.scalars().all()]
+
+        return JSONResponse({"items": items, "total": total, "unread": unread, "page": page, "per_page": per_page})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "items": [], "total": 0, "unread": 0}, status_code=500)
+
+
+async def api_notifications_read(request):
+    """PUT /api/notifications/{notify_id}/read — 标记通知为已读"""
+    from src.shared.database import async_session
+    from src.shared.models import Notification
+    from sqlalchemy import select
+    from datetime import datetime, timezone
+    try:
+        notify_id = request.path_params.get("notify_id", "")
+        if not notify_id:
+            return JSONResponse({"error": "缺少通知ID"}, status_code=400)
+
+        async with async_session() as session:
+            r = await session.execute(select(Notification).where(Notification.id == notify_id))
+            n = r.scalar_one_or_none()
+            if not n:
+                return JSONResponse({"error": "通知不存在"}, status_code=404)
+            n.is_read = True
+            n.read_at = datetime.now(timezone.utc)
+            await session.commit()
+
+        return JSONResponse({"status": "ok"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_notifications_read_all(request):
+    """POST /api/notifications/read-all — 全部标记已读"""
+    from src.shared.database import async_session
+    from src.shared.models import Notification
+    from sqlalchemy import select
+    from datetime import datetime, timezone
+    try:
+        body = await request.json()
+        email = body.get("email", "")
+        if not email:
+            return JSONResponse({"error": "缺少邮箱"}, status_code=400)
+
+        async with async_session() as session:
+            from src.shared.models import User
+            r = await session.execute(select(User).where(User.email == email))
+            u = r.scalar_one_or_none()
+            if not u:
+                return JSONResponse({"error": "用户不存在"}, status_code=404)
+
+            r = await session.execute(
+                select(Notification).where(
+                    Notification.user_id == u.human_id,
+                    Notification.is_read == False
+                )
+            )
+            now = datetime.now(timezone.utc)
+            for n in r.scalars().all():
+                n.is_read = True
+                n.read_at = now
+            await session.commit()
+
+        return JSONResponse({"status": "ok"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_notifications_unread_count(request):
+    """GET /api/notifications/unread-count — 未读通知数（右上角小红点用）"""
+    from src.shared.database import async_session
+    from src.shared.models import Notification
+    from sqlalchemy import select, func
+    try:
+        email = request.query_params.get("email", "")
+        if not email:
+            return JSONResponse({"count": 0})
+
+        async with async_session() as session:
+            from src.shared.models import User
+            r = await session.execute(select(User).where(User.email == email))
+            u = r.scalar_one_or_none()
+            if not u:
+                return JSONResponse({"count": 0})
+
+            count = (await session.execute(
+                select(func.count()).select_from(Notification).where(
+                    Notification.user_id == u.human_id, Notification.is_read == False
+                )
+            )).scalar() or 0
+
+        return JSONResponse({"count": count})
+    except Exception as e:
+        return JSONResponse({"count": 0})
+
+
 routes = [
     Route("/", index),
     Route("/login.html", login_page),
@@ -1578,6 +1722,8 @@ routes = [
     Route("/flywheel_dashboard.html", flywheel_dashboard),
     Route("/docs/tutorial.html", tutorial),
     Route("/verify-email", verify_email_page),
+    # Pages
+    Route("/notifications.html", notification_page),
     # Admin page
     Route("/admin.html", admin_page),
     # API Routes
@@ -1607,6 +1753,11 @@ routes = [
     Route("/api/matches/{match_id}/feedback", api_match_feedback, methods=["POST"]),
     Route("/api/flywheel/stats", api_flywheel_stats),
     Route("/api/flywheel/weights", api_flywheel_weights),
+    # Notification API
+    Route("/api/notifications", api_notifications_list),
+    Route("/api/notifications/unread-count", api_notifications_unread_count),
+    Route("/api/notifications/{notify_id}/read", api_notifications_read, methods=["PUT"]),
+    Route("/api/notifications/read-all", api_notifications_read_all, methods=["POST"]),
     # Admin API
     Route("/api/admin/check", api_admin_check, methods=["POST"]),
     Route("/api/admin/stats", api_admin_stats),

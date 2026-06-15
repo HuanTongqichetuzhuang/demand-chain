@@ -28,6 +28,8 @@
     'nav .links a:hover{background:rgba(124,110,240,0.08);color:var(--text)}' +
     'nav .links .btn-nav{background:linear-gradient(135deg,var(--purple),var(--purple-dark));box-shadow:0 2px 12px var(--glow-purple);padding:7px 20px;font-weight:600;color:#fff!important}' +
     'nav .links .btn-nav:hover{transform:translateY(-1px);box-shadow:0 4px 20px var(--glow-purple)}' +
+    '.notif-bell{position:relative;display:inline-flex;align-items:center;padding:6px 10px!important;font-size:16px!important}' +
+    '.notif-bell .badge{position:absolute;top:-2px;right:-2px;background:var(--red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px}' +
     '.card{border-radius:16px;transition:all 0.25s ease}.card:hover{box-shadow:0 8px 32px rgba(0,0,0,0.2);transform:translateY(-2px)}' +
     '::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}' +
     '::selection{background:rgba(124,110,240,0.3);color:#fff}';
@@ -64,6 +66,7 @@
     linksHtml += '<a href="/docs/tutorial.html">教程</a>';
     linksHtml += '<a href="/api_docs.html">API文档</a>';
     if (loggedIn) {
+      linksHtml += '<a href="/notifications.html" class="notif-bell" id="notifBell" title="通知中心">🔔<span class="badge" id="notifBadge">0</span></a>';
       linksHtml += '<a href="/profile.html" style="display:inline-flex;align-items:center;gap:4px;font-size:14px;color:var(--text);margin-left:4px">' +
         esc(session.name || session.email) + '</a>';
       linksHtml += '<a href="#" onclick="localStorage.removeItem(\'dc_session\');location.reload()" style="font-size:13px;color:var(--ts)">退出</a>';
@@ -96,4 +99,31 @@
       observer.observe(nav, { childList: true, subtree: true });
     }
   }, 500);
+
+  // 通知未读计数
+  function updateNotifCount() {
+    var session = null;
+    try { session = JSON.parse(localStorage.getItem('dc_session')); } catch(e) {}
+    if (!session || !session.email) return;
+    var badge = document.getElementById('notifBadge');
+    if (!badge) return;
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/notifications/unread-count?email=' + encodeURIComponent(session.email), true);
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          var count = data.count || 0;
+          badge.textContent = count;
+          badge.style.display = count > 0 ? 'flex' : 'none';
+        } catch(e) {}
+      }
+    };
+    xhr.send();
+  }
+
+  // 首次加载后更新通知计数
+  setTimeout(updateNotifCount, 1000);
+  // 每30秒轮询
+  setInterval(updateNotifCount, 30000);
 })();

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>通知中心 | 需求链平台</title>
+<link rel="icon" href="logo.jpg" type="image/jpeg">
+<link rel="stylesheet" href="/shared.css?v=6">
+<style>
+.container { max-width: 800px; margin: 0 auto; padding: 24px; }
+.page-title { font-size: 1.5em; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+.page-title .badge { background: var(--purple); color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 0.6em; }
+.actions { display: flex; gap: 8px; margin-bottom: 20px; }
+.actions button { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); cursor: pointer; font-size: 0.85em; }
+.actions button:hover { border-color: var(--purple); }
+
+.notif-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 8px; cursor: pointer; transition: all 0.15s; display: flex; gap: 14px; align-items: flex-start; }
+.notif-card:hover { border-color: var(--purple); }
+.notif-card.unread { border-left: 3px solid var(--purple); background: rgba(124,110,240,0.04); }
+.notif-card .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--purple); flex-shrink: 0; margin-top: 6px; }
+.notif-card .dot.read { background: transparent; }
+.notif-card .content { flex: 1; }
+.notif-card .title { font-weight: 600; font-size: 0.95em; margin-bottom: 4px; }
+.notif-card .body { font-size: 0.85em; color: var(--ts); margin-bottom: 6px; }
+.notif-card .meta { font-size: 0.75em; color: var(--muted); display: flex; gap: 12px; }
+.notif-card .urgency-high { color: var(--red); }
+.notif-card .action-link { color: var(--purple); font-size: 0.8em; text-decoration: none; }
+
+.empty-state { text-align: center; padding: 80px 20px; color: var(--ts); }
+.empty-state h3 { font-size: 1.2em; margin-bottom: 8px; }
+.loading { text-align: center; padding: 40px; color: var(--ts); }
+.pagination { display: flex; justify-content: center; gap: 8px; margin-top: 20px; }
+.pagination button { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); cursor: pointer; }
+.pagination button:disabled { opacity: 0.4; cursor: default; }
+
+@media(max-width:600px){
+  .container { padding: 12px; }
+  .notif-card { padding: 12px 14px; }
+}
+</style>
+</head>
+<body>
+<nav></nav>
+<div class="container">
+  <div class="page-title">
+    🔔 通知中心
+    <span class="badge" id="totalBadge">0</span>
+  </div>
+  <div class="actions">
+    <button onclick="markAllRead()">✅ 全部标记已读</button>
+    <button onclick="location.reload()">🔄 刷新</button>
+  </div>
+  <div id="notifList"><div class="loading">加载中...</div></div>
+  <div class="pagination" id="pagination"></div>
+</div>
+
+<script>
+let currentPage = 1;
+const perPage = 20;
+
+function getEmail() {
+  try {
+    const s = JSON.parse(localStorage.getItem('dc_session'));
+    return s ? s.email : null;
+  } catch(e) { return null; }
+}
+
+function loadNotifications(page) {
+  page = page || 1;
+  currentPage = page;
+  const email = getEmail();
+  const list = document.getElementById('notifList');
+  const pagination = document.getElementById('pagination');
+
+  if (!email) {
+    list.innerHTML = '<div class="empty-state"><h3>请先登录</h3><p>登录后查看通知</p></div>';
+    pagination.innerHTML = '';
+    return;
+  }
+
+  list.innerHTML = '<div class="loading">加载中...</div>';
+
+  fetch(`/api/notifications?email=${encodeURIComponent(email)}&page=${page}&per_page=${perPage}`)
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('totalBadge').textContent = data.unread || 0;
+
+      if (!data.items || !data.items.length) {
+        list.innerHTML = '<div class="empty-state"><h3>暂无通知</h3><p>当有新的匹配、论坛回复或系统消息时，会在这里显示</p></div>';
+        pagination.innerHTML = '';
+        return;
+      }
+
+      list.innerHTML = data.items.map(n => {
+        const isUnread = !n.is_read;
+        const time = n.created_at ? new Date(n.created_at).toLocaleString('zh-CN') : '';
+        const urgencyClass = n.urgency === 'high' || n.urgency === 'critical' ? 'urgency-high' : '';
+        return '<div class="notif-card' + (isUnread ? ' unread' : '') + '" onclick="markRead(\'' + n.id + '\', this)">' +
+          '<div class="dot' + (n.is_read ? ' read' : '') + '"></div>' +
+          '<div class="content">' +
+          '<div class="title ' + urgencyClass + '">' + escHtml(n.title) + '</div>' +
+          '<div class="body">' + escHtml(n.body.slice(0, 300)) + '</div>' +
+          '<div class="meta">' +
+          '<span>' + time + '</span>' +
+          '<span>' + n.channel + '</span>' +
+          (n.action_url ? '<a href="' + n.action_url + '" class="action-link" onclick="event.stopPropagation()">查看详情 →</a>' : '') +
+          '</div></div></div>';
+      }).join('');
+
+      // Pagination
+      const totalPages = Math.ceil((data.total || 0) / perPage);
+      if (totalPages <= 1) { pagination.innerHTML = ''; return; }
+      let phtml = '<button ' + (page <= 1 ? 'disabled' : '') + ' onclick="loadNotifications(' + (page-1) + ')">← 上一页</button>';
+      phtml += '<span style="padding:6px 12px;color:var(--ts);font-size:0.85em">' + page + '/' + totalPages + '</span>';
+      phtml += '<button ' + (page >= totalPages ? 'disabled' : '') + ' onclick="loadNotifications(' + (page+1) + ')">下一页 →</button>';
+      pagination.innerHTML = phtml;
+    })
+    .catch(err => {
+      list.innerHTML = '<div class="empty-state"><h3>加载失败</h3><p>' + err.message + '</p></div>';
+    });
+}
+
+function markRead(id, el) {
+  fetch('/api/notifications/' + id + '/read', { method: 'PUT' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.status === 'ok') {
+        const card = el.closest ? el.closest('.notif-card') : el;
+        if (card) {
+          card.classList.remove('unread');
+          card.querySelector('.dot')?.classList.add('read');
+        }
+      }
+    })
+    .catch(() => {});
+}
+
+function markAllRead() {
+  const email = getEmail();
+  if (!email) return;
+  fetch('/api/notifications/read-all', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email })
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d.status === 'ok') {
+        document.querySelectorAll('.notif-card').forEach(c => {
+          c.classList.remove('unread');
+          const dot = c.querySelector('.dot');
+          if (dot) dot.classList.add('read');
+        });
+        document.getElementById('totalBadge').textContent = '0';
+      }
+    })
+    .catch(() => {});
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Load on page ready
+document.addEventListener('DOMContentLoaded', function() {
+  loadNotifications(1);
+});
+</script>
+<script src="/nav.js?v=6"></script>
+</body>
+</html>
