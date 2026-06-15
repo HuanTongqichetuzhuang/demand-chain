@@ -1257,7 +1257,7 @@ async def api_flywheel_stats(request):
 async def api_admin_check(request):
     """POST /api/admin/check — 验证是否为管理员"""
     try:
-        await _require_admin(request)
+        email = await _require_admin(request)
         return JSONResponse({"admin": True, "email": email})
     except PermissionError as e:
         return JSONResponse({"admin": False, "error": str(e)}, status_code=403)
