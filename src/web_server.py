@@ -6,7 +6,8 @@ import os
 import uvicorn
 from starlette.applications import Starlette
 from starlette.responses import FileResponse, JSONResponse
-from starlette.routing import Route
+from starlette.routing import Route, WebSocketRoute
+from starlette.websockets import WebSocket
 from contextlib import asynccontextmanager
 
 
@@ -1838,6 +1839,213 @@ async def api_subscriptions_update(request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+# ============================================================
+# 即时通讯 API (REST + WebSocket)
+# ============================================================
+
+async def api_messages_list(request):
+    """GET /api/messages — 获取消息列表（按用户或按match）"""
+    from src.shared.database import async_session
+    from src.shared.models import Message
+    from sqlalchemy import select, func, or_
+    try:
+        email = request.query_params.get("email", "")
+        match_id = request.query_params.get("match_id", "")
+        if not email:
+            return JSONResponse({"items": []})
+
+        async with async_session() as session:
+            from src.shared.models import User
+            r = await session.execute(select(User).where(User.email == email))
+            u = r.scalar_one_or_none()
+            if not u:
+                return JSONResponse({"items": []})
+
+            query = select(Message).where(
+                or_(Message.from_user == u.human_id, Message.to_user == u.human_id)
+            )
+            if match_id:
+                query = query.where(Message.match_id == match_id)
+            query = query.order_by(Message.created_at.desc()).limit(50)
+
+            r = await session.execute(query)
+            items = [{
+                "id": m.id,
+                "from_user": m.from_user,
+                "to_user": m.to_user,
+                "match_id": m.match_id,
+                "content": m.content,
+                "is_read": m.is_read,
+                "created_at": m.created_at.isoformat() if m.created_at else "",
+            } for m in r.scalars().all()]
+            items.reverse()  # Oldest first
+
+        return JSONResponse({"items": items})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "items": []}, status_code=500)
+
+
+async def api_messages_send(request):
+    """POST /api/messages/send — 发送消息"""
+    from src.shared.database import async_session
+    from src.shared.models import Message
+    from sqlalchemy import select
+    from uuid import uuid4
+    try:
+        body = await request.json()
+        email = body.get("email", "")
+        to_email = body.get("to_email", "")
+        content = body.get("content", "").strip()
+        match_id = body.get("match_id", "")
+
+        if not email or not to_email or not content:
+            return JSONResponse({"error": "缺少必填字段"}, status_code=400)
+        if len(content) > 5000:
+            return JSONResponse({"error": "消息过长（最多5000字）"}, status_code=400)
+
+        async with async_session() as session:
+            from src.shared.models import User
+            r = await session.execute(select(User).where(User.email == email))
+            from_user = r.scalar_one_or_none()
+            r = await session.execute(select(User).where(User.email == to_email))
+            to_user = r.scalar_one_or_none()
+
+            if not from_user or not to_user:
+                return JSONResponse({"error": "用户不存在"}, status_code=404)
+
+            msg = Message(
+                id=str(uuid4()),
+                from_user=from_user.human_id,
+                to_user=to_user.human_id,
+                match_id=match_id or None,
+                content=content,
+                is_read=False,
+            )
+            session.add(msg)
+            await session.commit()
+
+            # Also create an in-app notification for the recipient
+            try:
+                from src.shared.notifications import notification_service, Notification as NotifObj, NotificationUrgency
+                await notification_service.notify(
+                    NotifObj(
+                        user_id=to_user.human_id,
+                        title=f"💬 {from_user.display_name} 发来一条消息",
+                        body=content[:200],
+                        urgency=NotificationUrgency.NORMAL,
+                        action_url="/chat.html",
+                    ),
+                    {"notification": {"channels": []}},  # Only DB persist, no external
+                )
+            except Exception as e:
+                pass
+
+        return JSONResponse({"status": "ok", "id": msg.id})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# WebSocket 连接管理
+_chat_connections: dict[str, list] = {}  # human_id -> [websocket, ...]
+
+
+async def chat_websocket(websocket):
+    """WebSocket /ws/chat — 实时聊天"""
+    from src.shared.database import async_session
+    from src.shared.models import User, Message
+    from sqlalchemy import select, or_
+    from uuid import uuid4
+    from datetime import datetime, timezone
+
+    await websocket.accept()
+    human_id = None
+
+    try:
+        # First message must be auth: {"type": "auth", "email": "..."}
+        data = await websocket.receive_json()
+        if data.get("type") != "auth" or not data.get("email"):
+            await websocket.send_json({"type": "error", "message": "请先发送认证消息"})
+            await websocket.close()
+            return
+
+        async with async_session() as session:
+            r = await session.execute(select(User).where(User.email == data["email"]))
+            u = r.scalar_one_or_none()
+            if not u:
+                await websocket.send_json({"type": "error", "message": "用户不存在"})
+                await websocket.close()
+                return
+            human_id = u.human_id
+
+        # Register connection
+        if human_id not in _chat_connections:
+            _chat_connections[human_id] = []
+        _chat_connections[human_id].append(websocket)
+        await websocket.send_json({"type": "auth_ok", "human_id": human_id})
+
+        # Listen for messages
+        while True:
+            data = await websocket.receive_json()
+            if data.get("type") == "ping":
+                await websocket.send_json({"type": "pong"})
+                continue
+
+            if data.get("type") == "message":
+                to_human_id = data.get("to", "")
+                content = data.get("content", "").strip()
+                if not to_human_id or not content:
+                    await websocket.send_json({"type": "error", "message": "缺少 to 或 content"})
+                    continue
+                if len(content) > 5000:
+                    await websocket.send_json({"type": "error", "message": "消息过长"})
+                    continue
+
+                # Persist
+                msg_id = str(uuid4())
+                async with async_session() as session:
+                    msg = Message(
+                        id=msg_id,
+                        from_user=human_id,
+                        to_user=to_human_id,
+                        match_id=data.get("match_id", None),
+                        content=content,
+                        is_read=False,
+                    )
+                    session.add(msg)
+                    await session.commit()
+
+                # Send to recipient if connected
+                payload = {
+                    "type": "message",
+                    "id": msg_id,
+                    "from": human_id,
+                    "content": content,
+                    "match_id": data.get("match_id"),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }
+                sent = False
+                if to_human_id in _chat_connections:
+                    for ws in _chat_connections[to_human_id][:]:
+                        try:
+                            await ws.send_json(payload)
+                            sent = True
+                        except Exception:
+                            _chat_connections[to_human_id].remove(ws)
+
+                # Confirm to sender
+                payload["sent"] = sent
+                await websocket.send_json(payload)
+
+    except Exception as e:
+        pass
+    finally:
+        if human_id and human_id in _chat_connections:
+            if websocket in _chat_connections[human_id]:
+                _chat_connections[human_id].remove(websocket)
+            if not _chat_connections[human_id]:
+                del _chat_connections[human_id]
+
+
 routes = [
     Route("/", index),
     Route("/login.html", login_page),
@@ -1908,6 +2116,11 @@ routes = [
     Route("/api/admin/demands/{id}", api_admin_demands_delete, methods=["DELETE"]),
     Route("/api/home/stats", api_home_stats),
     Route("/api/global_search", api_global_search),
+    # Message API
+    Route("/api/messages", api_messages_list),
+    Route("/api/messages/send", api_messages_send, methods=["POST"]),
+    # WebSocket
+    WebSocketRoute("/ws/chat", chat_websocket),
     Route("/.well-known/agent.json", api_agent_card),
     # Catch-all static
     Route("/{path:path}", static_file),
