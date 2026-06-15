@@ -2386,11 +2386,10 @@ app = Starlette(routes=routes, lifespan=lifespan,
                 middleware=[
                     Middleware(SecurityHeadersMiddleware),
                     Middleware(RateLimitMiddleware),
-                ],
-                max_request_body_size=10 * 1024 * 1024)  # 10MB
+                ])
 
 def run():
-    uvicorn.run(app, host="0.0.0.0", port=80, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=80, log_level="info", limit_max_request_body=10 * 1024 * 1024)
 
 if __name__ == "__main__":
     run()
