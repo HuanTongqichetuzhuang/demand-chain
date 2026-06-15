@@ -224,6 +224,12 @@ class GenericWebhookChannel(BaseChannel):
             return False
 
 
+class InAppChannel(BaseChannel):
+    """站内通知渠道 — NotificationService 的 notify() 方法已直接写入 DB，此渠道仅用于一致性"""
+    async def send(self, n: Notification, config: dict) -> bool:
+        return True
+
+
 # ============================================================
 # 通知服务
 # ============================================================
@@ -231,6 +237,7 @@ class GenericWebhookChannel(BaseChannel):
 class NotificationService:
     def __init__(self):
         self.channels = {
+            "in_app": InAppChannel(),
             "wechat": WechatServerChan(),
             "wecom": WecomBotChannel(),
             "feishu": FeishuBotChannel(),
@@ -239,6 +246,29 @@ class NotificationService:
         }
 
     async def notify(self, notification: Notification, user_config: dict):
+        # Always persist to database (in-app notification)
+        try:
+            from src.shared.database import async_session
+            from src.shared.models import Notification as NotificationModel
+            from uuid import uuid4
+            async with async_session() as session:
+                db_n = NotificationModel(
+                    id=str(uuid4()),
+                    user_id=notification.user_id,
+                    title=notification.title,
+                    body=notification.body,
+                    channel="in_app",
+                    urgency=notification.urgency.value,
+                    action_url=notification.action_url,
+                    demand_id=notification.demand_id,
+                    is_read=False,
+                )
+                session.add(db_n)
+                await session.commit()
+        except Exception as e:
+            logger.warning(f"[notify] DB persistence failed: {e}")
+
+        # Send via configured external channels
         channels = user_config.get("notification", {}).get("channels", ["chat"])
         for ch_name in channels:
             if ch_name in self.channels:

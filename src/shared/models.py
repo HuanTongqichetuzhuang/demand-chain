@@ -31,6 +31,24 @@ class User(Base):
     last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class Notification(Base):
+    """站内通知 — 持久化通知记录，支持已读/未读"""
+    __tablename__ = "notifications"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    channel: Mapped[str] = mapped_column(String(32), default="in_app")  # in_app / email / wechat / wecom / feishu
+    urgency: Mapped[str] = mapped_column(String(16), default="normal")
+    action_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    is_read: Mapped[bool] = mapped_column(default=False)
+    demand_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class DemandStatus(str, enum.Enum):
     NEW = "new"
     STRUCTURING = "structuring"
