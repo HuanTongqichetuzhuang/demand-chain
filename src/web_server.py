@@ -134,6 +134,7 @@ async def timeline(request): return await serve_file(request, "timeline.html")
 async def leaderboard(request): return await serve_file(request, "leaderboard.html")
 async def global_search(request): return await serve_file(request, "global_search.html")
 async def targeted(request): return await serve_file(request, "targeted_demand.html")
+async def demand_chain_page(request): return await serve_file(request, "demand_chain.html")
 async def discovered(request): return await serve_file(request, "discovered_demands.html")
 async def public_demand(request): return await serve_file(request, "public_demand.html")
 async def batch_export(request): return await serve_file(request, "batch_export.html")
@@ -2046,6 +2047,148 @@ async def chat_websocket(websocket):
                 del _chat_connections[human_id]
 
 
+# ============================================================
+# 需求链分解 API
+# ============================================================
+
+async def api_demand_decompose(request):
+    """POST /api/demands/{demand_id}/decompose — LLM 自动分解需求为子需求链"""
+    from src.shared.database import async_session
+    from src.shared.models import Demand
+    from sqlalchemy import select
+    from uuid import uuid4
+    try:
+        demand_id = request.path_params.get("demand_id", "")
+        if not demand_id:
+            return JSONResponse({"error": "缺少需求ID"}, status_code=400)
+
+        async with async_session() as session:
+            r = await session.execute(select(Demand).where(Demand.id == demand_id))
+            demand = r.scalar_one_or_none()
+            if not demand:
+                return JSONResponse({"error": "需求不存在"}, status_code=404)
+
+            if demand.level and demand.level >= 3:
+                return JSONResponse({"error": "深度已达上限（最大3级）"}, status_code=400)
+
+            from src.demand.decomposer import auto_decompose
+            sub_demands = await auto_decompose(
+                demand_id=demand.id,
+                raw_text=demand.raw_text,
+                category=demand.category,
+            )
+
+            if not sub_demands:
+                return JSONResponse({"error": "分解失败，LLM 未返回有效子需求"}, status_code=500)
+
+            created = []
+            parent_level = demand.level or 0
+            for i, sd in enumerate(sub_demands):
+                sub = Demand(
+                    id=str(uuid4()),
+                    user_id=demand.user_id,
+                    raw_text=sd["description"],
+                    category=sd.get("category", demand.category),
+                    parent_id=demand.id,
+                    level=parent_level + 1,
+                    sort_order=i,
+                    status="open",
+                    visibility="public",
+                )
+                session.add(sub)
+                created.append({
+                    "id": sub.id,
+                    "title": sd["title"],
+                    "description": sd["description"],
+                    "category": sub.category,
+                    "level": sub.level,
+                    "sort_order": sub.sort_order,
+                    "reason": sd.get("decomposition_reason", ""),
+                })
+
+            await session.commit()
+
+        return JSONResponse({
+            "status": "ok",
+            "parent_id": demand_id,
+            "children": created,
+            "count": len(created),
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_demand_chain(request):
+    """GET /api/demands/{demand_id}/chain — 获取需求完整链路树"""
+    from src.shared.database import async_session
+    from src.shared.models import Demand
+    from sqlalchemy import select, func
+    try:
+        demand_id = request.path_params.get("demand_id", "")
+        if not demand_id:
+            return JSONResponse({"error": "缺少需求ID"}, status_code=400)
+
+        async with async_session() as session:
+            r = await session.execute(select(Demand).where(Demand.id == demand_id))
+            demand = r.scalar_one_or_none()
+            if not demand:
+                return JSONResponse({"error": "需求不存在"}, status_code=404)
+
+            # Ancestor chain
+            ancestors = []
+            current_id = demand.parent_id
+            while current_id:
+                r = await session.execute(select(Demand).where(Demand.id == current_id))
+                parent = r.scalar_one_or_none()
+                if not parent:
+                    break
+                ancestors.append({
+                    "id": parent.id,
+                    "raw_text": parent.raw_text[:200],
+                    "category": parent.category or "",
+                    "level": parent.level or 0,
+                })
+                current_id = parent.parent_id
+
+            # Children tree (recursive, up to 3 levels)
+            async def get_subtree(parent_id, max_depth=3):
+                if max_depth <= 0:
+                    return []
+                r = await session.execute(
+                    select(Demand).where(Demand.parent_id == parent_id)
+                    .order_by(Demand.sort_order)
+                )
+                kids = r.scalars().all()
+                subtree = []
+                for k in kids:
+                    subtree.append({
+                        "id": k.id,
+                        "raw_text": k.raw_text[:200],
+                        "category": k.category or "",
+                        "level": k.level or 0,
+                        "status": k.status.value if k.status else "open",
+                        "children": await get_subtree(k.id, max_depth - 1),
+                    })
+                return subtree
+
+            children = await get_subtree(demand.id)
+
+        return JSONResponse({
+            "demand": {
+                "id": demand.id,
+                "raw_text": demand.raw_text,
+                "category": demand.category or "",
+                "level": demand.level or 0,
+                "status": demand.status.value if demand.status else "open",
+            },
+            "ancestors": list(reversed(ancestors)),
+            "children": children,
+            "total_children": len(children),
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 routes = [
     Route("/", index),
     Route("/login.html", login_page),
@@ -2058,6 +2201,7 @@ routes = [
     Route("/leaderboard.html", leaderboard),
     Route("/global_search.html", global_search),
     Route("/targeted_demand.html", targeted),
+    Route("/demand_chain.html", demand_chain_page),
     Route("/discovered_demands.html", discovered),
     Route("/public_demand.html", public_demand),
     Route("/batch_export.html", batch_export),
@@ -2091,6 +2235,8 @@ routes = [
     Route("/api/forum/topics/{topic_id}/reply", api_forum_reply_post, methods=["POST"]),
     Route("/api/forum/topics/{topic_id}/replies", api_forum_replies),
     Route("/api/demands", api_demand_list),
+    Route("/api/demands/{demand_id}/decompose", api_demand_decompose, methods=["POST"]),
+    Route("/api/demands/{demand_id}/chain", api_demand_chain),
     Route("/api/demands/filters", api_demands_filters),
     Route("/api/matches", api_matches),
     Route("/api/matches/{match_id}/email", api_match_email),

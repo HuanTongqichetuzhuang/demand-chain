@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>需求链 | 需求链平台</title>
+<link rel="icon" href="logo.jpg" type="image/jpeg">
+<style>
+  :root{--purple:#7c6ef0;--muted:#8888aa;--bg:#0c0c1d;--card:#14142b;--text:#e8e8f0;--ts:#9090b0;--ac:#6c5ce7;--br:#2a2a4a;--gn:#00b894;--am:#fdcb6e;--rd:#e24b4a}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  .container{max-width:900px;margin:0 auto;padding:24px}
+  .search-row{display:flex;gap:8px;margin-bottom:20px}
+  .search-row input{flex:1;padding:10px 16px;border-radius:8px;border:1px solid var(--br);background:var(--card);color:var(--text);font-size:.95em}
+  .search-row input:focus{border-color:var(--ac);outline:none}
+  .search-row button{padding:10px 20px;border-radius:8px;background:var(--ac);color:#fff;border:none;font-weight:600;cursor:pointer}
+  .search-row button:hover{background:#7c6ef0}
+
+  .chain-card{background:var(--card);border:1px solid var(--br);border-radius:12px;padding:20px;margin-bottom:16px}
+  .chain-card h2{font-size:1.15em;margin-bottom:8px}
+  .chain-card .meta{font-size:.8em;color:var(--ts);margin-bottom:8px;display:flex;gap:12px;flex-wrap:wrap}
+  .chain-card .status{display:inline-block;padding:1px 8px;border-radius:4px;font-size:.75em}
+  .status-open{background:rgba(0,184,148,0.1);color:var(--gn)}
+  .status-in_progress{background:rgba(253,203,110,0.1);color:var(--am)}
+  .level-badge{padding:1px 6px;border-radius:3px;font-size:.7em;background:rgba(108,92,231,0.1);color:#a29bfe}
+
+  .tree{padding-left:24px;border-left:2px solid var(--br);margin:12px 0}
+  .tree-node{padding:10px 14px;border:1px solid var(--br);border-radius:8px;margin:8px 0;background:rgba(20,20,43,0.5);cursor:pointer;transition:all .15s}
+  .tree-node:hover{border-color:var(--ac)}
+  .tree-node .node-title{font-weight:600;font-size:.9em}
+  .tree-node .node-body{font-size:.8em;color:var(--ts);margin-top:4px}
+  .tree-node .node-meta{font-size:.75em;color:var(--muted);margin-top:4px;display:flex;gap:8px}
+
+  .decompose-section{margin-top:16px}
+  .decompose-btn{padding:10px 20px;border-radius:8px;background:linear-gradient(135deg,var(--ac),#5a4ed8);color:#fff;border:none;font-weight:600;cursor:pointer;width:100%;font-size:.9em}
+  .decompose-btn:hover{opacity:.9}
+  .decompose-btn:disabled{opacity:.5;cursor:not-allowed}
+  .decompose-result{margin-top:12px}
+
+  .ancestor-chain{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;font-size:.85em}
+  .ancestor-chain a{color:var(--ac);text-decoration:none}
+  .ancestor-chain a:hover{text-decoration:underline}
+  .ancestor-chain .arrow{color:var(--ts)}
+
+  .loading{text-align:center;padding:40px;color:var(--ts)}
+  .error{text-align:center;padding:20px;color:var(--rd)}
+  .reason{font-size:.75em;color:var(--ts);font-style:italic;margin-top:4px}
+
+  @media(max-width:600px){.container{padding:12px}.tree{padding-left:12px}}
+</style>
+</head>
+<body>
+<nav></nav>
+<div class="container">
+  <h1 style="font-size:1.5em;margin-bottom:16px">🔗 需求链</h1>
+
+  <div class="search-row">
+    <input type="text" id="demandIdInput" placeholder="输入需求 ID 查看需求链..." onkeydown="if(event.key==='Enter')loadChain()">
+    <button onclick="loadChain()">查看</button>
+  </div>
+
+  <div id="chainContent">
+    <div class="loading">输入需求 ID 查看完整需求链</div>
+  </div>
+</div>
+
+<script>
+function getDemandIdFromURL() {
+  return new URLSearchParams(window.location.search).get("id") || "";
+}
+
+function loadChain() {
+  const id = document.getElementById("demandIdInput").value.trim() || getDemandIdFromURL();
+  if (!id) {
+    document.getElementById("chainContent").innerHTML = '<div class="error">请输入需求 ID</div>';
+    return;
+  }
+
+  const content = document.getElementById("chainContent");
+  content.innerHTML = '<div class="loading">加载中...</div>';
+
+  fetch("/api/demands/" + encodeURIComponent(id) + "/chain")
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        content.innerHTML = '<div class="error">' + data.error + '</div>';
+        return;
+      }
+      renderChain(data);
+    })
+    .catch(err => {
+      content.innerHTML = '<div class="error">请求失败: ' + err.message + '</div>';
+    });
+}
+
+function renderChain(data) {
+  const demand = data.demand;
+  const ancestors = data.ancestors || [];
+  const children = data.children || [];
+  const content = document.getElementById("chainContent");
+
+  let html = '<div class="chain-card">';
+
+  // Ancestor breadcrumb
+  if (ancestors.length) {
+    html += '<div class="ancestor-chain">';
+    ancestors.forEach(function(a) {
+      html += '<a href="javascript:loadDemand(\'' + a.id + '\')">' + escHtml(a.raw_text.slice(0,30)) + '</a>';
+      html += '<span class="arrow">→</span>';
+    });
+    html += '</div>';
+  }
+
+  // Current demand
+  html += '<h2>' + escHtml(demand.raw_text.slice(0,100)) + ' <span class="level-badge">Lv.' + demand.level + '</span></h2>';
+  html += '<div class="meta">';
+  html += '<span class="status status-' + demand.status + '">' + demand.status + '</span>';
+  html += '<span>' + (demand.category || '未分类') + '</span>';
+  html += '<span>子需求: ' + (data.total_children || 0) + '</span>';
+  html += '</div>';
+
+  // Children tree
+  if (children.length) {
+    html += '<div class="tree">';
+    html += renderTree(children, 1);
+    html += '</div>';
+  } else if (demand.level < 3) {
+    html += '<div class="decompose-section" id="decomposeSection">';
+    html += '<button class="decompose-btn" onclick="decompose(\'' + demand.id + '\')">🤖 AI 自动分解此需求</button>';
+    html += '<div id="decomposeResult" class="decompose-result"></div>';
+    html += '</div>';
+  } else {
+    html += '<p style="color:var(--ts);font-size:.85em;text-align:center;padding:12px">已达最大分解深度（3级）</p>';
+  }
+
+  html += '</div>';
+  content.innerHTML = html;
+}
+
+function renderTree(nodes, depth) {
+  let html = '';
+  nodes.forEach(function(n) {
+    const statusClass = 'status-' + (n.status || 'open');
+    html += '<div class="tree-node" onclick="loadDemand(\'' + n.id + '\')">';
+    html += '<div class="node-title">' + escHtml(n.raw_text.slice(0,80)) + ' <span class="level-badge">Lv.' + n.level + '</span></div>';
+    html += '<div class="node-body">' + escHtml(n.raw_text.slice(0,200)) + '</div>';
+    html += '<div class="node-meta">';
+    html += '<span class="status ' + statusClass + '">' + (n.status || 'open') + '</span>';
+    html += '<span>' + (n.category || '') + '</span>';
+    html += '<span>' + (n.children ? n.children.length : 0) + ' 个子需求</span>';
+    html += '</div>';
+    if (n.children && n.children.length) {
+      html += '<div class="tree">' + renderTree(n.children, depth + 1) + '</div>';
+    }
+    html += '</div>';
+  });
+  return html;
+}
+
+function loadDemand(id) {
+  document.getElementById("demandIdInput").value = id;
+  loadChain();
+}
+
+function decompose(demandId) {
+  const btn = document.querySelector(".decompose-btn");
+  const resultDiv = document.getElementById("decomposeResult");
+  if (!btn || !resultDiv) return;
+
+  btn.disabled = true;
+  btn.textContent = "🤖 AI 正在分析需求...";
+  resultDiv.innerHTML = '<div class="loading">LLM 正在分析需求结构...</div>';
+
+  fetch("/api/demands/" + encodeURIComponent(demandId) + "/decompose", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        resultDiv.innerHTML = '<div class="error">分解失败: ' + data.error + '</div>';
+        btn.disabled = false;
+        btn.textContent = "🤖 AI 自动分解此需求";
+        return;
+      }
+
+      resultDiv.innerHTML = '<div style="color:var(--gn);font-size:.9em;margin-bottom:8px">✅ 成功分解为 ' + data.count + ' 个子需求</div>' +
+        data.children.map(function(c) {
+          return '<div style="padding:8px 12px;border:1px solid var(--br);border-radius:8px;margin-bottom:6px">' +
+            '<div style="font-weight:600">' + escHtml(c.title) + ' <span class="level-badge">Lv.' + c.level + '</span></div>' +
+            '<div style="font-size:.8em;color:var(--ts);margin-top:4px">' + escHtml(c.description.slice(0,200)) + '</div>' +
+            (c.reason ? '<div class="reason">💡 ' + escHtml(c.reason) + '</div>' : '') +
+            '</div>';
+        }).join('') +
+        '<button class="decompose-btn" style="margin-top:8px" onclick="loadChain()">🔄 刷新查看需求树</button>';
+
+      btn.disabled = false;
+      btn.textContent = "🤖 AI 自动分解此需求";
+    })
+    .catch(function(err) {
+      resultDiv.innerHTML = '<div class="error">请求失败: ' + err.message + '</div>';
+      btn.disabled = false;
+      btn.textContent = "🤖 AI 自动分解此需求";
+    });
+}
+
+function escHtml(s) {
+  if (!s) return "";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// Init
+document.addEventListener("DOMContentLoaded", function() {
+  const idFromURL = getDemandIdFromURL();
+  if (idFromURL) {
+    document.getElementById("demandIdInput").value = idFromURL;
+    loadChain();
+  }
+});
+</script>
+<script src="/nav.js?v=6"></script>
+</body>
+</html>

@@ -137,6 +137,8 @@ class Demand(Base):
     visibility: Mapped[str] = mapped_column(String(32), default="public")
     country_restrictions: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     parent_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("demands.id"), nullable=True)
+    level: Mapped[int] = mapped_column(Integer, default=0)  # 0=根需求, 1=一级子需求, ...
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)  # 同一个父需求下的排序
     interest_count: Mapped[int] = mapped_column(Integer, default=1)
     duplicate_group_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     interest_users: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True, default=list)
