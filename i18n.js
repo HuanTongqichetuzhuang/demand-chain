@@ -1,12 +1,25 @@
 // 需求链平台 - 中英文语言切换
 (function(){
   var LANG_KEY = "dc_lang";
-  var currentLang = localStorage.getItem(LANG_KEY) || "zh";
+  var stored = localStorage.getItem(LANG_KEY);
+  // 如果存储的是空字符串或无效值，重置为中文
+  var currentLang = (stored === "zh" || stored === "en") ? stored : "zh";
+  if (stored !== currentLang) {
+    localStorage.setItem(LANG_KEY, currentLang);
+  }
   
-  function switchTo(lang) {
+  // 暴露全局 API，方便调试
+  window.__dc_lang = currentLang;
+  window.__dc_switchLang = function(lang) {
+    if (lang !== "zh" && lang !== "en") return;
     currentLang = lang;
     localStorage.setItem(LANG_KEY, lang);
+    window.__dc_lang = lang;
     applyLang();
+  };
+  
+  function switchTo(lang) {
+    window.__dc_switchLang(lang);
   }
   
   function applyLang() {
@@ -53,9 +66,10 @@
         a.className = "btn-nav";
       }
     });
-    // Find and update logout link
+    // Find and update logout link — by checking onclick attribute
     links.forEach(function(a) {
-      if (a.textContent === "退出" || a.textContent === "Logout" || (a.onclick && a.onclick.toString().indexOf("removeItem") >= 0)) {
+      var oc = a.getAttribute("onclick") || "";
+      if (oc.indexOf("removeItem") >= 0) {
         a.textContent = logoutText;
       }
     });
@@ -65,21 +79,28 @@
   function addLangToggle() {
     var nav = document.querySelector("nav .links");
     if (!nav) return;
-    var btn1 = document.createElement("a");
-    btn1.href = "#";
-    btn1.textContent = currentLang === "zh" ? "中文" : "EN";
-    btn1.style.cssText = "font-size:13px;color:var(--ts);margin-left:8px"; 
-    btn1.onclick = function(e) {
-      e.preventDefault();
-      switchTo(currentLang === "zh" ? "en" : "zh");
-    };
-    // Insert after last child
-    nav.insertBefore(btn1, nav.lastChild.nextSibling);
-    // Also insert a separator
+    // 避免重复添加
+    if (document.getElementById("dc-lang-toggle")) return;
     var sep = document.createElement("span");
     sep.textContent = " | ";
     sep.style.cssText = "font-size:13px;color:var(--ts)";
-    nav.insertBefore(sep, btn1);
+    nav.appendChild(sep);
+    
+    var btn1 = document.createElement("a");
+    btn1.id = "dc-lang-toggle";
+    btn1.href = "#";
+    var updateBtn = function() {
+      btn1.textContent = currentLang === "zh" ? "EN" : "中文";
+      btn1.title = currentLang === "zh" ? "切换到英文" : "切换到中文";
+    };
+    updateBtn();
+    btn1.style.cssText = "font-size:13px;color:var(--ts);cursor:pointer;text-decoration:none"; 
+    btn1.onclick = function(e) {
+      e.preventDefault();
+      switchTo(currentLang === "zh" ? "en" : "zh");
+      updateBtn();
+    };
+    nav.appendChild(btn1);
   }
   
   // i18n data - define per page
