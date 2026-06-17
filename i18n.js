@@ -75,33 +75,7 @@
     });
   }
   
-  // Add language toggle button
-  function addLangToggle() {
-    var nav = document.querySelector("nav .links");
-    if (!nav) return;
-    // 避免重复添加
-    if (document.getElementById("dc-lang-toggle")) return;
-    var sep = document.createElement("span");
-    sep.textContent = " | ";
-    sep.style.cssText = "font-size:13px;color:var(--ts)";
-    nav.appendChild(sep);
-    
-    var btn1 = document.createElement("a");
-    btn1.id = "dc-lang-toggle";
-    btn1.href = "#";
-    var updateBtn = function() {
-      btn1.textContent = currentLang === "zh" ? "EN" : "中文";
-      btn1.title = currentLang === "zh" ? "切换到英文" : "切换到中文";
-    };
-    updateBtn();
-    btn1.style.cssText = "font-size:13px;color:var(--ts);cursor:pointer;text-decoration:none"; 
-    btn1.onclick = function(e) {
-      e.preventDefault();
-      switchTo(currentLang === "zh" ? "en" : "zh");
-      updateBtn();
-    };
-    nav.appendChild(btn1);
-  }
+  // [已移除] addLangToggle — 暂时专注中文，不再显示 EN/中文 切换按钮
   
   // i18n data - define per page
   var i18nData = {
@@ -119,14 +93,6 @@
     }
   });
   
-  // Apply and add toggle
+  // Apply — 语言切换已禁用，专注中文
   applyLang();
-  if (document.querySelector("nav")) {
-    // Call addLangToggle after DOM-ready
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", addLangToggle);
-    } else {
-      addLangToggle();
-    }
-  }
 })();
