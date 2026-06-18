@@ -63,6 +63,8 @@
     linksHtml += '<a href="/demand_square.html">需求广场</a>';
     linksHtml += '<a href="/suppliers.html">供应商</a>';
     linksHtml += '<a href="/forum.html">论坛</a>';
+    linksHtml += '<a href="/scientist_workbench.html" style="background:rgba(0,212,160,0.12);color:var(--green)!important;font-weight:600">🔬科研工作台</a>';
+    linksHtml += '<a href="/flywheel_dashboard.html">飞轮</a>';
     linksHtml += '<a href="/docs/tutorial.html">教程</a>';
     linksHtml += '<a href="/api_docs.html">API文档</a>';
     if (loggedIn) {
@@ -127,3 +129,4 @@
   // 每30秒轮询
   setInterval(updateNotifCount, 30000);
 })();
+
