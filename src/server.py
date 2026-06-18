@@ -2560,6 +2560,121 @@ async def agent_get_card(
 
 
 # ============================================================
+# 学术检索工具
+# ============================================================
+
+_academic_client: Optional["AcademicClient"] = None
+
+async def _get_academic():
+    global _academic_client
+    if _academic_client is None:
+        from src.adapters.academic_client import AcademicClient
+        _academic_client = AcademicClient()
+    return _academic_client
+
+
+@mcp.tool()
+async def search_papers(query: str, limit: int = 10, source: str = "all") -> str:
+    """🔬 搜索学术论文。跨库检索 PubMed、CrossRef、OpenAlex、Semantic Scholar。
+
+    参数：
+    - query: 搜索关键词（支持英文，如 "CRISPR gene therapy 2024"）
+    - limit: 返回结果数（默认 10，最大 20）
+    - source: 数据源 all | pubmed | crossref | openalex | semantic（默认 all 跨库搜索）
+
+    返回字段：title, journal, year, doi, abstract, authors, cited_by, source, url
+    """
+    try:
+        client = await _get_academic()
+        papers = await client.search_papers(query, min(limit, 20), source)
+        if not papers:
+            return json.dumps({"status": "ok", "total": 0, "papers": [], "message": "未找到相关论文"}, ensure_ascii=False)
+        return json.dumps({
+            "status": "ok",
+            "total": len(papers),
+            "query": query,
+            "source": source,
+            "papers": papers,
+        }, ensure_ascii=False)
+    except Exception as e:
+        logger.exception("[search_papers] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+
+@mcp.tool()
+async def search_funding(query: str, limit: int = 10) -> str:
+    """💰 搜索科研资助机会（Grants.gov + 论文基金信息）。
+
+    参数：
+    - query: 研究主题关键词
+    - limit: 返回结果数
+
+    返回字段：title, agency/funder, status, close_date, description, url
+    """
+    try:
+        client = await _get_academic()
+        funding = await client.search_funding(query, min(limit, 10))
+        if not funding:
+            return json.dumps({"status": "ok", "total": 0, "funding": [], "message": "未找到相关资助机会"}, ensure_ascii=False)
+        return json.dumps({
+            "status": "ok",
+            "total": len(funding),
+            "query": query,
+            "funding": funding,
+        }, ensure_ascii=False)
+    except Exception as e:
+        logger.exception("[search_funding] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+
+@mcp.tool()
+async def research_summary(topic: str, session_token: str = "") -> str:
+    """📋 对研究主题进行综合检索，返回结构化研究总结。
+
+    自动搜索论文 + 资助机会 + 关键词提取。
+    如果提供了 session_token，会用 AI 生成总结文本。
+
+    参数：
+    - topic: 研究主题
+    - session_token: 可选，提供后会生成 AI 总结
+
+    返回：论文列表、资助机会、关键词、年份范围、AI 总结文本
+    """
+    try:
+        client = await _get_academic()
+
+        async def llm_summarize(prompt: str) -> str:
+            """用平台的 LLM (DeepSeek) 生成总结"""
+            if not session_token:
+                return ""
+            try:
+                from src.adapters.llm_client import get_llm
+                llm = get_llm()
+                result = await llm.chat("你是一个研究助手，帮助生成学术研究总结。", prompt)
+                return result
+            except Exception:
+                return ""
+
+        has_token = bool(session_token)
+        data = await client.research_summary(topic, llm_summarize_fn=llm_summarize if has_token else None)
+
+        return json.dumps({
+            "status": "ok",
+            "topic": topic,
+            "paper_count": data["paper_count"],
+            "funding_count": data["funding_count"],
+            "papers": data["papers"],
+            "funding": data["funding"],
+            "keywords": data["keywords"],
+            "year_range": data["year_range"],
+            "summary": data.get("summary", ""),
+        }, ensure_ascii=False)
+    except Exception as e:
+        logger.exception("[research_summary] 失败")
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+
+# ============================================================
 # 主入口
 # ============================================================
 
@@ -2592,3 +2707,4 @@ def run():
 
 if __name__ == "__main__":
     run()
+

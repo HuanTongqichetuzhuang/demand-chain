@@ -1701,6 +1701,86 @@ async def api_global_search(request):
 
 
 # ============================================================
+# 学术检索 API
+# ============================================================
+
+_academic_client_ref = None
+
+async def _get_academic_client():
+    global _academic_client_ref
+    if _academic_client_ref is None:
+        from src.adapters.academic_client import AcademicClient
+        _academic_client_ref = AcademicClient()
+    return _academic_client_ref
+
+
+async def api_academic_search_papers(request):
+    """GET /api/academic/search_papers — 搜索学术论文"""
+    q = request.query_params.get("q", "").strip()
+    limit = max(1, min(20, int(request.query_params.get("limit", 10))))
+    source = request.query_params.get("source", "all")
+    if not q:
+        return JSONResponse({"error": "缺少搜索关键词 q"}, status_code=400)
+    try:
+        client = await _get_academic_client()
+        papers = await client.search_papers(q, limit, source)
+        return JSONResponse({"status": "ok", "total": len(papers), "papers": papers})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_academic_search_funding(request):
+    """GET /api/academic/search_funding — 搜索科研资助机会"""
+    q = request.query_params.get("q", "").strip()
+    limit = max(1, min(20, int(request.query_params.get("limit", 10))))
+    if not q:
+        return JSONResponse({"error": "缺少搜索关键词 q"}, status_code=400)
+    try:
+        client = await _get_academic_client()
+        funding = await client.search_funding(q, limit)
+        return JSONResponse({"status": "ok", "total": len(funding), "funding": funding})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_academic_research_summary(request):
+    """POST /api/academic/research_summary — 研究主题综合总结"""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "无效的 JSON 请求体"}, status_code=400)
+    topic = (body.get("topic") or "").strip()
+    if not topic:
+        return JSONResponse({"error": "缺少 topic"}, status_code=400)
+    try:
+        from src.shared.auth import verify as verify_token
+        session_token = (body.get("session_token") or "")
+        has_llm = False
+        if session_token:
+            try:
+                await verify_token(session_token)
+                has_llm = True
+            except Exception:
+                pass
+
+        client = await _get_academic_client()
+        async def llm_summarize(prompt: str) -> str:
+            if not has_llm:
+                return ""
+            try:
+                from src.adapters.llm_client import get_llm
+                llm = get_llm()
+                return await llm.chat("你是一个研究助手，帮助生成学术研究总结。", prompt)
+            except Exception:
+                return ""
+
+        data = await client.research_summary(topic, llm_summarize_fn=llm_summarize if has_llm else None)
+        return JSONResponse(data)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# ============================================================
 # 通知 API
 # ============================================================
 
@@ -2338,6 +2418,8 @@ routes = [
     Route("/api_docs.html", api_docs),
     Route("/tools_extra.html", tools_extra),
     Route("/flywheel_dashboard.html", flywheel_dashboard),
+    # 科研工作台
+    Route("/scientist_workbench.html", lambda r: serve_file(r, "scientist_workbench.html")),
     Route("/docs/tutorial.html", tutorial),
     Route("/verify-email", verify_email_page),
     # Pages
@@ -2392,6 +2474,10 @@ routes = [
     Route("/api/admin/demands/{id}", api_admin_demands_delete, methods=["DELETE"]),
     Route("/api/home/stats", api_home_stats),
     Route("/api/global_search", api_global_search),
+    # Academic API
+    Route("/api/academic/search_papers", api_academic_search_papers),
+    Route("/api/academic/search_funding", api_academic_search_funding),
+    Route("/api/academic/research_summary", api_academic_research_summary, methods=["POST"]),
     # Message API
     Route("/api/messages", api_messages_list),
     Route("/api/messages/send", api_messages_send, methods=["POST"]),
@@ -2413,3 +2499,4 @@ def run():
 
 if __name__ == "__main__":
     run()
+
