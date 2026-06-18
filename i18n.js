@@ -41,28 +41,19 @@
   function navCheck() {
     var nav = document.querySelector("nav .links");
     if (!nav) return;
-    var session = localStorage.getItem("dc_session");
-    var user = null;
-    try { user = JSON.parse(session); } catch(e) {}
-    
-    var loginText = currentLang === "zh" ? "登录" : "Login";
-    var demandSquare = currentLang === "zh" ? "需求广场" : "Demands";
-    var forumText = currentLang === "zh" ? "论坛" : "Forum";
-    var tutorialText = currentLang === "zh" ? "教程" : "Guide";
-    var logoutText = currentLang === "zh" ? "退出" : "Logout";
-    
-    // Update link text only — don't rebuild nav (nav.js handles structure)
+
+    // 已专注中文，导航栏固定显示中文
     var links = nav.querySelectorAll("a");
     links.forEach(function(a) {
       var href = (a.getAttribute("href") || "").toLowerCase();
       if (href.indexOf("demand_square") >= 0 || href.indexOf("demands") >= 0) {
-        a.textContent = demandSquare;
+        a.textContent = "需求广场";
       } else if (href.indexOf("forum") >= 0) {
-        a.textContent = forumText;
+        a.textContent = "论坛";
       } else if (href.indexOf("tutorial") >= 0 || href.indexOf("guide") >= 0) {
-        a.textContent = tutorialText;
+        a.textContent = "教程";
       } else if (href.indexOf("login") >= 0) {
-        a.textContent = loginText;
+        a.textContent = "登录";
         a.className = "btn-nav";
       }
     });
@@ -70,7 +61,7 @@
     links.forEach(function(a) {
       var oc = a.getAttribute("onclick") || "";
       if (oc.indexOf("removeItem") >= 0) {
-        a.textContent = logoutText;
+        a.textContent = "退出";
       }
     });
   }
@@ -96,3 +87,4 @@
   // Apply — 语言切换已禁用，专注中文
   applyLang();
 })();
+
