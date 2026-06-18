@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>科研工作台 | Research Workbench</title>
+<link rel="icon" href="logo.jpg" type="image/jpeg">
+<style>
+  :root {--purple:#7c6ef0;--muted:#8888aa;
+    --bg: #0c0c1d; --card-bg: #14142b; --text: #e8e8f0;
+    --text-secondary: #9090b0; --accent: #6c5ce7; --border: #2a2a4a;
+    --green: #00b894; --amber: #fdcb6e; --red: #e24b4a; --blue: #5b8def;
+  }
+  * { margin:0;padding:0;box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+  /* Nav */
+  nav{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;max-width:1100px;margin:0 auto;border-bottom:1px solid var(--border)}
+  nav .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:17px;color:var(--text);text-decoration:none}
+  nav .brand img{width:36px;height:36px;border-radius:8px}
+  nav .links{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+  nav .links a{font-size:14px;color:var(--muted);transition:color .15s;text-decoration:none}
+  nav .links a:hover{color:var(--text)}
+  nav .links .btn-nav{background:var(--purple);color:#fff;padding:7px 18px;border-radius:8px;font-size:14px;font-weight:500}
+  nav .links .btn-nav:hover{background:#8c7ef5;color:#fff}
+
+  /* Hero Search */
+  .hero { text-align: center; padding: 50px 20px 30px; }
+  .hero h1 { font-size: 2.2em; margin-bottom: 8px; }
+  .hero p { color: var(--text-secondary); font-size: 1em; }
+  .search-box { display: flex; gap: 8px; max-width: 640px; margin: 24px auto 0; }
+  .search-box input { flex:1; padding: 14px 18px; border-radius: 12px; border: 2px solid var(--border); background: var(--card-bg); color: var(--text); font-size: 1.1em; }
+  .search-box input:focus { border-color: var(--accent); outline: none; }
+  .search-box button { padding: 14px 24px; border-radius: 12px; background: var(--accent); color: #fff; border: none; font-size: 1em; font-weight: 600; cursor: pointer; transition: background .15s; }
+  .search-box button:hover { background: #8c7ef5; }
+  .search-box button:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* Tab */
+  .tabs { display: flex; gap: 4px; margin: 20px 0; border-bottom: 1px solid var(--border); }
+  .tab { padding: 10px 20px; border: none; background: transparent; color: var(--text-secondary); font-size: .95em; cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+  /* Panels */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Cards */
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 10px; transition: border-color .15s; }
+  .card:hover { border-color: var(--accent); }
+  .card h4 { font-size: 1em; margin-bottom: 4px; }
+  .card .meta { font-size: .8em; color: var(--text-secondary); display: flex; gap: 12px; flex-wrap: wrap; margin: 4px 0; }
+  .card .meta span { display: inline-flex; align-items: center; gap: 4px; }
+  .card .abstract { font-size: .85em; color: var(--text-secondary); margin-top: 6px; line-height: 1.5; }
+  .card .actions { margin-top: 8px; display: flex; gap: 8px; }
+  .card .actions button { padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); font-size: .8em; cursor: pointer; transition: all .15s; }
+  .card .actions button:hover { border-color: var(--accent); color: var(--text); background: rgba(108,92,231,0.08); }
+
+  .source-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .7em; font-weight: 600; }
+  .source-pubmed { background: rgba(91,141,239,0.15); color: var(--blue); }
+  .source-crossref { background: rgba(0,184,148,0.15); color: var(--green); }
+  .source-openalex { background: rgba(253,203,110,0.15); color: var(--amber); }
+  .source-semantic { background: rgba(108,92,231,0.15); color: #a29bfe; }
+
+  .status-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .7em; }
+  .status-posted { background: rgba(0,184,148,0.15); color: var(--green); }
+  .status-forecasted { background: rgba(253,203,110,0.15); color: var(--amber); }
+  .status-closed { background: rgba(226,75,74,0.15); color: var(--red); }
+
+  .summary-card { background: linear-gradient(135deg, rgba(108,92,231,0.08), rgba(0,184,148,0.05)); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  .summary-card h3 { color: var(--accent); margin-bottom: 10px; }
+  .summary-card .stat-row { display: flex; gap: 20px; flex-wrap: wrap; margin: 12px 0; }
+  .summary-card .stat { text-align: center; padding: 10px 16px; background: rgba(108,92,231,0.06); border-radius: 8px; }
+  .summary-card .stat .num { font-size: 1.4em; font-weight: 700; color: var(--text); }
+  .summary-card .stat .label { font-size: .75em; color: var(--text-secondary); margin-top: 2px; }
+  .summary-card .summary-text { font-size: .9em; line-height: 1.6; color: var(--text-secondary); margin-top: 10px; white-space: pre-wrap; }
+  .summary-card .keywords { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .summary-card .keywords .kw { padding: 3px 10px; border-radius: 6px; background: rgba(108,92,231,0.1); color: #a29bfe; font-size: .8em; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+  .empty-state .icon { font-size: 3em; margin-bottom: 12px; }
+  .empty-state p { font-size: .95em; }
+
+  .loading { text-align: center; padding: 60px; color: var(--text-secondary); }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .source-filter { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .source-filter button { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); font-size: .8em; cursor: pointer; }
+  .source-filter button.active { border-color: var(--accent); color: var(--text); background: rgba(108,92,231,0.08); }
+
+  .error { background: rgba(226,75,74,0.1); border: 1px solid rgba(226,75,74,0.3); border-radius: 8px; padding: 12px 16px; color: var(--red); font-size: .9em; margin: 10px 0; }
+
+  /* Summary section inside workbench */
+  #summary-section { margin-bottom: 24px; }
+
+  footer{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);margin-top:40px}
+  footer .links{margin-bottom:12px;display:flex;justify-content:center;gap:24px;flex-wrap:wrap}
+  footer .links a{color:var(--muted);font-size:13px;text-decoration:none}
+  footer .links a:hover{color:var(--text)}
+
+  @media(max-width:768px){
+    nav{flex-direction:column;gap:10px;padding:12px}
+    nav .links{flex-wrap:wrap;justify-content:center}
+    .hero{padding:30px 16px 20px}
+    .hero h1{font-size:28px}
+    .search-box{flex-direction:column}
+    .tabs{overflow-x:auto;white-space:nowrap}
+    .stat-row{justify-content:center}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="brand" href="/">
+    <img src="logo.jpg" alt="需求链" onerror="this.style.display='none'">
+    需求链平台
+  </a>
+  <div class="links">
+    <a href="/">首页</a>
+    <a href="/demand_square.html">需求广场</a>
+    <a href="/suppliers.html">供应商</a>
+    <a href="/forum.html">论坛</a>
+    <a href="/scientist_workbench.html" class="btn-nav">🔬 科研工作台</a>
+    <a href="/login.html" id="nav-login">登录</a>
+    <a href="/profile.html" id="nav-profile" style="display:none">我的</a>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1>🔬 科研工作台</h1>
+    <p>搜索学术论文 · 发现资助机会 · 获取 AI 研究总结</p>
+    <div class="search-box">
+      <input type="text" id="search-input" placeholder="输入研究主题，如 CRISPR gene therapy 2024 或 量子计算 材料" autofocus>
+      <button id="search-btn" onclick="doSearch()">🔍 搜索</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="tabs-bar" style="display:none">
+    <button class="tab active" data-tab="summary" onclick="switchTab('summary')">📋 综合总结</button>
+    <button class="tab" data-tab="papers" onclick="switchTab('papers')">📄 论文 <span id="paper-count" class="count-badge"></span></button>
+    <button class="tab" data-tab="funding" onclick="switchTab('funding')">💰 资助机会 <span id="funding-count" class="count-badge"></span></button>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading" class="loading" style="display:none">
+    <div class="spinner"></div>
+    <p>正在搜索学术数据库...</p>
+  </div>
+
+  <!-- Empty state -->
+  <div id="empty-state" class="empty-state">
+    <div class="icon">🔬</div>
+    <p>输入研究主题，一键检索论文、资助和科研动态</p>
+    <p style="font-size:.85em;color:var(--text-secondary);margin-top:8px">数据来源：PubMed · CrossRef · OpenAlex · Semantic Scholar · Grants.gov</p>
+  </div>
+
+  <!-- Error -->
+  <div id="error-message" class="error" style="display:none"></div>
+
+  <!-- Summary Panel -->
+  <div id="panel-summary" class="panel active" style="display:none"></div>
+
+  <!-- Papers Panel -->
+  <div id="panel-papers" class="panel" style="display:none">
+    <div class="source-filter">
+      <button class="active" data-source="all" onclick="filterPapers('all')">全部</button>
+      <button data-source="PubMed" onclick="filterPapers('PubMed')">PubMed</button>
+      <button data-source="CrossRef" onclick="filterPapers('CrossRef')">CrossRef</button>
+      <button data-source="OpenAlex" onclick="filterPapers('OpenAlex')">OpenAlex</button>
+      <button data-source="Semantic Scholar" onclick="filterPapers('Semantic Scholar')">Semantic Scholar</button>
+    </div>
+    <div id="papers-list"></div>
+  </div>
+
+  <!-- Funding Panel -->
+  <div id="panel-funding" class="panel" style="display:none">
+    <div id="funding-list"></div>
+  </div>
+
+</div>
+
+<footer>
+  <div class="links">
+    <a href="/">首页</a>
+    <a href="/demand_square.html">需求广场</a>
+    <a href="/forum.html">论坛</a>
+    <a href="/api_docs.html">API 文档</a>
+  </div>
+  <p>需求链平台 © 2026 — AI 驱动的创新基础设施</p>
+</footer>
+
+<script>
+// ── State ───────────────────────────────────────────
+let allPapers = [];
+let allFunding = [];
+let currentQuery = '';
+let activeSource = 'all';
+let userEmail = '';
+
+// ── Init ────────────────────────────────────────────
+(async function() {
+  const u = localStorage.getItem('session_email');
+  if (u) { userEmail = u; document.getElementById('nav-login').style.display='none'; document.getElementById('nav-profile').style.display=''; }
+  document.getElementById('search-input').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+  // Check URL params
+  const params = new URLSearchParams(location.search);
+  const q = params.get('q');
+  if (q) {
+    document.getElementById('search-input').value = q;
+    doSearch();
+  }
+})();
+
+// ── Search ──────────────────────────────────────────
+async function doSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  currentQuery = q;
+
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('error-message').style.display = 'none';
+  document.getElementById('loading').style.display = '';
+
+  // Push state
+  const url = new URL(location);
+  url.searchParams.set('q', q);
+  history.replaceState(null, '', url);
+
+  // Clear previous
+  document.getElementById('panel-summary').style.display = 'none';
+  document.getElementById('panel-papers').style.display = 'none';
+  document.getElementById('panel-funding').style.display = 'none';
+  document.getElementById('tabs-bar').style.display = 'none';
+  document.getElementById('papers-list').innerHTML = '';
+  document.getElementById('funding-list').innerHTML = '';
+
+  // Parallel fetch: papers + funding + summary
+  try {
+    const [papersRes, fundingRes, summaryRes] = await Promise.all([
+      fetch(`/api/academic/search_papers?q=${encodeURIComponent(q)}&limit=15`).then(r => r.json()),
+      fetch(`/api/academic/search_funding?q=${encodeURIComponent(q)}&limit=8`).then(r => r.json()),
+      fetch(`/api/academic/research_summary`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ topic: q, session_token: localStorage.getItem('session_token') || '' }),
+      }).then(r => r.json()),
+    ]);
+
+    document.getElementById('loading').style.display = 'none';
+
+    if (papersRes.error) throw new Error(papersRes.error);
+
+    allPapers = papersRes.papers || [];
+    allFunding = fundingRes.funding || [];
+    const summary = summaryRes;
+
+    // Show tabs
+    document.getElementById('tabs-bar').style.display = '';
+    const pc = document.getElementById('paper-count');
+    pc.textContent = allPapers.length;
+    const fc = document.getElementById('funding-count');
+    fc.textContent = allFunding.length;
+
+    // Render summary
+    renderSummary(summary);
+
+    // Render papers
+    renderPapers();
+
+    // Render funding
+    renderFunding();
+
+    // Switch to summary tab
+    switchTab('summary');
+
+  } catch (err) {
+    document.getElementById('loading').style.display = 'none';
+    const errEl = document.getElementById('error-message');
+    errEl.textContent = '搜索失败：' + (err.message || '未知错误');
+    errEl.style.display = '';
+  }
+}
+
+// ── Render Summary ──────────────────────────────────
+function renderSummary(data) {
+  const el = document.getElementById('panel-summary');
+  if (!data || (!data.paper_count && !data.funding_count)) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">📋</div><p>未找到相关研究数据</p></div>`;
+    el.style.display = '';
+    return;
+  }
+
+  let html = `<div class="summary-card"><h3>📋 研究主题：${escapeHtml(currentQuery)}</h3>`;
+  html += `<div class="stat-row">`;
+  html += `<div class="stat"><div class="num">${data.paper_count || 0}</div><div class="label">相关论文</div></div>`;
+  html += `<div class="stat"><div class="num">${data.funding_count || 0}</div><div class="label">资助机会</div></div>`;
+  if (data.year_range && data.year_range[0]) {
+    html += `<div class="stat"><div class="num">${data.year_range[0]}-${data.year_range[1]}</div><div class="label">论文年份范围</div></div>`;
+  }
+  html += `</div>`;
+
+  if (data.summary) {
+    html += `<div class="summary-text">${escapeHtml(data.summary)}</div>`;
+  } else {
+    html += `<div class="summary-text" style="color:var(--muted)">💡 登录后可获取 AI 生成的研究总结</div>`;
+  }
+
+  if (data.keywords && data.keywords.length) {
+    html += `<div class="keywords">`;
+    data.keywords.slice(0, 15).forEach(k => { html += `<span class="kw">${escapeHtml(k)}</span>`; });
+    html += `</div>`;
+  }
+
+  // Latest papers
+  if (data.papers && data.papers.length) {
+    html += `<h4 style="margin-top:16px;margin-bottom:8px">📄 最新论文</h4>`;
+    data.papers.slice(0, 5).forEach(p => {
+      html += paperCard(p);
+    });
+    if (data.papers.length > 5) {
+      html += `<p style="font-size:.85em;color:var(--text-secondary);text-align:center">... 还有 ${data.papers.length - 5} 篇，切换到「论文」标签查看全部</p>`;
+    }
+  }
+
+  html += `</div>`;
+  el.innerHTML = html;
+  el.style.display = '';
+}
+
+// ── Render Papers ───────────────────────────────────
+function renderPapers() {
+  const el = document.getElementById('papers-list');
+  if (!allPapers.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">📄</div><p>未找到相关论文</p></div>`;
+    return;
+  }
+  let html = `<p style="font-size:.85em;color:var(--text-secondary);margin-bottom:10px">共 ${allPapers.length} 篇论文</p>`;
+  allPapers.forEach(p => { html += paperCard(p); });
+  el.innerHTML = html;
+}
+
+function paperCard(p) {
+  const srcClass = 'source-' + (p.source || '').toLowerCase().replace(/\s+/g, '');
+  const authors = (p.authors || []).slice(0, 3).join(', ') + ((p.authors || []).length > 3 ? ' et al.' : '');
+  return `<div class="card">
+    <h4><a href="${escapeHtml(p.url || '#')}" target="_blank" style="color:var(--text);text-decoration:none;hover:text-decoration:underline">${escapeHtml(p.title)}</a></h4>
+    <div class="meta">
+      <span>${p.year || '—'}</span>
+      <span class="source-badge ${srcClass}">${escapeHtml(p.source || '')}</span>
+      ${p.cited_by !== undefined ? `<span>📊 ${p.cited_by} 引用</span>` : ''}
+      <span>${escapeHtml(p.journal || '')}</span>
+    </div>
+    ${authors ? `<div class="meta">✍️ ${authors}</div>` : ''}
+    ${p.doi ? `<div class="meta">DOI: ${escapeHtml(p.doi)}</div>` : ''}
+    <div class="abstract">${escapeHtml((p.abstract || '').slice(0, 300))}${(p.abstract || '').length > 300 ? '...' : ''}</div>
+    <div class="actions">
+      <button onclick="window.open('${escapeHtml(p.url || '')}','_blank')">🔗 打开</button>
+      ${p.doi ? `<button onclick="copyToClipboard('${escapeHtml(p.doi)}')">📋 复制 DOI</button>` : ''}
+      <button onclick="shareToForum('${escapeHtml(p.title)}','${escapeHtml(p.url || '')}')">💬 分享到论坛</button>
+    </div>
+  </div>`;
+}
+
+// ── Render Funding ──────────────────────────────────
+function renderFunding() {
+  const el = document.getElementById('funding-list');
+  if (!allFunding.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">💰</div><p>未找到相关资助机会</p></div>`;
+    return;
+  }
+  let html = `<p style="font-size:.85em;color:var(--text-secondary);margin-bottom:10px">共 ${allFunding.length} 条资助机会</p>`;
+  allFunding.forEach(f => {
+    const st = (f.status || '').toLowerCase();
+    const stClass = st === 'posted' ? 'status-posted' : (st === 'forecasted' ? 'status-forecasted' : '');
+    html += `<div class="card">
+      <h4><a href="${escapeHtml(f.url || '#')}" target="_blank" style="color:var(--text);text-decoration:none">${escapeHtml(f.title)}</a></h4>
+      <div class="meta">
+        <span>🏛️ ${escapeHtml(f.agency || f.funder || '')}</span>
+        ${f.status ? `<span class="status-badge ${stClass}">${escapeHtml(f.status)}</span>` : ''}
+        ${f.close_date ? `<span>📅 截止: ${escapeHtml(f.close_date)}</span>` : ''}
+        ${f.source ? `<span>📡 ${escapeHtml(f.source)}</span>` : ''}
+      </div>
+      ${f.description ? `<div class="abstract">${escapeHtml(f.description.slice(0, 300))}</div>` : ''}
+      <div class="actions">
+        <button onclick="window.open('${escapeHtml(f.url || '')}','_blank')">🔗 查看详情</button>
+        <button onclick="createDemand('${escapeHtml(f.title)}')">📝 生成需求</button>
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+// ── Tab switching ───────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
+  document.getElementById(`panel-${name}`).classList.add('active');
+}
+
+// ── Filter papers by source ─────────────────────────
+function filterPapers(source) {
+  activeSource = source;
+  document.querySelectorAll('.source-filter button').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.source-filter button[data-source="${source}"]`).classList.add('active');
+
+  const filtered = source === 'all' ? allPapers : allPapers.filter(p => p.source === source);
+  const el = document.getElementById('papers-list');
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">📄</div><p>该数据源无结果</p></div>`;
+    return;
+  }
+  let html = `<p style="font-size:.85em;color:var(--text-secondary);margin-bottom:10px">${filtered.length} 篇论文 (${source === 'all' ? '全部' : source})</p>`;
+  filtered.forEach(p => { html += paperCard(p); });
+  el.innerHTML = html;
+}
+
+// ── Share to forum ──────────────────────────────────
+function shareToForum(title, url) {
+  if (!userEmail) { alert('请先登录后再分享到论坛'); window.location='/login.html'; return; }
+  // Pre-fill forum create with this paper
+  window.location = `/forum.html?action=create&title=📄 分享论文: ${encodeURIComponent(title)}&body=🔗 ${encodeURIComponent(url)}`;
+}
+
+// ── Create demand from funding ──────────────────────
+function createDemand(fundingTitle) {
+  if (!userEmail) { alert('请先登录'); window.location='/login.html'; return; }
+  window.location = `/demand_square.html?action=publish&text=${encodeURIComponent(`我要申请资助: ${fundingTitle}`)}`;
+}
+
+// ── Copy to clipboard ───────────────────────────────
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    // Flash feedback
+  }).catch(() => {});
+}
+
+// ── Util ────────────────────────────────────────────
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
