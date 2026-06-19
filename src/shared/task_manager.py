@@ -209,3 +209,4 @@ async def cleanup_old_tasks(max_age_days: int = 30):
                     _loaded_from_db.discard(k)
     except Exception as e:
         logger.error(f"Failed to cleanup old tasks: {e}")
+

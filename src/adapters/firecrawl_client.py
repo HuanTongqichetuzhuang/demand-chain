@@ -137,3 +137,4 @@ def get_firecrawl() -> FirecrawlClient:
     if _firecrawl is None:
         _firecrawl = FirecrawlClient()
     return _firecrawl
+

@@ -35,3 +35,5 @@ LOGO/
 # Workflow files — push manually via GitHub web UI
 
 # GitHub workflow files — pushed via web UI only.github/workflows/
+
+# AI Agent internal files.reasonix/.workbuddy/.claude/

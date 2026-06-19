@@ -106,3 +106,4 @@ async def auto_decompose(demand_id: str, raw_text: str, category: Optional[str] 
     except Exception as e:
         logger.error(f"[Decomposer] LLM 调用失败: {e}")
         return []
+

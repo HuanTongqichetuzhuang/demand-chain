@@ -192,3 +192,4 @@ class CollaborationService:
             ],
             "created_at": ws.created_at.isoformat(),
         }
+

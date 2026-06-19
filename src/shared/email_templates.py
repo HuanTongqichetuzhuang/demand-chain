@@ -72,7 +72,7 @@ Best,
 class OutreachEmailGenerator:
     """生成供需求方自己发送的邮件模板"""
 
-    def __init__(self, base_url: str = "http://8.154.26.92:8000"):
+    def __init__(self, base_url: str = "http://demand-chain.duckdns.org:8000"):
         self.base_url = base_url
 
     def generate(
@@ -134,3 +134,5 @@ class OutreachEmailGenerator:
 
 # 全局实例
 email_generator = OutreachEmailGenerator()
+
+

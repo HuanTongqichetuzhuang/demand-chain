@@ -161,3 +161,4 @@ class CompanyContactFinder:
 
 # 全局实例
 contact_finder = CompanyContactFinder()
+

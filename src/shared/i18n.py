@@ -24,3 +24,4 @@ def t(key: str, lang: str = "zh") -> str:
     if lang not in _cache:
         _cache[lang] = load_locale(lang)
     return _cache[lang].get(key, key)
+

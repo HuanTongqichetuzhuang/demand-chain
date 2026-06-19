@@ -32,7 +32,7 @@ class AgentChatService:
     利用已有的 SSE 长连接实时推送消息，不需要额外的Webrtc或Socket。
     """
 
-    def __init__(self, base_url: str = "http://8.154.26.92:8000"):
+    def __init__(self, base_url: str = "http://demand-chain.duckdns.org:8000"):
         self.base_url = base_url
         # workspace_id → 连接中的 agent_ids 列表
         self._online_agents: dict[str, set[str]] = {}
@@ -115,3 +115,5 @@ class AgentChatService:
 
 # 全局实例
 chat_service = AgentChatService()
+
+

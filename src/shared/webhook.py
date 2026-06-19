@@ -72,7 +72,7 @@ class AgentWebhookService:
             "demand_title": demand_title[:100],
             "supplier_name": supplier_name,
             "score": score,
-            "action_url": f"http://8.154.26.92:8000/matches/{match_id}",
+            "action_url": f"http://demand-chain.duckdns.org:8000/matches/{match_id}",
             "message": f"你的需求「{demand_title[:40]}」收到新匹配：{supplier_name}（得分 {score:.2f}）"
         })
 
@@ -117,3 +117,5 @@ class AgentWebhookService:
 
 # 全局实例
 webhook_service = AgentWebhookService()
+
+
