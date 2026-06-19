@@ -1,10 +1,10 @@
 # 需求链平台 · Demand Chain Platform
 
 > AI 驱动的开放式创新基础设施 — 连接全球需求与供应商  
-> 🌐 [https://8.154.26.92:8080](https://8.154.26.92:8080)
+> 🌐 [https://demand-chain.duckdns.org](https://demand-chain.duckdns.org)
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-active-green.svg)](https://8.154.26.92:8080)
+[![Status](https://img.shields.io/badge/status-active-green.svg)](https://demand-chain.duckdns.org)
 [![Stars](https://img.shields.io/github/stars/HuanTongqichetuzhuang/demand-chain?style=social)](https://github.com/HuanTongqichetuzhuang/demand-chain)
 
 ---
@@ -19,8 +19,9 @@
 | **语义搜索** | ✅ | 中英文混合分词，TF-IDF 余弦相似度排序 |
 | **论坛系统** | ✅ | 发帖/回复/点赞/置顶/Markdown 渲染/分页 |
 | **用户系统** | ✅ | 注册/登录/个人资料/头像/密码修改/通知设置 |
-| **MCP Server** | ✅ | 56+ 工具，Agent 直接接入 |
-| **Web 页面** | ✅ | 首页/需求广场/供应商/论坛/登录/个人主页/API 文档/教程 |
+| **科研工作台** 🆕 | ✅ | 跨库学术检索（PubMed/CrossRef/OpenAlex/Semantic Scholar）+ Grants.gov 资助搜索 + AI 研究总结 |
+| **MCP Server** | ✅ | 71 个工具，Agent 直接接入 |
+| **Web 页面** | ✅ | 首页/需求广场/供应商/论坛/科研工作台/登录/个人主页/API 文档/教程 |
 | **自动爬虫** | ✅ | 每日 06:00 自动执行，9 个需求源 + 3 个供应商源 |
 | **国际化** | 🚧 | 中英文切换（部分页面） |
 
@@ -35,6 +36,7 @@
 2. 匹配引擎自动搜索供应商库，计算匹配分数
 3. 通过邮件通知用户匹配结果
 4. 支持 A2A 协议（Google 开源的 Agent 间通信标准）让 AI Agent 代表用户沟通
+5. 🔬 **学术检索** — 科研工作者可直接搜索 PubMed、CrossRef、OpenAlex、Semantic Scholar 四大数据库，发现资助机会，AI 自动生成研究总结
 
 ## 技术栈
 
@@ -66,15 +68,16 @@ docker compose -f docker-compose.prod.yml -p dc up -d
 将 MCP 地址配置给你的 AI 助手（Claude Desktop / 龙虾助手 / 通义千问）：
 
 ```
-http://8.154.26.92:8000/sse
+http://demand-chain.duckdns.org:8000/sse
 ```
 
-你的 AI 助手即可使用 56+ 工具，代表你发布需求、搜索供应商、查看匹配结果。
+你的 AI 助手即可使用 71 个工具，代表你发布需求、搜索供应商、查看匹配结果、搜索学术论文。
 
 ## 项目结构
 
 ```
 ├── index.html              # 首页（实时数据流）
+├── scientist_workbench.html # 🔬 科研工作台（学术检索）
 ├── demand_square.html      # 需求广场（语义搜索 + 分类）
 ├── suppliers.html          # 供应商页面（搜索 + 筛选）
 ├── forum.html              # 论坛（Markdown + 分页）
@@ -87,10 +90,12 @@ http://8.154.26.92:8000/sse
 │   ├── auto_crawler.py     # 自动爬虫（9需求源+3供应商源）
 │   ├── structure_demands.py # 批量结构化
 │   ├── batch_structure.py  # 快速结构化
+│   ├── researcher_support_crawler.py  # 科研资助爬虫
+│   ├── sci_equip_crawler.py           # 科研设备爬虫
 │   └── seed_forum.py       # 论坛种子数据
 └── src/
-    ├── server.py           # MCP Server (56+ tools)
-    ├── web_server.py       # Web + REST API
+    ├── server.py           # MCP Server (71 tools)
+    ├── web_server.py       # Web + REST API + 学术检索 API
     ├── matching/engine.py  # 匹配引擎
     ├── forum/service.py    # 论坛服务
     ├── demand/service.py   # 需求服务
@@ -99,6 +104,8 @@ http://8.154.26.92:8000/sse
     │   ├── classification.py   # 多维度分类
     │   └── models.py           # 数据库模型
     └── adapters/
+        ├── academic_client.py  # 🔬 学术检索客户端
+        ├── firecrawl_client.py # 网页爬虫
         └── llm_client.py       # DeepSeek 客户端
 ```
 
@@ -110,3 +117,4 @@ http://8.154.26.92:8000/sse
 ## License
 
 Apache 2.0 · 永久开源 · 中立 · 免费
+
