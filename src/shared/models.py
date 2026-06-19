@@ -403,3 +403,4 @@ class ForumVote(Base):
     direction: Mapped[int] = mapped_column(Integer, nullable=False)  # 1=up, -1=down
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+

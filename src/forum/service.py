@@ -180,3 +180,4 @@ class ForumService:
                 for r in topic.replies
             ],
         }
+

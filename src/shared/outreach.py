@@ -34,7 +34,7 @@ class OutreachService:
     需求投递服务。
     """
 
-    def __init__(self, base_url: str = "http://8.154.26.92:8000"):
+    def __init__(self, base_url: str = "http://demand-chain.duckdns.org:8000"):
         self.base_url = base_url
         self.notification_service = NotificationService()
 
@@ -146,3 +146,5 @@ Apache 2.0 开源 · 数据不卖 · 不追踪用户
 
 # 全局实例
 outreach_service = OutreachService()
+
+

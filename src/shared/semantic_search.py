@@ -123,3 +123,4 @@ class TfidfSearch:
 
 demand_search = TfidfSearch()
 supplier_search = TfidfSearch()
+

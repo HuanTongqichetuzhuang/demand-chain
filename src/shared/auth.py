@@ -143,3 +143,4 @@ async def cleanup_expired_tokens():
                 logger.info(f"Cleaned up {result.rowcount} expired tokens")
     except Exception as e:
         logger.error(f"Failed to cleanup expired tokens: {e}")
+

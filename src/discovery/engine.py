@@ -252,3 +252,4 @@ async def discover_for_demand(demand_text: str, demand_tags: list[str]) -> list[
     keywords = demand_tags[:5] if demand_tags else [demand_text[:50]]
     candidates = await engine.run(keywords, limit=50)
     return [c.to_db_dict() for c in candidates]
+

@@ -102,3 +102,4 @@ class ContributionService:
 
 # 全局实例
 contribution_service = ContributionService()
+

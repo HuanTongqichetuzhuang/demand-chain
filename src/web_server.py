@@ -240,6 +240,7 @@ async def batch_export(request): return await serve_file(request, "batch_export.
 async def api_docs(request): return await serve_file(request, "api_docs.html")
 async def tools_extra(request): return await serve_file(request, "tools_extra.html")
 async def flywheel_dashboard(request): return await serve_file(request, "flywheel_dashboard.html")
+async def scientist_workbench(request): return await serve_file(request, "scientist_workbench.html")
 async def admin_page(request): return await serve_file(request, "admin.html")
 async def notification_page(request): return await serve_file(request, "notifications.html")
 async def tutorial(request): return await serve_file(request, "docs/tutorial.html")
@@ -2419,7 +2420,7 @@ routes = [
     Route("/tools_extra.html", tools_extra),
     Route("/flywheel_dashboard.html", flywheel_dashboard),
     # 科研工作台
-    Route("/scientist_workbench.html", lambda r: serve_file(r, "scientist_workbench.html")),
+    Route("/scientist_workbench.html", scientist_workbench),
     Route("/docs/tutorial.html", tutorial),
     Route("/verify-email", verify_email_page),
     # Pages

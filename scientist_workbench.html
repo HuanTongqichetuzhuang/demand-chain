@@ -234,6 +234,9 @@ async function doSearch() {
   history.replaceState(null, '', url);
 
   // Clear previous
+  document.getElementById('panel-summary').classList.remove('active');
+  document.getElementById('panel-papers').classList.remove('active');
+  document.getElementById('panel-funding').classList.remove('active');
   document.getElementById('panel-summary').style.display = 'none';
   document.getElementById('panel-papers').style.display = 'none';
   document.getElementById('panel-funding').style.display = 'none';
@@ -400,9 +403,14 @@ function renderFunding() {
 // ── Tab switching ───────────────────────────────────
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => {
+    p.classList.remove('active');
+    p.style.display = '';  // 清除 doSearch 里设置的内联 display:none
+  });
   document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
-  document.getElementById(`panel-${name}`).classList.add('active');
+  const panel = document.getElementById(`panel-${name}`);
+  panel.classList.add('active');
+  panel.style.display = '';  // 确保显示
 }
 
 // ── Filter papers by source ─────────────────────────

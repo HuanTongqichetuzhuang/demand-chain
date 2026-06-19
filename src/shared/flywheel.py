@@ -273,3 +273,4 @@ async def get_weight_matrix() -> list[dict]:
         "supplier_category": w.supplier_category,
         "weight": w.weight,
     } for w in weights]
+
