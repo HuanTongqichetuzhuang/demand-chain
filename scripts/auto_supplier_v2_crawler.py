@@ -19,7 +19,7 @@ from datetime import datetime
 # ============================================================
 # Config
 # ============================================================
-API_BASE = "http://8.154.26.92:8080"
+API_BASE = "http://demand-chain.duckdns.org:8080"
 FIRECRAWL_KEY = "fc-e97094049296412bb87cc3946d515649"
 DEEPSEEK_KEY = "sk-c32415bb5ae44cdc844f1b95f99e4544"
 
@@ -482,3 +482,5 @@ if __name__ == "__main__":
     dry = "--dry-run" in sys.argv
     clean = "--cleanup" in sys.argv
     run(dry_run=dry, cleanup=clean)
+
+

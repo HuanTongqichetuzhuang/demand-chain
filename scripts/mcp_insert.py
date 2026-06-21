@@ -12,7 +12,7 @@ import http.client
 import ssl
 
 
-MCP_SERVER_HOST = "8.154.26.92"
+MCP_SERVER_HOST = "demand-chain.duckdns.org"
 MCP_SERVER_PORT = 8000
 
 
@@ -136,7 +136,7 @@ def insert_demands_from_file(json_path: str):
     print(f"Skipped {len(demands) - len(valid)} non-demand items")
     
     # Try the HTTP API first
-    api_base = "http://8.154.26.92:8000"
+    api_base = "http://demand-chain.duckdns.org:8000"
     ok = 0
     fail = 0
 
@@ -228,7 +228,7 @@ def insert_suppliers_from_file(json_path: str):
 
     print(f"\n=== Inserting {len(valid)} valid suppliers (filtered from {len(suppliers)}) ===")
 
-    api_base = "http://8.154.26.92:8000"
+    api_base = "http://demand-chain.duckdns.org:8000"
     ok = 0
     fail = 0
 
@@ -291,3 +291,5 @@ if __name__ == "__main__":
     print("\n--- Trying direct POST list ---")
     result2 = list_tools()
     print(json.dumps(result2, ensure_ascii=False, indent=2)[:1000])
+
+

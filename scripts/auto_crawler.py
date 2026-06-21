@@ -22,10 +22,42 @@ import urllib.request
 import urllib.parse
 from datetime import datetime, timezone
 
+# DeepSeek 翻译
+DEEPSEEK_KEY = "sk-c32415bb5ae44cdc844f1b95f99e4544"
+
+def translate_to_chinese(text):
+    """把英文翻译成中文，已经是中文的保留原样"""
+    if not text or len(text) < 5:
+        return text
+    cn_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+    if cn_chars > len(text) * 0.3:
+        return text
+    try:
+        payload = json.dumps({
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "system", "content": "把下面的英文翻译成中文。保留专有名词(公司名、品牌名、缩写)不译。只输出译文。输出不超过200字。"},
+                {"role": "user", "content": text[:500]}
+            ],
+            "temperature": 0.1,
+            "max_tokens": 300
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            "https://api.deepseek.com/v1/chat/completions",
+            data=payload,
+            headers={"Authorization": f"Bearer {DEEPSEEK_KEY}", "Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=30) as r:
+            result = json.loads(r.read())
+            translated = result["choices"][0]["message"]["content"].strip()
+            return translated if translated else text
+    except:
+        return text
+
 # ============================================================
 # Config
 # ============================================================
-API_BASE = "http://8.154.26.92:8080"
+API_BASE = "http://demand-chain.duckdns.org:8080"
 
 # Category keyword mapping
 CATEGORY_KEYWORDS = {
@@ -52,6 +84,9 @@ CATEGORY_KEYWORDS = {
 
 # Source configuration — 可扩展，只需加 URL 和提取器
 SOURCES = {
+    # ============================================================
+    # 需求源 — 国际
+    # ============================================================
     "usa_gov": {
         "enabled": True,
         "url": "https://www.usa.gov/find-active-challenge",
@@ -73,6 +108,13 @@ SOURCES = {
         "extractor": "generic_links",
         "label": "NASA挑战",
     },
+    "nasa_sbir": {
+        "enabled": True,
+        "url": "https://sbir.nasa.gov/",
+        "type": "demand",
+        "extractor": "nasa_sbir",
+        "label": "NASA SBIR技术需求",
+    },
     "mit_solve": {
         "enabled": True,
         "url": "https://solve.mit.edu/challenges",
@@ -81,7 +123,7 @@ SOURCES = {
         "label": "MIT Solve",
     },
     "darpa": {
-        "enabled": True,
+        "enabled": False,  # DNS 解析失败
         "url": "https://www.darpa.mil/",
         "type": "demand",
         "extractor": "darpa",
@@ -109,13 +151,46 @@ SOURCES = {
         "label": "国家自然科学基金委",
     },
     "grants_gov": {
-        "enabled": True,
+        "enabled": False,  # SSL 证书错误
         "url": "https://simpler.grants.gov/search",
         "type": "demand",
         "extractor": "grant_search",
         "label": "Grants.gov美国联邦资助",
     },
-    # === 中国技术需求来源 ===
+    "herox_challenges": {
+        "enabled": False,  # 404
+        "url": "https://www.herox.com/challenges",
+        "type": "demand",
+        "extractor": "generic_links",
+        "label": "HeroX挑战赛",
+    },
+    # ============================================================
+    # 需求源 — 全新国际源
+    # ============================================================
+    "ukri_innovate_uk": {
+        "enabled": True,
+        "url": "https://www.ukri.org/opportunity/",
+        "type": "demand",
+        "extractor": "generic_links",
+        "label": "UKRI英国研究与创新资助",
+    },
+    "uk_contracts_finder": {
+        "enabled": True,
+        "url": "https://www.contractsfinder.service.gov.uk/Search",
+        "type": "demand",
+        "extractor": "generic_links",
+        "label": "英国政府合同招标",
+    },
+    "world_bank_procurement": {
+        "enabled": True,
+        "url": "https://www.worldbank.org/en/projects-operations/procurement",
+        "type": "demand",
+        "extractor": "generic_links",
+        "label": "世界银行采购项目",
+    },
+    # ============================================================
+    # 需求源 — 中国
+    # ============================================================
     "sdut_tech_demands": {
         "enabled": True,
         "url": "https://research.sdut.edu.cn/jsxq/list.htm",
@@ -137,15 +212,23 @@ SOURCES = {
         "extractor": "generic_links",
         "label": "苏州市揭榜挂帅关键核心技术攻关",
     },
-    # === 更多海外挑战平台 ===
-    "herox_challenges": {
+    "most_china": {
         "enabled": True,
-        "url": "https://www.herox.com/challenges",
+        "url": "https://service.most.gov.cn/",
         "type": "demand",
         "extractor": "generic_links",
-        "label": "HeroX挑战赛",
+        "label": "中国科技部项目申报",
     },
-    # === 供应商 / 公司来源 ===
+    "xiongan_jiebang": {
+        "enabled": True,
+        "url": "https://www.xiongan.gov.cn/",
+        "type": "demand",
+        "extractor": "generic_links",
+        "label": "雄安新区揭榜挂帅",
+    },
+    # ============================================================
+    # 供应商源
+    # ============================================================
     "startus_ccus": {
         "enabled": True,
         "url": "https://www.startus-insights.com/innovators-guide/carbon-capture-utilization-storage-startups/",
@@ -166,6 +249,13 @@ SOURCES = {
         "type": "supplier",
         "extractor": "rankred",
         "label": "气候科技初创企业2026",
+    },
+    "eu_startups": {
+        "enabled": True,
+        "url": "https://www.eu-startups.com/category/startups/",
+        "type": "supplier",
+        "extractor": "eu_startups",
+        "label": "欧盟初创企业",
     },
 }
 
@@ -190,7 +280,7 @@ def fetch_url(url, timeout=15):
     """Fetch a URL and return text content."""
     try:
         req = urllib.request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0 (compatible; DemandChainCrawler/1.0; +https://8.154.26.92:8080)",
+            "User-Agent": "Mozilla/5.0 (compatible; DemandChainCrawler/1.0; +https://demand-chain.duckdns.org)",
             "Accept": "text/html,application/json,*/*",
         })
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -276,6 +366,24 @@ NEGATIVE_KEYWORDS = [
     "cooperative agreement for affiliated",
     "community programs for youth",
     "staff sergeant fox",
+    # 中文负向词（过滤政府公告类垃圾）
+    "公示", "管理办法", "管理细则", "条例", "实施细则",
+    "监理", "培训班", "大讲堂",
+    "交流会", "论证会", "推进会", "动员会", "研讨会", "务虚会",
+    "座谈会", "新闻发布会", "发布会",
+    "自然科学基金", "基金管理",
+    "调研", "走访",
+    "党课", "党建", "学习会", "学习教育", "贯彻", "安全生产",
+    "书记", "厅长", "局长", "主任", "部长",
+    "总书记", "习近平",
+    "政策解读", "一图读懂", "政策问答",
+    "招聘", "诚聘", "博士后", "引进人才",
+    "奖励办法", "奖励的决定",
+    "注销", "新年", "春节", "慰问", "致辞",
+    "关于印发",
+    "会计师事务所", "中标结果",
+    "修改决定", "修改条例",
+    "开展.*工作", "推进.*工作", "工作部署",
 ]
 
 DEMAND_KEYWORDS = [
@@ -319,6 +427,21 @@ def extract_generic_links(html, base_url, source_label):
         has_demand_kw = any(kw in title_lower for kw in DEMAND_KEYWORDS)
         if not has_demand_kw:
             continue
+        # Skip pure organization/council names (e.g. "Medical Research Council (MRC)")
+        # These are organization homepages, not actual funding opportunities
+        if ("research council" in title_lower or "council" in title_lower) and \
+            not any(kw in title_lower for kw in ["grant", "funding", "call", "opportunity",
+                "deadline", "prize", "award", "competition", "challenge", "proposal"]):
+            continue
+        # Skip single organization/department names without specific funding context
+        if title_lower.endswith("(esrc)") or title_lower.endswith("(mrc)") or \
+            title_lower.endswith("(epsrc)") or title_lower.endswith("(ahrc)") or \
+            title_lower.endswith("(esrc)") or title_lower.endswith("(nerc)") or \
+            title_lower.endswith("(stfc)") or title_lower.endswith("(bbsrc)"):
+            continue
+        # Skip help pages, general info pages
+        if title_lower.startswith("improving your") or title_lower.startswith("we are one piece"):
+            continue
 
         # Skip non-tech grants (government administrative grants)
         if any(kw in title_lower for kw in NEGATIVE_KEYWORDS):
@@ -348,6 +471,58 @@ def extract_demands_from_darpa(html):
     return demands
 
 
+def extract_demands_from_nasa_sbir(html):
+    """Extract SBIR/STTR topics from NASA SBIR site."""
+    demands = []
+    # Look for solicitations and topics in headings + links
+    # Pattern 1: h2/h3 with SBIR topic titles
+    headings = re.findall(r'<h[23][^>]*>(?:<[^>]+>\s*)*([A-Z][A-Za-z0-9 ./-]{10,100})</h[23]>', html)
+    for title in headings:
+        t = title.strip()
+        t_lower = t.lower()
+        if any(skip in t_lower for skip in NAV_SKIP_TITLE):
+            continue
+        if any(kw in t_lower for kw in ["sbir", "sttr", "solicitation", "topic", "research", "technology", "innovation", "development", "phase i", "phase ii"]):
+            demands.append({"title": t, "source": "NASA SBIR/STTR", "url": "https://sbir.nasa.gov/", "body": t})
+    # Pattern 2: links with specific text
+    links = re.findall(r'<a[^>]*href="([^"]+)"[^>]*>([A-Z][A-Za-z0-9 ./-]{15,120})</a>', html)
+    for path, title in links:
+        t = title.strip()
+        t_lower = t.lower()
+        if any(skip in t_lower for skip in NAV_SKIP_TITLE):
+            continue
+        if any(kw in t_lower for kw in ["sbir", "sttr", "solicitation", "topic", "research", "tech"]):
+            if path.startswith("/"):
+                url = "https://sbir.nasa.gov" + path
+            elif path.startswith("http"):
+                url = path
+            else:
+                continue
+            demands.append({"title": t, "source": "NASA SBIR/STTR", "url": url, "body": t})
+    return demands[:20]
+
+
+def extract_suppliers_eu_startups(html, src_key):
+    """Extract startup companies from EU-Startups listings."""
+    suppliers = []
+    # Pattern: article headings with startup names
+    articles = re.findall(r'<h[23][^>]*>(?:<[^>]+>)*<a[^>]*href="([^"]+)"[^>]*>([^<]{10,100})</a>', html)
+    seen = set()
+    for url, name in articles:
+        name = name.strip()
+        name_lower = name.lower()
+        # Skip navigation/site labels
+        if any(skip in name_lower for skip in ["privacy", "terms", "cookie", "contact", "about", "home", "subscribe", "newsletter"]):
+            continue
+        if len(name) < 4 or len(name) > 80:
+            continue
+        if name_lower in seen:
+            continue
+        seen.add(name_lower)
+        suppliers.append({"name": name, "description": "", "source": "欧盟初创企业", "url": url})
+    return suppliers
+
+
 def extract_demands_from_grant_search(html):
     """Extract demands from Grants.gov search results with quality filtering."""
     demands = []
@@ -373,10 +548,12 @@ EXTRACTORS = {
     "xprize": lambda html, src: extract_demands_from_xprize(html),
     "darpa": lambda html, src: extract_demands_from_darpa(html),
     "grant_search": lambda html, src: extract_demands_from_grant_search(html),
+    "nasa_sbir": lambda html, src: extract_demands_from_nasa_sbir(html),
     # Supplier extractors
     "startus_ccus": lambda html, src: extract_suppliers_startus(html, src),
     "rankred": lambda html, src: extract_suppliers_rankred(html, src),
     "energy_hydrogen": lambda html, src: extract_suppliers_energy_hydrogen(html, src),
+    "eu_startups": lambda html, src: extract_suppliers_eu_startups(html, src),
 }
 
 # ============================================================
@@ -490,13 +667,23 @@ def extract_suppliers_energy_hydrogen(html, src_key):
     for name in links:
         name = name.strip()
         name_lower = name.lower()
-        if any(skip in name_lower for skip in [
+        # 严格过滤：只保留真实公司名
+        skip_patterns = [
             "startups in", "market ", "top 1", "list of", "category",
             "privacy", "terms ", "sign ", "login", "home", "about",
             "contact", "blog", "search", "submit",
-        ]):
+            "load more", "add startup", "promote startup", "advertising",
+            "energy startups by", "startup of the", "startups to watch",
+            "battery swapping startups", "ammonia fuel startups",
+            "electric vehicle charging startups", "methanol fuel startups",
+            "energy startups", "renewable energy", "add your",
+        ]
+        if any(skip in name_lower for skip in skip_patterns):
             continue
         if len(name) > 2 and len(name) < 80:
+            # 跳过明显不是公司名的单字/导航文字
+            if name_lower in ("advertising", "energy startups", "newsletter", "subscribe", "home", "about", "contact", "blog", "search", "submit"):
+                continue
             suppliers.add(name)
     return [{"name": n, "description": "", "source": SOURCES[src_key]["label"]} for n in suppliers]
 
@@ -602,8 +789,10 @@ def seed_demands_to_db(demands):
     count_skip = 0
     count_fail = 0
     for d in demands:
+        raw = d.get("body", d.get("title", ""))
+        cn_raw = translate_to_chinese(raw)  # 翻译为中文
         payload = json.dumps({
-            "raw_text": d.get("body", d.get("title", "")),
+            "raw_text": cn_raw,
             "category": d.get("category", "其他"),
             "email": "crawler",
             "source": d.get("source", ""),
@@ -714,6 +903,15 @@ def run():
     print(f"  Demands collected: {len(all_demands)}")
     print(f"  Suppliers collected: {len(all_suppliers)}")
 
+    # arXiv论文→需求转化（高优先级内容源）
+    try:
+        print(f"\n=== arXiv论文→需求转化 ===")
+        from sci_data_crawler import crawl_arxiv
+        arxiv_count = crawl_arxiv(dry_run=False)
+        print(f"  arXiv需求入库: {arxiv_count}")
+    except Exception as e:
+        print(f"  [SKIP] arXiv crawler failed: {e}")
+
     if all_demands:
         try:
             seed_demands_to_db(all_demands)
@@ -744,3 +942,5 @@ def run():
 
 if __name__ == "__main__":
     run()
+
+

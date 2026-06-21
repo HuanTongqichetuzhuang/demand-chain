@@ -39,7 +39,7 @@ curl localhost:8080    # 网站首页（返回 200）
 
 | 端口 | 服务 | 用途 |
 |------|------|------|
-| 8000 | MCP Server | AI 助手接入 `http://IP:8000/sse` |
+| 8000 | MCP Server | AI 助手接入 `https://demand-chain.duckdns.org/sse` |
 | 8080 | Web 站点 | 人类浏览器访问 `http://IP:8080` |
 | 5432 | PostgreSQL | 数据库（仅内部） |
 | 9000 | ~~微信服务~~ | 已弃用 |
@@ -81,3 +81,4 @@ python -m src.server
 - 推荐配置：**2 核 4G**
 - 开放端口：8000（MCP）、8080（Web）
 - 数据库自动保存，重启不丢数据
+

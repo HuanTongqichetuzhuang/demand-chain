@@ -26,7 +26,7 @@ except ImportError:
 # ============================================================
 # Config
 # ============================================================
-API_BASE = "http://8.154.26.92:8080"
+API_BASE = "http://demand-chain.duckdns.org:8080"
 DEEPSEEK_KEY = "sk-c32415bb5ae44cdc844f1b95f99e4544"
 RESULTS_DIR = "supplier_backups"
 
@@ -49,12 +49,43 @@ GITHUB_TOPIC_QUERIES = [
     ('化学工程', 'chemical-engineering stars:>50'),
     ('信息技术', 'cybersecurity stars:>50'),
     ('农业科学', 'agriculture-technology stars:>50'),
+    # 新增：更多细分领域
+    ('量子计算', 'quantum-computing stars:>30'),
+    ('自动驾驶', 'autonomous-driving stars:>50'),
+    ('储能技术', 'energy-storage stars:>30'),
+    ('碳捕集', 'carbon-capture stars:>20'),
+    ('合成生物学', 'synthetic-biology stars:>20'),
+    ('脑机接口', 'brain-computer-interface stars:>20'),
+    ('6G通信', '6g stars:>30'),
+    ('边缘计算', 'edge-computing stars:>50'),
+    ('生物信息学', 'bioinformatics stars:>50'),
+    ('智能电网', 'smart-grid stars:>30'),
+    # === 新增：科学仪器/实验设备领域 ===
+    ('科学仪器', 'scientific-instrumentation stars:>10'),
+    ('实验室设备', 'laboratory-equipment stars:>10'),
+    ('生物仪器', 'bioinstrumentation stars:>10'),
+    ('分析仪器', 'analytical-chemistry stars:>20'),
+    ('光学仪器', 'optical-instrument stars:>10'),
+    ('传感器设计', 'sensor-design stars:>20'),
+    ('微流控', 'microfluidics stars:>20'),
+    ('质谱技术', 'mass-spectrometry stars:>10'),
+    ('显微镜技术', 'microscopy stars:>30'),
+    ('光谱技术', 'spectroscopy stars:>20'),
+    ('测量计量', 'metrology stars:>10'),
 ]
 
 DIRECT_SCRAPE_URLS = [
     # 已知可访问的公开数据源
     ('中国科学院', 'http://www.cas.cn/zz/kyjg/'),
-    ('工信部专精特新', 'https://www.miit.gov.cn/datainfo/datainfo/index.html'),
+    # 中国主要科研机构
+    ('中科院深圳先进院', 'https://www.siat.ac.cn/'),
+    ('北京航空航天大学科研', 'https://www.buaa.edu.cn/'),
+    ('清华大学技术转移', 'https://www.tsinghua.edu.cn/'),
+    ('浙江大学科研', 'https://www.zju.edu.cn/'),
+    ('上海交大科研', 'https://www.sjtu.edu.cn/'),
+    # 美国能源部国家实验室
+    ('MIT Media Lab', 'https://www.media.mit.edu/'),
+    ('Stanford Research', 'https://www.stanford.edu/'),
 ]
 
 # ============================================================
@@ -444,6 +475,14 @@ def run(dry_run=False, limit_per_source=8):
         ("新能源", "太阳能 OR 锂电池 中国 stars:>30"),
         ("生物医药", "基因 OR 医疗 中国 stars:>30"),
         ("材料科学", "新材料 OR 复合材料 中国 stars:>30"),
+        # 新增搜索
+        ("自动驾驶", "自动驾驶 OR 智能驾驶 中国 stars:>20"),
+        ("储能", "储能 OR 钠离子 中国 stars:>20"),
+        ("量子", "量子计算 OR 量子通信 中国 stars:>20"),
+        ("脑机", "脑机接口 OR 神经科学 中国 stars:>20"),
+        ("合成生物", "合成生物学 OR 基因编辑 中国 stars:>20"),
+        ("氢能", "氢能 OR 燃料电池 中国 stars:>20"),
+        ("航空航天", "航天 OR 卫星 中国 stars:>20"),
     ]
 
     for cat_name, query in chinese_queries:
@@ -539,3 +578,5 @@ if __name__ == "__main__":
     run(dry_run=dry_run, limit_per_source=limit)
 
     print(f"\n完成时间: {datetime.now().isoformat()}")
+
+

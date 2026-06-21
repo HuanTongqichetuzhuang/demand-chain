@@ -101,10 +101,10 @@ async def verify(token: str) -> dict:
 
     # 2. 数据库（只查一次，查到后加入缓存）
     if token not in _loaded_from_db:
-        _loaded_from_db.add(token)
         entry = await _load_token_from_db(token)
         if entry:
             _token_cache[token] = entry
+            _loaded_from_db.add(token)  # ← 只有DB查到才标记，防止瞬态失败导致永久负缓存
             return entry
 
     raise PermissionError("session_token 无效。请让人类重新登录。")

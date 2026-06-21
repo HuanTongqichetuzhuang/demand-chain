@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: demand_chain
       POSTGRES_USER: dc
-      POSTGRES_PASSWORD: dc_dev_2026
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dc_dev_2026}
     ports:
       - "5432:5432"
     volumes:
@@ -43,9 +43,9 @@ services:
       redis:
         condition: service_started
     environment:
-      DATABASE_URL: postgresql+asyncpg://dc:dc_dev_2026@db:5432/demand_chain
-      DEEPSEEK_API_KEY: sk-c32415bb5ae44cdc844f1b95f99e4544
-      FIRECRAWL_API_KEY: fc-e97094049296412bb87cc3946d515649
+      DATABASE_URL: postgresql+asyncpg://dc:${POSTGRES_PASSWORD:-dc_dev_2026}@db:5432/demand_chain
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
       LOG_LEVEL: INFO
       REDIS_URL: redis://redis:6379/0
     ports:
@@ -63,7 +63,7 @@ services:
       redis:
         condition: service_started
     environment:
-      DATABASE_URL: postgresql+asyncpg://dc:dc_dev_2026@db:5432/demand_chain
+      DATABASE_URL: postgresql+asyncpg://dc:${POSTGRES_PASSWORD:-dc_dev_2026}@db:5432/demand_chain
       REDIS_URL: redis://redis:6379/0
     command: ["python", "-m", "src.web_server"]
     ports:
@@ -83,11 +83,11 @@ services:
       redis:
         condition: service_started
     environment:
-      DATABASE_URL: postgresql+asyncpg://dc:dc_dev_2026@db:5432/demand_chain
-      DEEPSEEK_API_KEY: sk-c32415bb5ae44cdc844f1b95f99e4544
+      DATABASE_URL: postgresql+asyncpg://dc:${POSTGRES_PASSWORD:-dc_dev_2026}@db:5432/demand_chain
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       LOG_LEVEL: INFO
       REDIS_URL: redis://redis:6379/0
-      ALERT_WEBHOOK_URL: ""
+      ALERT_WEBHOOK_URL: "${ALERT_WEBHOOK_URL:-}"
     command: ["python", "-m", "src.worker"]
     networks:
       - dc-net

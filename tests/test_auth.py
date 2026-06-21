@@ -144,3 +144,4 @@ class TestEmailVerification:
             content = f.read()
         assert "verify" in content.lower() or "验证" in content, \
             "verify_email.html 应包含验证相关文本"
+

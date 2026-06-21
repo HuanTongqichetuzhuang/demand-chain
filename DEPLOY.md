@@ -19,7 +19,7 @@ cp .env.example .env
 #   DATABASE_URL=postgresql+asyncpg://dc:dc_dev_2026@db:5432/demand_chain
 ```
 
-### 2. 服务器上启动（阿里云 ECS 8.154.26.92）
+### 2. 服务器上启动（阿里云 ECS demand-chain.duckdns.org）
 ```bash
 # 安装 Docker
 curl -fsSL https://get.docker.com | sh
@@ -77,27 +77,44 @@ PYTHONPATH="$PWD" .venv/Scripts/python -m src.server
 {
   "mcpServers": {
     "demand-chain": {
-      "url": "http://8.154.26.92:8000/sse",
+      "url": "https://demand-chain.duckdns.org/sse",
       "transport": "sse"
     }
   }
 }
 ```
 
+## 域名绑定
+
+域名 `demand-chain.duckdns.org` 通过以下方式绑定：
+
+| 项目 | 配置 |
+|------|------|
+| **DDNS** | `/usr/local/bin/duckdns-update.sh` (cron 每5分钟) |
+| **Nginx** | `/etc/nginx/sites-available/demand-chain` 反向代理 → `127.0.0.1:8080` |
+| **SSL** | acme.sh Let's Encrypt, 证书 `/etc/nginx/ssl/demand-chain.{crt,key}` |
+| **WebSocket** | `/ws` → `127.0.0.1:8080` (聊天功能) |
+| **HTTP→HTTPS** | 301 自动跳转 |
+| **证书自动续期** | acme.sh cron (每日检查) |
+
+配置方法见 `deploy/` 目录。
+
 ## 当前状态
 
 | 项目 | 状态 |
 |------|------|
+| 域名 | https://demand-chain.duckdns.org ✅ |
 | 数据库 | PostgreSQL 16 + pgvector, 10张表 |
 | MCP Server | FastMCP SSE, 37个工具 |
 | HTML 页面 | 16个（全部可用mock数据） |
 | 测试 | 35 pass / 0 fail |
 | 国际化 | zh/en JSON + Agent原生架构 |
-| 部署 | Docker Compose 3服务 |
+| 部署 | Docker Compose 5服务 (含redis/worker) |
+| SSL | Let's Encrypt (ECC), 有效期3个月自动续期 |
 
 ## 下一步
 
 1. 填入 DeepSeek API Key → 测试 LLM 结构化
-2. 服务器上 docker compose up -d 部署
-3. Agent 配置 MCP 接入测试
-4. git push 到 GitHub 开源仓库
+2. Agent 配置 MCP 接入测试: `https://demand-chain.duckdns.org/sse`
+3. git push 到 GitHub 开源仓库
+

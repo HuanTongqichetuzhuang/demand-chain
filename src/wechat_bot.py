@@ -76,7 +76,7 @@ async def process_message(msg_type: str, content: str, from_user: str) -> str:
                     return f"没找到与「{content}」相关的需求。试试换个关键词？"
 
         elif "发" in content and ("需求" in content or "求" in content):
-            return "发布需求需要先注册账号。打开 AI 助手（如 Claude），配置 MCP 地址 http://demand-chain.duckdns.org:8000/sse，让 AI 帮你完成注册和发布。"
+            return "发布需求需要先注册账号。打开 AI 助手（如 Claude），配置 MCP 地址 https://demand-chain.duckdns.org/sse，让 AI 帮你完成注册和发布。"
 
         elif "你好" in content or "hello" in content.lower():
             return (
@@ -86,7 +86,7 @@ async def process_message(msg_type: str, content: str, from_user: str) -> str:
                 "  2. 查看平台 — 说「有什么需求」\n"
                 "  3. 了解平台 — 说「是什么」\n\n"
                 "深度使用请配置 AI 助手（Claude 等）连接 MCP 地址：\n"
-                "  http://demand-chain.duckdns.org:8000/sse"
+                "  https://demand-chain.duckdns.org/sse"
             )
 
         elif "是什么" in content or "介绍" in content:
@@ -110,7 +110,7 @@ async def process_message(msg_type: str, content: str, from_user: str) -> str:
                 )
                 return reply[:200]
             except Exception:
-                return f"收到你的消息了。深度使用请配置 AI 助手连接 MCP 地址：http://demand-chain.duckdns.org:8000/sse"
+                return f"收到你的消息了。深度使用请配置 AI 助手连接 MCP 地址：https://demand-chain.duckdns.org/sse"
 
     except Exception as e:
         logger.error(f"处理消息失败: {e}")

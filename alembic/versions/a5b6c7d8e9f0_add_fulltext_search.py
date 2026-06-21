@@ -97,3 +97,4 @@ def downgrade():
     op.drop_index("ix_capability_profiles_search_vector", table_name="capability_profiles")
     op.drop_column("demands", "search_vector")
     op.drop_column("capability_profiles", "search_vector")
+

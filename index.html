@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>需求链平台 — AI 原生需求匹配网络</title>
-<link rel="icon" href="logo.jpg" type="image/jpeg">
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+<link rel="stylesheet" href="shared.css?v=6">
 <style>
 :root{
   --bg:#08081a;--card:#11112b;--text:#eaeaf2;--muted:#8888aa;
@@ -110,7 +111,7 @@ footer .links a:hover{color:var(--text)}
       "name": "需求链平台",
       "alternateName": "Demand Chain Platform",
       "description": "AI驱动的开源需求匹配基础设施，基于MCP协议连接全球需求与供应商",
-      "url": "http://demand-chain.duckdns.org:8080",
+      "url": "https://demand-chain.duckdns.org",
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Web",
       "offers": {
@@ -126,17 +127,17 @@ footer .links a:hover{color:var(--text)}
     {
       "@type": "Organization",
       "name": "需求链平台",
-      "url": "http://demand-chain.duckdns.org:8080",
-      "logo": "http://demand-chain.duckdns.org:8080/logo.jpg",
+      "url": "https://demand-chain.duckdns.org",
+      "logo": "https://demand-chain.duckdns.org/logo.jpg",
       "description": "AI驱动的开源创新基础设施，连接全球需求与供应商"
     },
     {
       "@type": "WebSite",
       "name": "需求链平台",
-      "url": "http://demand-chain.duckdns.org:8080",
+      "url": "https://demand-chain.duckdns.org",
       "potentialAction": {
         "@type": "SearchAction",
-        "target": "http://demand-chain.duckdns.org:8080/demand_square.html?q={search_term_string}",
+        "target": "https://demand-chain.duckdns.org/demand_square.html?q={search_term_string}",
         "query-input": "required name=search_term_string"
       }
     }
@@ -148,7 +149,7 @@ footer .links a:hover{color:var(--text)}
 
 <nav>
   <a class="brand" href="/">
-    <img src="logo.jpg" alt="" loading="lazy">
+    <img src="logo_small.png" alt="" loading="lazy">
     需求链平台
   </a>
   <div class="links">
@@ -162,7 +163,7 @@ footer .links a:hover{color:var(--text)}
 </nav>
 
 <div class="hero">
-  <img src="logo.jpg" alt="需求链平台">
+  <img src="logo_small.png" alt="需求链平台">
   <h1>让全人类的创造力<span class="gradient">蓬勃发展的 AI 创新基础设施</span></h1>
   <p>需求链平台连接"需求提出者"与"需求解决者"，打破信息孤岛，加速科技与商业创新。</p>
   <div class="cta-buttons">
@@ -174,7 +175,7 @@ footer .links a:hover{color:var(--text)}
 
 <div class="stats">
   <div class="stat">
-    <div class="number">71</div>
+    <div class="number">72</div>
     <div class="label">MCP 工具</div>
   </div>
   <div class="stat">
@@ -188,6 +189,25 @@ footer .links a:hover{color:var(--text)}
   <div class="stat">
     <div class="number">6</div>
     <div class="label">分类维度</div>
+  </div>
+  <div class="stat">
+    <div class="number">267</div>
+    <div class="label">真实需求</div>
+  </div>
+</div>
+
+<!-- MCP 地址入口 — 突出显示 -->
+<div class="section" style="padding:10px 0 0">
+  <div class="inner" style="max-width:800px">
+    <div class="mcp-box" style="background:linear-gradient(135deg,rgba(124,110,240,0.12),rgba(0,212,160,0.08));border:2px solid rgba(124,110,240,0.3);border-radius:16px;padding:24px 28px;text-align:center;margin:0 auto">
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:14px;color:var(--purple);font-weight:600">🤖 MCP 服务器地址</span>
+        <span style="font-size:11px;background:rgba(124,110,240,0.2);color:var(--purple-light);padding:2px 10px;border-radius:20px">点击复制</span>
+      </div>
+      <code onclick="copyMCP()" style="display:block;font-size:17px;font-weight:600;color:#fff;background:rgba(124,110,240,0.25);border:1px solid rgba(124,110,240,0.4);padding:14px 20px;border-radius:10px;cursor:pointer;word-break:break-all;transition:all 0.2s;letter-spacing:0.5px"
+      onmouseover="this.style.background='rgba(124,110,240,0.4)'" onmouseout="this.style.background='rgba(124,110,240,0.25)'">http://8.154.26.92:8000/sse</code>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px">在 Claude / 通义千问 / 龙虾助手的 MCP 设置中粘贴此地址即可连接</p>
+    </div>
   </div>
 </div>
 
@@ -313,7 +333,7 @@ footer .links a:hover{color:var(--text)}
   <div class="inner">
     <div class="code-box">
       <label>MCP Server 地址</label>
-      <code onclick="copyMCP()" title="点击复制">http://demand-chain.duckdns.org:8000/sse</code>
+      <code onclick="copyMCP()" title="点击复制">http://8.154.26.92:8000/sse</code>
       <p style="font-size:12px;color:var(--muted);margin-top:8px">↑ 点一下复制</p>
     </div>
   </div>
@@ -381,7 +401,7 @@ footer .links a:hover{color:var(--text)}
 </footer>
 
 <script>
-const MCP = "http://demand-chain.duckdns.org:8000/sse";
+const MCP = "http://8.154.26.92:8000/sse";
 function copyMCP(){
   const cfg = JSON.stringify({mcpServers:{"demand-chain":{url:MCP,transport:"sse"}}},null,2);
   navigator.clipboard.writeText(cfg).then(()=>{
@@ -431,6 +451,7 @@ function copyMCP(){
 
 function esc(s) { return String(s||"").replace(/</g,"&lt;"); }
 </script>
+<script src="/nav.js?v=6"></script>
 <script src="/i18n.js?v=6"></script>
 </body>
 </html>

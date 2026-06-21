@@ -43,3 +43,4 @@ def upgrade():
 def downgrade():
     op.drop_table("category_weights")
     op.drop_table("match_outcomes")
+

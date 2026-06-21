@@ -8,7 +8,7 @@
 ### 阿里云 ECS
 | 项目 | 值 |
 |------|---|
-| **公网 IP** | 8.154.26.92 |
+| **公网 IP** | demand-chain.duckdns.org |
 | **SSH 端口** | 2222 |
 | **SSH 用户** | root |
 | **服务器配置** | 1.6GB RAM, 阿里云 ECS |
@@ -16,7 +16,7 @@
 
 ### SSH 登录命令
 ```bash
-ssh -o StrictHostKeyChecking=no -p 2222 root@8.154.26.92
+ssh -o StrictHostKeyChecking=no -p 2222 root@demand-chain.duckdns.org
 ```
 
 ### 项目路径
@@ -49,7 +49,7 @@ ssh -o StrictHostKeyChecking=no -p 2222 root@8.154.26.92
 
 ### 直接操作数据库
 ```bash
-ssh -p 2222 root@8.154.26.92 "docker exec dc-db psql -U dc -d demand_chain"
+ssh -p 2222 root@demand-chain.duckdns.org "docker exec dc-db psql -U dc -d demand_chain"
 ```
 
 ---
@@ -76,8 +76,8 @@ FIRECRAWL_API_KEY=fc-e97094049296412bb87cc3946d515649
 cd "E:/项目/需求链平台"
 docker build -t demand-chain:slim .
 docker save demand-chain:slim -o "E:/temp/dc-slim.tar"
-scp -o StrictHostKeyChecking=no -P 2222 "E:/temp/dc-slim.tar" root@8.154.26.92:/opt/dc-slim.tar
-ssh -o StrictHostKeyChecking=no -p 2222 root@8.154.26.92 \
+scp -o StrictHostKeyChecking=no -P 2222 "E:/temp/dc-slim.tar" root@demand-chain.duckdns.org:/opt/dc-slim.tar
+ssh -o StrictHostKeyChecking=no -p 2222 root@demand-chain.duckdns.org \
   "docker load -i /opt/dc-slim.tar > /dev/null && rm /opt/dc-slim.tar && \
    cd /opt/demand-chain && docker compose -f docker-compose.prod.yml -p dc up -d --force-recreate web"
 ```
@@ -87,7 +87,7 @@ ssh -o StrictHostKeyChecking=no -p 2222 root@8.154.26.92 \
 ## 4. API 服务
 
 ### MCP Server (端口 8000)
-- **地址**: `http://8.154.26.92:8000/sse`
+- **地址**: `http://demand-chain.duckdns.org:8000/sse`
 - **本地 MCP 配置**: `~/.workbuddy/mcp.json` 中 `demand-chain` 条目
 - 工具数量: 56+
 
@@ -321,3 +321,6 @@ cd "E:/项目/需求链平台"
 | Search and Networking Engine | ✅ |
 | NLnet 提案 | ✅ |
 | 自动爬虫调度 | ✅ |
+
+
+

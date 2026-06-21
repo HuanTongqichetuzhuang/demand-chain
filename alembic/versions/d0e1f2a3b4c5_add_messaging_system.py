@@ -34,3 +34,4 @@ def downgrade():
     op.drop_index("ix_messages_match", table_name="messages")
     op.drop_index("ix_messages_users", table_name="messages")
     op.drop_table("messages")
+

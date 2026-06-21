@@ -10,7 +10,7 @@
 """
 import csv, json, os, sys, time, requests, hashlib
 
-API_BASE = "http://8.154.26.92:8080"
+API_BASE = "http://demand-chain.duckdns.org:8080"
 DEEPSEEK_KEY = "sk-c32415bb5ae44cdc844f1b95f99e4544"
 
 def deepseek_batch(items, is_research=False):
@@ -223,3 +223,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     run(args.csv, limit=args.limit, dry_run=args.dry_run, is_research=args.research)
+
+

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>API 文档 - 需求链平台</title>
-<link rel="icon" href="/logo.jpg" type="image/jpeg">
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
 <meta property="og:title" content="需求链平台 — API 文档">
 <meta property="og:description" content="MCP Server 和 REST API 完整参考">
 <style>
@@ -29,7 +29,7 @@ footer{text-align:center;padding:40px;color:var(--ts);font-size:13px;border-top:
 </head>
 <body>
 <nav>
-  <a class="brand" href="/"><img src="/logo.jpg" width="34" height="34" style="width:34px;height:34px;border-radius:8px;object-fit:cover" alt="">需求链平台</a>
+  <a class="brand" href="/"><img src="/logo_small.png" width="34" height="34" style="width:34px;height:34px;border-radius:8px;object-fit:cover" alt="">需求链平台</a>
   <div class="links">
     <a href="/demand_square.html">需求广场</a>
     <a href="/suppliers.html">供应商</a>
@@ -46,7 +46,7 @@ footer{text-align:center;padding:40px;color:var(--ts);font-size:13px;border-top:
 
 <h2>MCP Server（AI 助手接入）</h2>
 <p style="color:var(--ts);margin-bottom:16px">配置你的 AI 助手使用以下 MCP 地址连接平台：</p>
-<pre>http://8.154.26.92:8000/sse</pre>
+<pre>https://demand-chain.duckdns.org/sse</pre>
 <p style="color:var(--ts);font-size:.88em;margin-top:-8px">连接后 AI 助手可调用 56+ 个 MCP 工具。</p>
 
 <h2>REST API（网页前端调用）</h2>
@@ -55,7 +55,7 @@ footer{text-align:center;padding:40px;color:var(--ts);font-size:13px;border-top:
 <div class="endpoint">
 <span class="tag tag-post">POST</span><code>/api/register</code>
 <div class="url">注册新用户</div>
-<pre>curl -X POST http://8.154.26.92:8080/api/register \
+<pre>curl -X POST https://demand-chain.duckdns.org/api/register \
   -H 'Content-Type: application/json' \
   -d '{"email":"user@example.com","name":"小明","password":"pass123","country":"中国"}'</pre>
 <p>返回：<code>{"status":"ok","human_id":"...","api_key":"..."}</code></p>
@@ -64,7 +64,7 @@ footer{text-align:center;padding:40px;color:var(--ts);font-size:13px;border-top:
 <div class="endpoint">
 <span class="tag tag-post">POST</span><code>/api/login</code>
 <div class="url">用户登录</div>
-<pre>curl -X POST http://8.154.26.92:8080/api/login \
+<pre>curl -X POST https://demand-chain.duckdns.org/api/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"user@example.com","password":"pass123"}'</pre>
 <p>返回：<code>{"status":"ok","name":"小明","api_key":"..."}</code></p>
@@ -74,7 +74,7 @@ footer{text-align:center;padding:40px;color:var(--ts);font-size:13px;border-top:
 <div class="endpoint">
 <span class="tag tag-get">GET</span><code>/api/demands</code>
 <div class="url">获取所有公开需求</div>
-<pre>curl http://8.154.26.92:8080/api/demands</pre>
+<pre>curl https://demand-chain.duckdns.org/api/demands</pre>
 <p>返回 JSON 数组，包含需求标题、分类、状态、创建时间等。</p>
 </div>
 
@@ -82,14 +82,14 @@ footer{text-align:center;padding:40px;color:var(--ts);font-size:13px;border-top:
 <div class="endpoint">
 <span class="tag tag-get">GET</span><code>/api/forum/topics</code>
 <div class="url">浏览帖子（支持分类和排序）</div>
-<pre>curl "http://8.154.26.92:8080/api/forum/topics?category=传感器技术&sort=hot"</pre>
+<pre>curl "https://demand-chain.duckdns.org/api/forum/topics?category=传感器技术&sort=hot"</pre>
 <p>返回 JSON 数组。支持参数：<code>category</code>（按行业筛选）、<code>sort</code>（hot/new/top）。</p>
 </div>
 
 <div class="endpoint">
 <span class="tag tag-post">POST</span><code>/api/forum/topics/create</code>
 <div class="url">发帖</div>
-<pre>curl -X POST http://8.154.26.92:8080/api/forum/topics/create \
+<pre>curl -X POST https://demand-chain.duckdns.org/api/forum/topics/create \
   -H 'Content-Type: application/json' \
   -d '{"title":"传感器技术讨论","body":"800度高温传感器可行性研究","category":"传感器技术","author_id":"web_user"}'</pre>
 </div>
@@ -97,7 +97,7 @@ footer{text-align:center;padding:40px;color:var(--ts);font-size:13px;border-top:
 <div class="endpoint">
 <span class="tag tag-post">POST</span><code>/api/forum/topics/{id}/reply</code>
 <div class="url">回复帖子</div>
-<pre>curl -X POST http://8.154.26.92:8080/api/forum/topics/{topic_id}/reply \
+<pre>curl -X POST https://demand-chain.duckdns.org/api/forum/topics/{topic_id}/reply \
   -H 'Content-Type: application/json' \
   -d '{"body":"这个方向不错","author_id":"user2"}'</pre>
 </div>
@@ -105,7 +105,7 @@ footer{text-align:center;padding:40px;color:var(--ts);font-size:13px;border-top:
 <div class="endpoint">
 <span class="tag tag-post">POST</span><code>/api/forum/topics/{id}/vote</code>
 <div class="url">点赞</div>
-<pre>curl -X POST http://8.154.26.92:8080/api/forum/topics/{topic_id}/vote \
+<pre>curl -X POST https://demand-chain.duckdns.org/api/forum/topics/{topic_id}/vote \
   -H 'Content-Type: application/json' \
   -d '{"direction":"up"}'</pre>
 </div>
@@ -114,7 +114,7 @@ footer{text-align:center;padding:40px;color:var(--ts);font-size:13px;border-top:
 <div class="endpoint">
 <span class="tag tag-get">GET</span><code>/api/forum/categories</code>
 <div class="url">获取所有行业分类（按需求数量降序）</div>
-<pre>curl http://8.154.26.92:8080/api/forum/categories</pre>
+<pre>curl https://demand-chain.duckdns.org/api/forum/categories</pre>
 <p>返回 JSON 数组，包含<code>id</code>、<code>name</code>、<code>count</code>。</p>
 </div>
 
@@ -141,3 +141,5 @@ footer{text-align:center;padding:40px;color:var(--ts);font-size:13px;border-top:
 <footer><p>需求链平台 · 永久开源 · Apache 2.0</p></footer>
 <script src="/nav.js?v=6"></script></body>
 </html>
+
+

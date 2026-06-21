@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>个人主页 - 需求链平台</title>
-<link rel="icon" href="logo.jpg" type="image/jpeg">
+<link rel="icon" href="favicon.ico" type="image/x-icon">
 <style>
 :root{--bg:#0c0c1d;--card-bg:#14142b;--text:#e8e8f0;--ts:#9090b0;--accent:#7c6ef0;--border:#2a2a4a;--green:#00b894}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -47,15 +47,15 @@ nav .links .user-info img{width:28px;height:28px;border-radius:50%}
 
 <meta property="og:title" content="需求链平台 — AI 驱动创新基础设施">
 <meta property="og:description" content="用 AI 助手自动匹配需求与供应商。注册即用，永久开源。">
-<meta property="og:image" content="https://8.154.26.92:8080/logo.jpg">
-<meta property="og:url" content="https://8.154.26.92:8080/">
+<meta property="og:image" content="https://demand-chain.duckdns.org/logo.jpg">
+<meta property="og:url" content="https://demand-chain.duckdns.org/">
 <meta name="twitter:card" content="summary_large_image">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 </head>
 <body>
 <nav>
-  <a class="brand" href="/"><img src="logo.jpg" alt="">需求链平台</a>
+  <a class="brand" href="/"><img src="logo_small.png" width="34" height="34" style="width:34px;height:34px;border-radius:8px;object-fit:cover" alt="">需求链平台</a>
   <div class="links" id="navLinks">
     <a href="demand_square.html">需求广场</a>
     <a href="suppliers.html">供应商</a><a href="forum.html">论坛</a>
@@ -138,6 +138,14 @@ nav .links .user-info img{width:28px;height:28px;border-radius:50%}
     </div>
     <button class="btn btn-outline" onclick="showAddSub()" style="margin-top:8px;width:100%">+ 新建订阅</button>
     <div id="subMsg" style="margin-top:8px"></div>
+  </div>
+
+  <!-- 我的认领（科研团队画像） -->
+  <div class="card" id="claimCard">
+    <h3 style="margin-bottom:16px">🔑 我的认领 <span style="font-size:12px;color:var(--ts);font-weight:400">— 认领科研团队画像，接收匹配通知</span></h3>
+    <div id="claimList">
+      <div style="text-align:center;padding:16px;color:var(--ts);font-size:.85em">加载中...</div>
+    </div>
   </div>
 
   <!-- 我的匹配 -->
@@ -431,7 +439,51 @@ async function deleteSub(id) {
   } catch(e) { console.error("deleteSub:", e); }
 }
 
+// 加载可认领画像
+async function loadClaimable() {
+  if (!currentUser || !currentUser.email) return;
+  const div = document.getElementById("claimList");
+  try {
+    const r = await fetch("/api/claimable-profiles?email=" + encodeURIComponent(currentUser.email));
+    const items = await r.json();
+    if (!items || !items.length) {
+      div.innerHTML = '<div style="text-align:center;padding:16px;color:var(--ts);font-size:.85em">暂无可认领的画像。<a href="/suppliers.html" style="color:var(--purple)">浏览供应商 →</a></div>';
+      return;
+    }
+    div.innerHTML = items.map(function(p){
+      return '<div style="padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">' +
+        '<div><strong>' + esc(p.name||"未知") + '</strong>' +
+        ' <span style="font-size:.8em;color:var(--ts)">' + esc(p.type||"") + (p.country?" · "+esc(p.country):"") + '</span>' +
+        (p.description ? '<div style="font-size:.8em;color:var(--ts);margin-top:4px">' + esc(p.description.substring(0,80)) + '...</div>' : '') +
+        '</div>' +
+        '<button class="btn btn-outline" style="padding:4px 12px;font-size:.8em;flex-shrink:0" onclick="doClaim(\''+esc(p.id)+'\',\''+esc(p.name).replace(/'/g,"\\'")+'\')">🔑 认领</button>' +
+        '</div>';
+    }).join('');
+  } catch(e) {
+    div.innerHTML = '<div style="text-align:center;padding:16px;color:var(--ts);font-size:.85em">加载失败，<a href="/suppliers.html" style="color:var(--purple)">去供应商页面认领 →</a></div>';
+  }
+}
+
+async function doClaim(pid, name) {
+  if (!confirm("确认认领「"+name+"」？")) return;
+  try {
+    const r = await fetch("/api/claim-profile", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email:currentUser.email, profile_id:pid})
+    });
+    const d = await r.json();
+    if (d.status === "ok") {
+      alert("✅ "+d.message);
+      loadClaimable();
+    } else {
+      alert("❌ "+(d.error||"认领失败"));
+    }
+  } catch(e) { alert("❌ 网络错误"); }
+}
+
 checkLogin();
+loadClaimable();
 </script>
 <script src="/nav.js?v=6"></script>
 <script src="/i18n.js?v=6"></script>

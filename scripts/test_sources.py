@@ -64,3 +64,4 @@ for name, url in sources:
             print(f"  ✅ OK — {str(data)[:60]}")
     except Exception as e:
         print(f"  ❌ Error: {str(e)[:80]}")
+

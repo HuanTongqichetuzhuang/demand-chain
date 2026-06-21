@@ -248,3 +248,4 @@ def downgrade():
     op.execute("DROP TYPE IF EXISTS matchstatus")
     op.execute("DROP TYPE IF EXISTS profiletype")
     op.execute("DROP TYPE IF EXISTS demandstatus")
+

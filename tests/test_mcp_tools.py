@@ -195,3 +195,4 @@ class TestWellKnownEndpoint:
             data = resp.json()
             assert "name" in data
             assert "total_agents" in data
+

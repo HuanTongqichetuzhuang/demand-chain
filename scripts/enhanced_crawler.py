@@ -114,3 +114,4 @@ async def discover_procurement_demands(keywords: list[str] = None, limit: int = 
 
 if __name__ == "__main__":
     asyncio.run(discover_procurement_demands())
+

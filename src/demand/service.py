@@ -289,10 +289,10 @@ class DemandService:
                 "context": context,
                 "subscribe_all": subscribe_all,
                 "tracked_sub_ids": [],
-                "joined_at": datetime.now(timezone.utc).isoformat(),
+                "joined_at": datetime.utcnow().isoformat(),
             })
         demand.interest_users = details
-        demand.updated_at = datetime.now(timezone.utc)
+        demand.updated_at = datetime.utcnow()
         await self.session.commit()
 
         return {

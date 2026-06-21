@@ -1,5 +1,5 @@
 """
-需求链平台 MCP Server — 68个工具，Agent 通过 MCP 协议直接接入。
+需求链平台 MCP Server — 72个工具，Agent 通过 MCP 协议直接接入。
 """
 import json
 import logging
@@ -256,8 +256,58 @@ async def get_demand(demand_id: str) -> str:
 async def register_capability(session_token: str, user_id: str, description: str) -> str:
     """注册能力画像。AI 辅助生成结构化 Agent Card。"""
     from src.shared.auth import verify
-    await verify(session_token)
-    return json.dumps({"status": "stub", "message": "能力画像注册功能开发中"}, ensure_ascii=False)
+    from src.shared.database import async_session
+    from src.shared.models import CapabilityProfile, ProfileType
+    from src.shared.classification import classification_service
+    from uuid import uuid4
+    try:
+        await verify(session_token)
+        if not description or len(description) < 10:
+            return json.dumps({"status": "error", "message": "请提供至少10个字符的能力描述"}, ensure_ascii=False)
+
+        # 用分类引擎提取分类信息
+        try:
+            classify_result = await classification_service.classify(description)
+            disciplines = [d.get("name", "") for d in (classify_result.disciplines or []) if d.get("name")]
+            ipc = [c.get("code", "") for c in (classify_result.ipc_classes or []) if c.get("code")]
+            processes = [p.get("name", "") for p in (classify_result.processes or []) if p.get("name")]
+        except Exception:
+            disciplines, ipc, processes = [], [], []
+
+        profile = CapabilityProfile(
+            user_id=user_id,
+            agent_card_json={
+                "name": user_id,
+                "description": description,
+                "summary": description[:200],
+                "disciplines": disciplines,
+                "ipc_classes": ipc,
+                "processes": processes,
+                "category": disciplines[0] if disciplines else "未分类",
+                "tags": disciplines + processes,
+            },
+            profile_type=ProfileType.INDIVIDUAL,
+            is_claimed=True,
+            verified=False,
+            trust_score=0.0,
+        )
+        async with async_session() as session:
+            session.add(profile)
+            await session.commit()
+            profile_id = profile.id
+
+        return json.dumps({
+            "status": "ok",
+            "profile_id": profile_id,
+            "message": "能力画像注册成功，可调 search_suppliers 被其他需求发现",
+            "classification": {
+                "disciplines": disciplines,
+                "ipc": ipc,
+                "processes": processes,
+            }
+        }, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
 @mcp.tool()
 async def search_suppliers(query: str = "", top_k: int = 20) -> str:
@@ -415,7 +465,7 @@ async def accept_match(session_token: str, match_id: str, action: str, outcome_d
     from src.shared.flywheel import update_trust_by_outcome
     from sqlalchemy import select
     from uuid import uuid4
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     if action not in ("accept", "reject"):
         return json.dumps({"status": "error", "message": "action 必须为 accept 或 reject"}, ensure_ascii=False)
@@ -768,12 +818,13 @@ async def discover_suppliers(demand_keywords: str, ipc_class: str = "") -> str:
     if not keywords:
         return json.dumps({"status": "error", "message": "请提供至少一个关键词"}, ensure_ascii=False)
     try:
+        from sqlalchemy import text
         results = await discover_for_demand(demand_keywords, keywords)
         # 写入 unclaimed_suppliers 表
         async with async_session() as session:
             for item in results:
                 existing = await session.execute(
-                    "SELECT id FROM unclaimed_suppliers WHERE name = :name AND country = :country",
+                    text("SELECT id FROM unclaimed_suppliers WHERE name = :name AND country = :country"),
                     {"name": item["name"], "country": item.get("country")}
                 )
                 if not existing.scalar():
@@ -888,7 +939,7 @@ async def match_feedback(
     from src.shared.models import Match, Demand, DemandStatus
     from sqlalchemy import select
     from uuid import uuid4
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     try:
         await verify(session_token)
@@ -927,8 +978,8 @@ async def match_feedback(
                     profile_id=sid,
                     score=1.0,  # Agent 推荐，得分最高
                     status=MatchStatus.PENDING,
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc),
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
                 )
                 session.add(match)
                 created.append(sid)
@@ -1105,7 +1156,7 @@ async def agent_contact_supplier(
     from src.shared.outreach import outreach_service
     from sqlalchemy import select
     from uuid import uuid4
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     try:
         await verify(session_token)
@@ -1166,8 +1217,8 @@ async def agent_contact_supplier(
                     id=ws_id, match_id="", demand_id=demand_id,
                     demand_agent_id="", supply_agent_id=supplier_agent_id,
                     status="pending", consent_granted=False, following=False,
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc),
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
                 )
                 session.add(ws)
                 await session.commit()
@@ -1469,7 +1520,7 @@ async def list_available_tools(session_token: str = "") -> str:
             {"name": "contribute_to_platform", "desc": "捐赠"},
         ]
         return json.dumps({"status": "authenticated", "tools": all_tools}, ensure_ascii=False)
-    except:
+    except PermissionError:
         return json.dumps({"status": "new", "tools": core, "message": "注册或登录后可解锁全部工具"}, ensure_ascii=False)
 
 
@@ -1880,11 +1931,12 @@ async def import_discovered_demand(session_token: str, demand_id: str, user_id: 
 async def demand_sources_overview() -> str:
     """查看所有需求发现数据源的概览。"""
     try:
+        from sqlalchemy import text
         sources = []
         for name, info in DATA_SOURCES.items():
             async with async_session() as session:
                 result = await session.execute(
-                    "SELECT count(*) FROM discovered_demands WHERE source = :src",
+                    text("SELECT count(*) FROM discovered_demands WHERE source = :src"),
                     {"src": name}
                 )
                 count = result.scalar()
@@ -2420,7 +2472,7 @@ async def agent_handshake(
     from src.shared.database import async_session
     from src.shared.models import CollaborationWorkspace
     from uuid import uuid4
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     try:
         await verify(session_token)
@@ -2439,8 +2491,8 @@ async def agent_handshake(
                 status="pending",
                 consent_granted=False,
                 following=False,
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
             )
             session.add(ws)
             await session.commit()
@@ -2474,7 +2526,7 @@ async def agent_accept_handshake(
     from src.shared.database import async_session
     from src.shared.models import CollaborationWorkspace
     from sqlalchemy import select
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     try:
         await verify(session_token)
@@ -2490,8 +2542,8 @@ async def agent_accept_handshake(
             if accept:
                 ws.status = "active"
                 ws.consent_granted = True
-                ws.consent_granted_at = datetime.now(timezone.utc)
-                ws.updated_at = datetime.now(timezone.utc)
+                ws.consent_granted_at = datetime.utcnow()
+                ws.updated_at = datetime.utcnow()
                 await session.commit()
                 return json.dumps({
                     "status": "ok",
@@ -2501,7 +2553,7 @@ async def agent_accept_handshake(
                 }, ensure_ascii=False)
             else:
                 ws.status = "rejected"
-                ws.updated_at = datetime.now(timezone.utc)
+                ws.updated_at = datetime.utcnow()
                 await session.commit()
                 return json.dumps({
                     "status": "ok",
@@ -2681,11 +2733,6 @@ async def research_summary(topic: str, session_token: str = "") -> str:
 def run():
     logging.basicConfig(level=logging.INFO)
     logger.info("需求链 MCP Server 启动中 (0.0.0.0:8000)...")
-
-    # Initialize database tables
-    import asyncio
-    from src.shared.database import init_db
-    asyncio.run(init_db())
 
     # Mount HTTP API routes on the same SSE app
     from src.web_server import api_auto_demand, api_auto_supplier, api_demand_list, api_suppliers

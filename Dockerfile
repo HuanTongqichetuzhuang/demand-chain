@@ -14,6 +14,7 @@ COPY AGENT_GUIDE.md ./
 COPY *.html ./
 COPY *.jpg ./
 COPY *.png ./
+COPY *.ico ./
 COPY *.js ./
 COPY scripts/ ./scripts/
 COPY docs/ ./docs/

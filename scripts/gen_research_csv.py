@@ -171,3 +171,4 @@ from collections import Counter
 stats = Counter(t for t, n in data)
 for typ, count in stats.most_common():
     print(f"  {typ}: {count}")
+

@@ -139,3 +139,4 @@ class TestClassificationPipeline:
         from src.shared.classification import classification_service
         # 只验证实例存在，不调用（因需 LLM API Key）
         assert hasattr(classification_service, "classify")
+
