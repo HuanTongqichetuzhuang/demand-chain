@@ -20,7 +20,7 @@
 | **论坛系统** | ✅ | 发帖/回复/点赞/置顶/Markdown 渲染/分页 |
 | **用户系统** | ✅ | 注册/登录/个人资料/头像/密码修改/通知设置 |
 | **科研工作台** 🆕 | ✅ | 跨库学术检索（PubMed/CrossRef/OpenAlex/Semantic Scholar）+ Grants.gov 资助搜索 + AI 研究总结 |
-| **MCP Server** | ✅ | 71 个工具，Agent 直接接入 |
+| **MCP Server** | ✅ | 72 个工具，Agent 直接接入 |
 | **Web 页面** | ✅ | 首页/需求广场/供应商/论坛/科研工作台/登录/个人主页/API 文档/教程 |
 | **自动爬虫** | ✅ | 每日 06:00 自动执行，9 个需求源 + 3 个供应商源 |
 | **国际化** | 🚧 | 中英文切换（部分页面） |
@@ -68,10 +68,10 @@ docker compose -f docker-compose.prod.yml -p dc up -d
 将 MCP 地址配置给你的 AI 助手（Claude Desktop / 龙虾助手 / 通义千问）：
 
 ```
-http://demand-chain.duckdns.org:8000/sse
+https://demand-chain.duckdns.org/sse
 ```
 
-你的 AI 助手即可使用 71 个工具，代表你发布需求、搜索供应商、查看匹配结果、搜索学术论文。
+你的 AI 助手即可使用 72 个工具，代表你发布需求、搜索供应商、查看匹配结果、搜索学术论文。
 
 ## 项目结构
 
@@ -94,7 +94,7 @@ http://demand-chain.duckdns.org:8000/sse
 │   ├── sci_equip_crawler.py           # 科研设备爬虫
 │   └── seed_forum.py       # 论坛种子数据
 └── src/
-    ├── server.py           # MCP Server (71 tools)
+    ├── server.py           # MCP Server (72 tools)
     ├── web_server.py       # Web + REST API + 学术检索 API
     ├── matching/engine.py  # 匹配引擎
     ├── forum/service.py    # 论坛服务

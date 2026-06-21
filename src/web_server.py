@@ -30,7 +30,7 @@ _LOGIN_LIMIT = 5
 _LOGIN_WINDOW = 300  # 5 分钟
 
 _api_attempts: dict[str, list[float]] = defaultdict(list)
-_API_LIMIT = 120
+_API_LIMIT = 300
 _API_WINDOW = 60  # 1 分钟
 
 
@@ -106,7 +106,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         path = request.url.path
         # Skip static files and WebSocket
-        if path.startswith("/ws/") or path.startswith("/.well-known/"):
+        if path.startswith("/ws/") or path.startswith("/.well-known/") or \
+           path.endswith((".css", ".js", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".webp", ".woff2")):
             return await call_next(request)
 
         client_ip = request.client.host if request.client else "unknown"
@@ -941,6 +942,99 @@ async def api_auto_supplier(request):
         logger.error(f"api_auto_supplier error: {e}\n{traceback.format_exc()}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
+
+# ============================================================
+# 科研团队认领 API
+# ============================================================
+
+async def api_claim_profile(request):
+    """POST /api/claim-profile — 科研团队/机构认领画像"""
+    from src.shared.database import async_session
+    from src.shared.models import CapabilityProfile, User
+    from sqlalchemy import select
+    import json, re
+    try:
+        body = await request.json()
+        email = body.get("email", "")
+        profile_id = body.get("profile_id", "")
+        if not email or not profile_id:
+            return JSONResponse({"error": "缺少email或profile_id"}, status_code=400)
+        if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+            return JSONResponse({"error": "无效邮箱"}, status_code=400)
+
+        async with async_session() as session:
+            # 验证用户存在
+            result = await session.execute(select(User).where(User.email == email))
+            user = result.scalar_one_or_none()
+            if not user:
+                return JSONResponse({"error": "用户不存在，请先注册"}, status_code=404)
+
+            # 查找画像
+            result = await session.execute(select(CapabilityProfile).where(
+                CapabilityProfile.id == profile_id,
+                CapabilityProfile.is_claimed == False,
+            ))
+            profile = result.scalar_one_or_none()
+            if not profile:
+                return JSONResponse({"error": "画像不存在或已被认领"}, status_code=404)
+
+            # 认领：设置用户ID + 标记已认领
+            profile.user_id = user.human_id
+            profile.is_claimed = True
+            await session.commit()
+
+            name = profile.agent_card_json.get("name", "") if isinstance(profile.agent_card_json, dict) else ""
+            return JSONResponse({
+                "status": "ok",
+                "profile_id": profile.id,
+                "name": name,
+                "message": f"成功认领{name}"
+            })
+    except Exception as e:
+        logger.error(f"api_claim_profile error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_claimable_profiles(request):
+    """GET /api/claimable-profiles — 获取当前用户可认领的画像列表"""
+    from src.shared.database import async_session
+    from src.shared.models import CapabilityProfile
+    from sqlalchemy import select
+    try:
+        email = request.query_params.get("email", "")
+        if not email:
+            return JSONResponse({"error": "缺少email"}, status_code=400)
+
+        async with async_session() as session:
+            result = await session.execute(
+                select(CapabilityProfile)
+                .where(CapabilityProfile.is_claimed == False)
+                .order_by(CapabilityProfile.created_at.desc())
+                .limit(50)
+            )
+            profiles = result.scalars().all()
+
+            items = []
+            for p in profiles:
+                card = p.agent_card_json or {}
+                if isinstance(card, str):
+                    try: card = json.loads(card)
+                    except: card = {}
+                name = card.get("name", "") if isinstance(card, dict) else ""
+                # 简单匹配：邮箱域名或名称包含
+                items.append({
+                    "id": p.id,
+                    "name": name,
+                    "type": p.profile_type.value if hasattr(p.profile_type, 'value') else str(p.profile_type),
+                    "country": p.country or "",
+                    "trust_score": p.trust_score,
+                    "tags": card.get("tags", []) if isinstance(card, dict) else [],
+                    "description": (card.get("description", "") or card.get("summary", ""))[:200] if isinstance(card, dict) else "",
+                })
+            return JSONResponse(items)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 # ============================================================
 # REST API — 论坛、需求等数据接口
 # ============================================================
@@ -1502,6 +1596,74 @@ async def api_admin_suppliers_delete(request):
             await session.commit()
 
         return JSONResponse({"status": "deleted", "id": supplier_id})
+    except PermissionError as e:
+        return JSONResponse({"error": str(e)}, status_code=403)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_admin_suppliers_update(request):
+    """PUT /api/admin/suppliers/{id} — 更新供应商信息（供爬虫补全用）"""
+    from src.shared.database import async_session
+    from src.shared.models import CapabilityProfile
+    from sqlalchemy import select
+    try:
+        await _require_admin(request)
+        supplier_id = request.path_params.get("id", "")
+        body = await request.json()
+        
+        # 可更新字段
+        updates = {}
+        for key in ("description", "country", "category", "industry", "name", "url",
+                    "discipline", "trl", "trust_score", "profile_type"):
+            if key in body:
+                updates[key] = body[key]
+        
+        # agent_card 作为 JSONB 单独处理
+        agent_card = body.get("agent_card", {})
+        if agent_card:
+            # 合并而非覆盖
+            for key in ("description", "country", "contact", "skills", "process",
+                        "category", "industry", "name", "url", "discipline", "trl"):
+                if key in agent_card:
+                    updates[f"agent_card_json.{key}"] = agent_card[key]
+        
+        async with async_session() as session:
+            r = await session.execute(select(CapabilityProfile).where(CapabilityProfile.id == supplier_id))
+            p = r.scalar_one_or_none()
+            if not p:
+                return JSONResponse({"error": "供应商不存在"}, status_code=404)
+            
+            # 更新顶层字段
+            for key in ("description", "country", "category", "industry", "url", "profile_type"):
+                if key in body:
+                    setattr(p, key, body[key])
+            if "name" in body:
+                p.name = body["name"]
+            if "trust_score" in body:
+                p.trust_score = float(body["trust_score"])
+            if "discipline" in body:
+                p.discipline = body["discipline"]
+            if "trl" in body:
+                p.trl = int(body["trl"])
+            
+            # 更新 agent_card (JSONB)
+            if agent_card:
+                card = dict(p.agent_card_json or {})
+                for key, val in agent_card.items():
+                    if key == "contact" and isinstance(val, dict):
+                        card["contact"] = {**card.get("contact", {}), **val}
+                    elif key == "skills" and isinstance(val, list):
+                        card["skills"] = list(set(card.get("skills", []) + val))
+                    elif key == "process" and isinstance(val, list):
+                        card["process"] = list(set(card.get("process", []) + val))
+                    elif val is not None and val != "":
+                        card[key] = val
+                p.agent_card_json = card
+            
+            await session.commit()
+        
+        return JSONResponse({"status": "updated", "id": supplier_id})
     except PermissionError as e:
         return JSONResponse({"error": str(e)}, status_code=403)
     except Exception as e:
@@ -2440,6 +2602,8 @@ routes = [
     Route("/api/register", api_register, methods=["POST"]),
     Route("/api/login", api_login, methods=["POST"]),
     Route("/api/verify-email", api_verify_email),
+    Route("/api/claim-profile", api_claim_profile, methods=["POST"]),
+    Route("/api/claimable-profiles", api_claimable_profiles),
     Route("/api/forum/categories", api_forum_categories),
     Route("/api/forum/topics/create", api_forum_create, methods=["POST"]),
     Route("/api/forum/topics", api_forum_topics),
@@ -2472,6 +2636,7 @@ routes = [
     Route("/api/admin/users", api_admin_users_list),
     Route("/api/admin/users/{id}", api_admin_users_update, methods=["POST"]),
     Route("/api/admin/suppliers/{id}", api_admin_suppliers_delete, methods=["DELETE"]),
+    Route("/api/admin/suppliers/{id}", api_admin_suppliers_update, methods=["PUT"]),
     Route("/api/admin/demands/{id}", api_admin_demands_delete, methods=["DELETE"]),
     Route("/api/home/stats", api_home_stats),
     Route("/api/global_search", api_global_search),

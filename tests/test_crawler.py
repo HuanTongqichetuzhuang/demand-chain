@@ -180,3 +180,4 @@ class TestCompanyContacts:
             result = await contact_finder.find("example.com")
             assert result is not None
             assert "example.com" in result.emails[0]
+

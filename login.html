@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>需求链平台 — 注册 / 登录</title>
-<link rel="icon" href="logo.jpg" type="image/jpeg">
+<link rel="icon" href="favicon.ico" type="image/x-icon">
 <style>
 :root{--purple:#7c6ef0;--muted:#8888aa;--bg:#0c0c1d;--card-bg:#14142b;--text:#e8e8f0;--ts:#9090b0;--accent:#6c5ce7;--border:#2a2a4a;--green:#00b894;--red:#e24b4a;--amber:#fdcb6e}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -63,8 +63,8 @@ footer .links a:hover{color:var(--text)}
 
 <meta property="og:title" content="需求链平台 — AI 驱动创新基础设施">
 <meta property="og:description" content="用 AI 助手自动匹配需求与供应商。注册即用，永久开源。">
-<meta property="og:image" content="https://8.154.26.92:8080/logo.jpg">
-<meta property="og:url" content="https://8.154.26.92:8080/">
+<meta property="og:image" content="https://demand-chain.duckdns.org/logo.jpg">
+<meta property="og:url" content="https://demand-chain.duckdns.org/">
 <meta name="twitter:card" content="summary_large_image">
 
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -72,7 +72,7 @@ footer .links a:hover{color:var(--text)}
 <body>
 <nav>
   <a class="brand" href="/">
-    <img src="logo.jpg" alt="">
+    <img src="logo_small.png" alt="">
     需求链平台
   </a>
   <div class="links">
@@ -84,7 +84,7 @@ footer .links a:hover{color:var(--text)}
 </nav>
 <div class="container">
 <div style="text-align:center;margin-bottom:30px">
-<img src="logo.jpg" alt="" style="width:80px;height:80px;border-radius:16px;margin-bottom:12px">
+<img src="logo_small.png" alt="" style="width:80px;height:80px;border-radius:16px;margin-bottom:12px">
 <h1 style="font-size:1.8em;margin-bottom:4px">需求链平台</h1>
 <p style="color:var(--ts);font-size:.9em">注册后拿 API 密钥给你的 AI 助手，它帮你发布需求、找合作</p>
 </div>
@@ -205,7 +205,7 @@ document.getElementById("agentPromptSection").classList.add("hidden");
 }
 document.getElementById("profileEmail").textContent = "邮箱: " + email;
 document.getElementById("apiKeyDisplay").textContent = apiKey || "";
-document.getElementById("agentPrompt").textContent = "我的需求链平台账号已就绪。API密钥："+(apiKey||"")+"。请用这个密钥帮我发布需求和搜索匹配。MCP地址：http://8.154.26.92:8000/sse";
+document.getElementById("agentPrompt").textContent = "我的需求链平台账号已就绪。API密钥："+(apiKey||"")+"。请用这个密钥帮我发布需求和搜索匹配。MCP地址：https://demand-chain.duckdns.org/sse";
 }
 
 function copyApiKey() {
@@ -265,6 +265,7 @@ document.getElementById("sectionProfile").classList.add("hidden");
     <a href="suppliers.html">供应商</a><a href="forum.html">论坛</a>
     <a href="docs/tutorial.html">教程</a>
     <a href="login.html">登录</a>
+    <a href="https://message.bilibili.com/#/whisper/14516298" target="_blank" title="B站私信反馈">问题反馈</a>
     <a href="https://github.com/HuanTongqichetuzhuang/demand-chain">GitHub</a>
   </div>
   <p>需求链平台 v5.0 · Apache 2.0 · 永久开源 · 中立 · 免费</p>
@@ -272,3 +273,6 @@ document.getElementById("sectionProfile").classList.add("hidden");
 <script src="/nav.js?v=6"></script><script src="/i18n.js?v=6"></script>
 </body>
 </html>
+
+
+

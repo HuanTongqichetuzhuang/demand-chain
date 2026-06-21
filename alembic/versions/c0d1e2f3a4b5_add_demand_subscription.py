@@ -35,3 +35,4 @@ def upgrade():
 def downgrade():
     op.drop_index("ix_demand_subscriptions_user", table_name="demand_subscriptions")
     op.drop_table("demand_subscriptions")
+

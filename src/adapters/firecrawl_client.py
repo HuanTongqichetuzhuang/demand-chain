@@ -15,6 +15,13 @@ FIRECRAWL_API_KEY = os.environ.get("FIRECRAWL_API_KEY", "")
 FIRECRAWL_BASE = "https://api.firecrawl.dev/v1"
 
 
+def _require_api_key():
+    """检查 Firecrawl API Key 是否已配置，否则返回错误"""
+    if not FIRECRAWL_API_KEY:
+        return {"status": "error", "reason": "Firecrawl API Key 未配置，请在环境变量 FIRECRAWL_API_KEY 中设置"}
+    return None
+
+
 class FirecrawlClient:
     """Firecrawl API 客户端"""
 
@@ -134,6 +141,17 @@ _firecrawl = None
 
 def get_firecrawl() -> FirecrawlClient:
     global _firecrawl
+    key_error = _require_api_key()
+    if key_error:
+        # Return a mock that returns error for any call
+        class ErrorClient:
+            async def scrape_url(self, url, **kw): return {"status": "error", "reason": "Firecrawl API Key 未配置"}
+            async def search_web(self, q, **kw): return []
+            async def search_patents(self, q, **kw): return []
+            async def search_procurement(self, q, **kw): return []
+            async def search_academic(self, q, **kw): return []
+            async def check_credits(self): return {"status": "error"}
+        return ErrorClient()
     if _firecrawl is None:
         _firecrawl = FirecrawlClient()
     return _firecrawl

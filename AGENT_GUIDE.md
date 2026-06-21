@@ -272,3 +272,4 @@ Agent：调用 accept_match(demand_id, "accept")
 ---
 
 _版本 v1.0 | 2026-06-05 | 需求链平台 Agent 接入指南_
+

@@ -154,3 +154,4 @@ class TestTfidfSearch:
         idx.build_index()
         results = idx.search("anything", top_k=5)
         assert results == []
+

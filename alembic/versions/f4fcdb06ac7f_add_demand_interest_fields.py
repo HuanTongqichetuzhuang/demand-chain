@@ -27,3 +27,4 @@ def downgrade():
     op.drop_column("demands", "interest_users")
     op.drop_column("demands", "duplicate_group_id")
     op.drop_column("demands", "interest_count")
+

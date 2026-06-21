@@ -8,7 +8,7 @@
 | **One-line description** | An open, AI-powered innovation infrastructure that connects problem-holders with problem-solvers using Agent-to-Agent (A2A) protocol |
 | **License** | Apache 2.0 |
 | **Repository** | https://github.com/HuanTongqichetuzhuang/demand-chain |
-| **Website** | https://8.154.26.92:8080 |
+| **Website** | https://demand-chain.duckdns.org |
 | **Existing funding** | None (community-funded) |
 | **Target budget** | €45,000 |
 
@@ -131,3 +131,4 @@ The core software will remain **Apache 2.0 — forever free and open-source**.
 ---
 
 *Submitted by HuanTongqichetuzhuang — June 2026*
+

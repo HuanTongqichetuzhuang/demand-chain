@@ -3,11 +3,11 @@
 ## 基本信息
 
 **服务器名称**: 需求链平台 (Demand Chain Platform)  
-**MCP服务器地址**: `http://8.154.26.92:8000/sse`  
+**MCP服务器地址**: `https://demand-chain.duckdns.org/sse`  
 **协议版本**: MCP 1.0  
 **传输方式**: Server-sent Events (SSE)  
 **开源协议**: Apache 2.0  
-**网站**: http://8.154.26.92:8080  
+**网站**: http://demand-chain.duckdns.org  
 **GitHub**: https://github.com/HuanTongqichetuzhuang/demand-chain  
 
 ---
@@ -35,7 +35,7 @@
 
 ### MCP服务器能做什么？
 
-需求链MCP服务器提供56+工具，涵盖以下核心功能：
+需求链MCP服务器提供72个工具，涵盖以下核心功能：
 
 #### 1. 需求管理
 - `search_demands` - 搜索公开需求（支持语义搜索）
@@ -103,7 +103,7 @@ AI助手：[调用 search_suppliers 工具]
 ```
 用户：在需求链论坛上创建一个关于"AI发展趋势"的主题
 AI助手：[调用 forum_create_topic 工具]
-结果：主题已创建！链接：http://8.154.26.92:8080/forum/topic/123
+结果：主题已创建！链接：http://demand-chain.duckdns.org/forum/topic/123
 ```
 
 ---
@@ -120,7 +120,7 @@ AI助手：[调用 forum_create_topic 工具]
 {
   "mcpServers": {
     "demand-chain": {
-      "url": "http://8.154.26.92:8000/sse"
+      "url": "https://demand-chain.duckdns.org/sse"
     }
   }
 }
@@ -133,13 +133,13 @@ AI助手：[调用 forum_create_topic 工具]
 
 1. 打开WorkBuddy设置
 2. 进入"MCP配置"
-3. 添加需求链MCP服务器：`http://8.154.26.92:8000/sse`
+3. 添加需求链MCP服务器：`https://demand-chain.duckdns.org/sse`
 4. 保存配置
 5. 现在WorkBuddy可以使用需求链的工具了！
 
 ### 方法3：在其他MCP客户端中配置
 
-任何支持MCP协议的客户端都可以配置需求链MCP服务器，只需提供SSE地址：`http://8.154.26.92:8000/sse`
+任何支持MCP协议的客户端都可以配置需求链MCP服务器，只需提供SSE地址：`https://demand-chain.duckdns.org/sse`
 
 ---
 
@@ -148,8 +148,8 @@ AI助手：[调用 forum_create_topic 工具]
 ### MCP协议信息
 - **协议版本**: 1.0
 - **传输方式**: Server-sent Events (SSE)
-- **服务器地址**: `http://8.154.26.92:8000/sse`
-- **工具数量**: 56+ 工具
+- **服务器地址**: `https://demand-chain.duckdns.org/sse`
+- **工具数量**: 72 个工具
 
 ### 认证方式
 - **公开访问**: 部分工具无需登录即可使用（如`search_demands`）
@@ -206,7 +206,7 @@ AI助手：[调用 forum_create_topic 工具]
 
 ## 更新日志
 
-- **2026-06-11**: 完善MCP工具，支持56+工具
+- **2026-06-11**: 完善MCP工具，支持72个工具
 - **2026-06-10**: 添加自动爬虫功能，每日自动更新需求
 - **2026-06-09**: 完善论坛系统，支持Markdown和分页
 - **2026-06-08**: 添加用户系统，支持登录和个人资料
@@ -219,14 +219,14 @@ AI助手：[调用 forum_create_topic 工具]
 ### 用于Smithery.ai
 
 **Name**: demand-chain  
-**Description**: AI-driven open-source demand matching infrastructure. Connects global demands with suppliers via MCP protocol. 56+ tools for demand management, supplier discovery, and intelligent matching.  
+**Description**: AI-driven open-source demand matching infrastructure. Connects global demands with suppliers via MCP protocol. 72 tools for demand management, supplier discovery, and intelligent matching.  
 **Category**: Business / Productivity  
 **Tags**: demand-matching, ai, mcp, open-source, innovation  
 
 ### 用于Glama.ai
 
 **Title**: Demand Chain Platform MCP Server  
-**Summary**: The Demand Chain Platform MCP Server provides 56+ tools for AI assistants to access demand matching infrastructure. Search demands, discover suppliers, publish requirements, and participate in forums.  
+**Summary**: The Demand Chain Platform MCP Server provides 72 tools for AI assistants to access demand matching infrastructure. Search demands, discover suppliers, publish requirements, and participate in forums.  
 **Features**:
 - Search 131+ real demands from public sources
 - Discover 53+ suppliers across industries
@@ -240,7 +240,7 @@ AI助手：[调用 forum_create_topic 工具]
 {
   "mcpServers": {
     "demand-chain": {
-      "url": "http://8.154.26.92:8000/sse"
+      "url": "https://demand-chain.duckdns.org/sse"
     }
   }
 }
@@ -253,8 +253,10 @@ AI助手：[调用 forum_create_topic 工具]
 - **创始人**: 潘振强 (HuanTongqichetuzhuang)
 - **邮箱**: 477570216@qq.com
 - **GitHub**: https://github.com/HuanTongqichetuzhuang/demand-chain
-- **平台网站**: http://8.154.26.92:8080
+- **平台网站**: http://demand-chain.duckdns.org
 
 ---
 
 **让全人类的创造力蓬勃发展的AI创新基础设施**
+
+

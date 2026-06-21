@@ -63,16 +63,35 @@ function timeAgo(d) {
   return Math.floor(diff/2592000) + " 个月前";
 }
 
-// 分类标签显示名称
+// 分类标签显示名称（与后端 CATEGORIES 保持一致）
 var CAT_LABELS = {
-  "demand_board": "需求告示板",
-  "capability_showcase": "能力展示",
-  "matching_feedback": "匹配反馈",
-  "bug_report": "问题反馈",
-  "feature_request": "功能建议",
+  "ai": "人工智能",
+  "biomedicine": "生物医药",
+  "new_energy": "新能源",
+  "semiconductor": "半导体",
+  "materials": "材料科学",
+  "aerospace": "航空航天",
+  "information": "信息技术",
+  "sensor": "传感器技术",
+  "robotics": "机器人与智能系统",
+  "environmental": "环境工程",
+  "manufacturing": "制造业",
+  "electronics": "电子科学与技术",
+  "chemistry": "化学工程",
+  "transport": "交通运输",
+  "agriculture": "农业科学",
+  "ocean": "海洋科学",
   "general": "综合讨论"
 };
-function catLabel(c) { return CAT_LABELS[c] || c || "综合讨论"; }
+// 兼容旧分类（迁移期间）
+var CAT_LEGACY = {
+  "demand_board": "综合讨论",
+  "capability_showcase": "综合讨论",
+  "matching_feedback": "综合讨论",
+  "bug_report": "综合讨论",
+  "feature_request": "综合讨论"
+};
+function catLabel(c) { return CAT_LABELS[c] || CAT_LEGACY[c] || c || "综合讨论"; }
 
 // 构建帖子卡片
 function buildCard(t) {
@@ -217,3 +236,4 @@ async function replyTopic(id) {
 
 loadCategories();
 loadTopics();
+

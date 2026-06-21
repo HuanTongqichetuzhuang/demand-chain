@@ -28,6 +28,13 @@
     'nav .links a:hover{background:rgba(124,110,240,0.08);color:var(--text)}' +
     'nav .links .btn-nav{background:linear-gradient(135deg,var(--purple),var(--purple-dark));box-shadow:0 2px 12px var(--glow-purple);padding:7px 20px;font-weight:600;color:#fff!important}' +
     'nav .links .btn-nav:hover{transform:translateY(-1px);box-shadow:0 4px 20px var(--glow-purple)}' +
+    'nav .dropdown{position:relative;display:inline-flex;padding-bottom:12px;margin-bottom:-12px}' +
+    'nav .dropdown-trigger{font-size:13.5px;color:var(--ts);padding:6px 14px;border-radius:8px;cursor:pointer;transition:all 0.25s ease;text-decoration:none;background:none;border:none;font-family:inherit}' +
+    'nav .dropdown-trigger:hover{background:rgba(124,110,240,0.08);color:var(--text)}' +
+    'nav .dropdown-menu{position:absolute;top:100%;right:0;margin-top:0;min-width:160px;background:var(--card-bg-solid);border:1px solid var(--border);border-radius:12px;padding:6px;box-shadow:0 8px 32px rgba(0,0,0,0.4);display:none;z-index:200}' +
+    'nav .dropdown:hover .dropdown-menu{display:block}' +
+    'nav .dropdown-menu a{display:block;font-size:13px;color:var(--ts);padding:8px 12px;border-radius:8px;text-decoration:none;transition:all 0.15s ease}' +
+    'nav .dropdown-menu a:hover{background:rgba(124,110,240,0.12);color:var(--text)}' +
     '.notif-bell{position:relative;display:inline-flex;align-items:center;padding:6px 10px!important;font-size:16px!important}' +
     '.notif-bell .badge{position:absolute;top:-2px;right:-2px;background:var(--red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px}' +
     '.card{border-radius:16px;transition:all 0.25s ease}.card:hover{box-shadow:0 8px 32px rgba(0,0,0,0.2);transform:translateY(-2px)}' +
@@ -58,19 +65,25 @@
     try { session = JSON.parse(localStorage.getItem('dc_session')); } catch(e) {}
     var loggedIn = !!(session && session.email);
 
-    var brandHtml = '<a class="brand" href="/"><img src="/logo.jpg" width="34" height="34" style="width:34px;height:34px;border-radius:8px;object-fit:cover" alt="" loading="lazy">需求链平台</a>';
+    var brandHtml = '<a class="brand" href="/"><img src="/logo_small.png" width="34" height="34" style="width:34px;height:34px;border-radius:8px;object-fit:cover" alt="" loading="lazy">需求链平台</a>';
     var linksHtml = '<div class="links">';
-    linksHtml += '<a href="/demand_square.html">需求广场</a>';
-    linksHtml += '<a href="/suppliers.html">供应商</a>';
-    linksHtml += '<a href="/forum.html">论坛</a>';
-    linksHtml += '<a href="/scientist_workbench.html" style="background:rgba(0,212,160,0.12);color:var(--green)!important;font-weight:600">🔬科研工作台</a>';
-    linksHtml += '<a href="/flywheel_dashboard.html">飞轮</a>';
-    linksHtml += '<a href="/docs/tutorial.html">教程</a>';
-    linksHtml += '<a href="/api_docs.html">API文档</a>';
+    linksHtml += '<a href="/demand_square.html" style="font-weight:600;color:var(--text)!important">📋 发布需求</a>';
+    linksHtml += '<a href="/suppliers.html" style="font-weight:600;color:var(--text)!important">🔍 找供应商</a>';
+    linksHtml += '<a href="/forum.html" style="font-weight:600;color:var(--text)!important">💬 论坛</a>';
+    linksHtml += '<span class="dropdown"><span class="dropdown-trigger">🔬 实验室 ▾</span><span class="dropdown-menu">';
+    linksHtml += '<a href="/scientist_workbench.html">🔬 科研工作台</a>';
+    linksHtml += '<a href="/flywheel_dashboard.html">⚙️ 数据飞轮</a>';
+    linksHtml += '<a href="/docs/tutorial.html">📖 教程</a>';
+    linksHtml += '<a href="/api_docs.html">📡 API文档</a>';
+    linksHtml += '</span></span>';
     if (loggedIn) {
       linksHtml += '<a href="/notifications.html" class="notif-bell" id="notifBell" title="通知中心">🔔<span class="badge" id="notifBadge">0</span></a>';
+      var avatarUrl = session.avatar || '';
+      var avatarHtml = avatarUrl
+        ? '<img src="'+avatarUrl+'" style="width:28px;height:28px;border-radius:50%;object-fit:cover;margin-right:4px;vertical-align:middle" loading="lazy">'
+        : '';
       linksHtml += '<a href="/profile.html" style="display:inline-flex;align-items:center;gap:4px;font-size:14px;color:var(--text);margin-left:4px">' +
-        esc(session.name || session.email) + '</a>';
+        avatarHtml + esc(session.name || session.email) + '</a>';
       linksHtml += '<a href="#" onclick="localStorage.removeItem(\'dc_session\');location.reload()" style="font-size:13px;color:var(--ts)">退出</a>';
     } else {
       linksHtml += '<a href="/login.html" class="btn-nav">登录</a>';
@@ -101,6 +114,17 @@
       observer.observe(nav, { childList: true, subtree: true });
     }
   }, 500);
+
+  // 更新导航栏头像（profile.html 上传后调用）
+  window.updateNav = function(displayName, avatarUrl) {
+    var session = null;
+    try { session = JSON.parse(localStorage.getItem('dc_session')); } catch(e) {}
+    if (session && avatarUrl) {
+      session.avatar = avatarUrl;
+      localStorage.setItem('dc_session', JSON.stringify(session));
+    }
+    renderNav();
+  };
 
   // 通知未读计数
   function updateNotifCount() {

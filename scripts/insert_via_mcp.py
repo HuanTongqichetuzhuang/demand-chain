@@ -10,7 +10,7 @@ import re
 import time
 
 
-MCP_HOST = "8.154.26.92"
+MCP_HOST = "demand-chain.duckdns.org"
 MCP_PORT = 8000
 
 # Registered crawler user credentials
@@ -251,3 +251,5 @@ if __name__ == "__main__":
                 insert_suppliers(suppliers_file)
         else:
             print("No JSON files found. Run auto_crawler.py first.")
+
+

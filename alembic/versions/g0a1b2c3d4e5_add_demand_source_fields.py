@@ -34,3 +34,4 @@ def downgrade():
     op.drop_column("demands", "organization")
     op.drop_column("demands", "source_url")
     op.drop_column("demands", "source")
+

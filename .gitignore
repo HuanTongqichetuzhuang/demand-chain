@@ -37,3 +37,31 @@ LOGO/
 # GitHub workflow files — pushed via web UI only.github/workflows/
 
 # AI Agent internal files.reasonix/.workbuddy/.claude/
+
+# JSON data dumps
+*.json
+!pyproject.toml
+!alembic.ini
+
+# SQL scripts (temp analysis)
+scripts/*.sql
+scripts/*.json
+
+# Deploy temp files
+deploy/*.sh
+deploy/*.conf
+deploy/*.md
+
+# Temp test files (keep important crawlers)
+scripts/test_*.py
+scripts/debug_*.py
+scripts/check_*.py
+scripts/fix_*.py
+scripts/enrich_*.py
+scripts/count_*.py
+scripts/audit_*.py
+scripts/analyze_*.py
+scripts/gen_*.py
+scripts/import_*.py
+scripts/resize_logo.py
+scripts/remove_*

@@ -17,7 +17,7 @@
 import json, sys, time
 from collections import Counter
 
-API_BASE = "http://8.154.26.92:8080"
+API_BASE = "http://demand-chain.duckdns.org:8080"
 BATCH_SIZE = 50  # 每批更新数
 
 # ============================================================
@@ -363,7 +363,7 @@ def run(dry_run=False, target_category=None):
                     sql_file = f.name
                 
                 result = subprocess.run(
-                    ["ssh", "-p", "2222", "root@8.154.26.92",
+                    ["ssh", "-p", "2222", "root@demand-chain.duckdns.org",
                      f"docker exec -i dc-db psql -U dc -d demand_chain < {sql_file}"],
                     capture_output=True, text=True, timeout=30
                 )
@@ -388,3 +388,5 @@ if __name__ == "__main__":
             target = arg.split("=", 1)[1]
 
     run(dry_run=dry, target_category=target)
+
+

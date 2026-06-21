@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>供应商 - 需求链平台</title>
-<link rel="icon" href="logo.jpg" type="image/jpeg">
+<link rel="icon" href="favicon.ico" type="image/x-icon">
 <link rel="stylesheet" href="shared.css?v=6">
 <style>
 h1{font-size:1.6em;margin:20px 0 4px}
@@ -100,17 +100,17 @@ h1{font-size:1.6em;margin:20px 0 4px}
 {
   "@context": "https://schema.org",
   "@graph": [
-    {"@type":"SoftwareApplication","name":"需求链平台","alternateName":"Demand Chain Platform","description":"AI驱动的开源需求匹配基础设施，基于MCP协议连接全球需求与供应商","url":"http://8.154.26.92:8080","applicationCategory":"BusinessApplication","operatingSystem":"Web","offers":{"@type":"Offer","price":"0","priceCurrency":"CNY"},"author":{"@type":"Organization","name":"需求链平台"}},
-    {"@type":"Organization","name":"需求链平台","url":"http://8.154.26.92:8080","logo":"http://8.154.26.92:8080/logo.jpg","description":"AI驱动的开源创新基础设施，连接全球需求与供应商"},
-    {"@type":"WebSite","name":"需求链平台","url":"http://8.154.26.92:8080","potentialAction":{"@type":"SearchAction","target":"http://8.154.26.92:8080/suppliers.html?q={search_term_string}","query-input":"required name=search_term_string"}},
-    {"@type":"CollectionPage","name":"供应商","description":"公开的供应商能力档案，AI助手通过匹配引擎自动为每条需求寻找最佳供应商","url":"http://8.154.26.92:8080/suppliers.html","isPartOf":{"@type":"WebSite","name":"需求链平台","url":"http://8.154.26.92:8080"}}
+    {"@type":"SoftwareApplication","name":"需求链平台","alternateName":"Demand Chain Platform","description":"AI驱动的开源需求匹配基础设施，基于MCP协议连接全球需求与供应商","url":"https://demand-chain.duckdns.org","applicationCategory":"BusinessApplication","operatingSystem":"Web","offers":{"@type":"Offer","price":"0","priceCurrency":"CNY"},"author":{"@type":"Organization","name":"需求链平台"}},
+    {"@type":"Organization","name":"需求链平台","url":"https://demand-chain.duckdns.org","logo":"https://demand-chain.duckdns.org/logo.jpg","description":"AI驱动的开源创新基础设施，连接全球需求与供应商"},
+    {"@type":"WebSite","name":"需求链平台","url":"https://demand-chain.duckdns.org","potentialAction":{"@type":"SearchAction","target":"https://demand-chain.duckdns.org/suppliers.html?q={search_term_string}","query-input":"required name=search_term_string"}},
+    {"@type":"CollectionPage","name":"供应商","description":"公开的供应商能力档案，AI助手通过匹配引擎自动为每条需求寻找最佳供应商","url":"https://demand-chain.duckdns.org/suppliers.html","isPartOf":{"@type":"WebSite","name":"需求链平台","url":"https://demand-chain.duckdns.org"}}
   ]
 }
 </script>
 </head>
 <body>
 <nav>
-  <a class="brand" href="/"><img src="logo.jpg" alt="">需求链平台</a>
+  <a class="brand" href="/"><img src="logo_small.png" width="34" height="34" style="width:34px;height:34px;border-radius:8px;object-fit:cover" alt="">需求链平台</a>
   <div class="links" id="navLinks">
     <a href="demand_square.html">需求广场</a>
     <a href="suppliers.html" style="color:var(--purple);font-weight:600">供应商</a>
@@ -165,6 +165,7 @@ h1{font-size:1.6em;margin:20px 0 4px}
     <a href="suppliers.html">供应商</a><a href="forum.html">论坛</a>
     <a href="docs/tutorial.html">教程</a>
     <a href="login.html">登录</a>
+    <a href="https://message.bilibili.com/#/whisper/14516298" target="_blank" title="B站私信反馈">问题反馈</a>
     <a href="https://github.com/HuanTongqichetuzhuang/demand-chain">GitHub</a>
   </div>
   <p>需求链平台 v5.0 · Apache 2.0 · 永久开源 · 中立 · 免费</p>
@@ -311,7 +312,7 @@ function renderCard(s){
       '</div>'+
       '<div class="badge-row" style="justify-content:flex-end;margin:0">'+
         (s.verified?'<span class="verified-badge">✅ 已验证</span>':'')+
-        '<span class="claimed-badge">📋 Public Information</span>'+
+        (s.is_claimed ? '<span class="claimed-badge">✅ 已认领</span>' : '<span class="unclaimed-badge">🔓 未认领</span>')+
       '</div>'+
     '</div>'+
     '<div class="badge-row">'+
@@ -354,7 +355,7 @@ function showDetail(id){
       '<span class="type-badge">'+(typeLabel[s.profile_type]||s.profile_type)+'</span>'+
       (s.country?'<span class="country-badge">'+esc(s.country)+'</span>':'')+
       (s.trl?'<span class="trl-badge">TRL '+s.trl+'</span>':'')+
-      '<span class="claimed-badge">📋 Public Information</span>'+
+      (s.is_claimed ? '<span class="claimed-badge">✅ 已认领</span>' : '<span class="unclaimed-badge">🔓 未认领</span>')+
     '</div>'+
 
     (s.description?'<div class="modal-section"><h4>简介</h4><div class="modal-desc">'+esc(s.description)+'</div></div>':'')+
@@ -374,7 +375,7 @@ function showDetail(id){
 
     '<div class="modal-footer">'+
       (s.url?'<a href="'+esc(s.url)+'" target="_blank" class="btn-claim" style="background:transparent;border:1px solid var(--border);color:var(--text)">🔗 官网</a>':'')+
-      '<span class="btn-claim" style="background:var(--teal);cursor:default">📋 Public Information Source</span>'+
+      (s.is_claimed ? '' : '<span class="btn-claim" onclick="claimProfile(\''+esc(s.id)+'\',\''+esc(s.name)+'\')" style="background:var(--purple);cursor:pointer">🔑 认领此画像</span>')+
     '</div>';
 
   document.getElementById("modal").style.display="flex";
@@ -386,8 +387,36 @@ function closeModal(e){
   }
 }
 
+// 认领画像
+function claimProfile(pid, name){
+  var session = null;
+  try { session = JSON.parse(localStorage.getItem("dc_session")); } catch(e) {}
+  if(!session || !session.email){
+    alert("请先登录后再认领");
+    window.location.href = "/login.html";
+    return;
+  }
+  if(!confirm("确认认领「"+name+"」？认领后你将收到该画像的匹配通知。")) return;
+  fetch("/api/claim-profile", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({email:session.email, profile_id:pid})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.status==="ok"){
+      alert("✅ "+d.message);
+      closeModal();
+      load(currentPage);
+    } else {
+      alert("❌ "+(d.error||"认领失败"));
+    }
+  }).catch(function(e){alert("❌ 网络错误");});
+}
+
 load(1);
 loadFilters();
 </script>
 </body>
 </html>
+
+
+

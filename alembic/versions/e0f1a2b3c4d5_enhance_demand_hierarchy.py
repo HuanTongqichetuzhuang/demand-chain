@@ -24,3 +24,4 @@ def downgrade():
     op.drop_index("ix_demands_parent_level", table_name="demands")
     op.drop_column("demands", "sort_order")
     op.drop_column("demands", "level")
+

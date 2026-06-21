@@ -12,7 +12,7 @@ import threading
 import queue
 
 
-MCP_HOST = "8.154.26.92"
+MCP_HOST = "demand-chain.duckdns.org"
 MCP_PORT = 8000
 
 
@@ -177,3 +177,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

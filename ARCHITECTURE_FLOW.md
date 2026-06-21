@@ -21,7 +21,7 @@ flowchart TB
 
     subgraph API["🔌 API层"]
         WEB["Web Server (Starlette)\n端口 80/8080\nREST API + WebSocket"]
-        MCP["MCP Server (FastMCP)\n端口 8000\n68+3 = 71 工具"]
+        MCP["MCP Server (FastMCP)\n端口 8000\n72 工具"]
     end
 
     subgraph Adapters["🔗 适配器层 🆕"]
@@ -142,11 +142,11 @@ flowchart LR
     Out --> Tag["标注数据源"]
 ```
 
-## 4. MCP 工具全景 (71个)
+## 4. MCP 工具全景 (72个)
 
 ```mermaid
 mindmap
-  root((71 MCP 工具))
+  root((72 MCP 工具))
     需求发布
       发布需求
       搜索需求

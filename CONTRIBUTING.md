@@ -35,7 +35,7 @@ python tests/run_all.py
 
 1. 在 AI 助手（Claude、通义千问、龙虾助手）里配置 MCP：
    ```
-   URL: http://8.154.26.92:8000/sse
+   URL: https://demand-chain.duckdns.org/sse
    ```
 
 2. 第一次连上会说没有账号，注册一个测试账号
@@ -96,3 +96,5 @@ src/
 ---
 
 有问题在 Issues 里问，或者发论坛帖。欢迎 PR。
+
+

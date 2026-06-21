@@ -1,6 +1,6 @@
 [project]
 name = "demand-chain"
-version = "0.1.0"
+version = "0.9.0"
 description = "demand chain platform - AI-powered innovation matching infrastructure"
 requires-python = ">=3.12"
 dependencies = [

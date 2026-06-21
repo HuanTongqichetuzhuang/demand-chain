@@ -8,7 +8,7 @@
 - **前端**: 纯 HTML + JS（无框架），多页面 SPA 风格，中英文 i18n
 - **入口**: `src/server.py` (MCP Server :8000) / `src/web_server.py` (Web Server :8080)
 - **仓库**: `github.com/HuanTongqichetuzhuang/demand-chain` (master)
-- **服务器**: `ssh -p 2222 root@8.154.26.92` → Docker 容器部署
+- **服务器**: `ssh -p 2222 root@demand-chain.duckdns.org` → Docker 容器部署
 
 ## Commands
 | 命令 | 说明 |
@@ -18,7 +18,7 @@
 | `python scripts/auto_crawler.py` | 运行爬虫 |
 | `docker build -t demand-chain:slim .` | 本地构建镜像 |
 | `docker save demand-chain:slim -o E:/temp/dc-slim.tar` | 导出镜像 |
-| `scp -P 2222 ... root@8.154.26.92:/opt/dc-slim.tar` | 上传到服务器 |
+| `scp -P 2222 ... root@demand-chain.duckdns.org:/opt/dc-slim.tar` | 上传到服务器 |
 | `docker compose -f docker-compose.prod.yml -p dc up -d --force-recreate web` | 服务器部署 |
 | `.venv/Scripts/pytest` | 运行测试 |
 | `git config --local http.proxy http://127.0.0.1:7897` | Git 代理（用完即删） |
@@ -42,3 +42,6 @@
 - API 返回 JSON，前端 `catch` 处理错误
 - Git 推送需本地代理 (127.0.0.1:7897)，推送完立即 unset
 - 部署流程：本地 Docker 构建 → SCP 上传 → 服务器 load + up -d
+
+
+

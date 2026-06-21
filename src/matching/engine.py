@@ -40,6 +40,8 @@ async def build_supplier_index(max_profiles: int | None = None) -> tuple[dict[st
         text += (card.get("industry", "") or "") + " "
         text += (card.get("discipline", "") or "") + " "
         text += " ".join(card.get("skills", []) or []) + " "
+        # 顶层 country 字段
+        text += (p.country or "") + " "
         idx.add(p.id, text)
         id_to_profile[p.id] = p
 
@@ -48,7 +50,7 @@ async def build_supplier_index(max_profiles: int | None = None) -> tuple[dict[st
 
 
 def _category_overlap(demand_cat: str, supplier_cat: str) -> float:
-    """计算分类重叠度"""
+    """计算分类重叠度 — 支持同义词和层级匹配"""
     if not demand_cat or not supplier_cat:
         return 0.0
     d = demand_cat.lower().strip()
@@ -57,6 +59,21 @@ def _category_overlap(demand_cat: str, supplier_cat: str) -> float:
         return 1.0
     if d in s or s in d:
         return 0.6
+    
+    # 同义 / 相近分类关系组
+    related_groups = [
+        {"人工智能", "机器人与智能系统", "信息技术"},
+        {"生物医药", "生物技术", "化学工程"},
+        {"新能源", "环境工程", "核科学"},
+        {"材料科学", "化学工程", "电子科学与技术"},
+        {"航空航天", "交通运输", "机器人与智能系统"},
+        {"传感器技术", "电子科学与技术", "机器人与智能系统"},
+        {"农业科学", "海洋科学", "环境工程"},
+        {"电子科学与技术", "信息技术", "传感器技术"},
+    ]
+    for group in related_groups:
+        if d in group and s in group:
+            return 0.5
     return 0.0
 
 
@@ -98,11 +115,18 @@ async def match_one_demand(
             if cw is not None:
                 cat_boost = cw * 2  # 0.5 (default) → 1.0, 1.0 → 2.0, 0.0 → 0.0
 
-        # Final score: 60% text match + 30% category (flywheel-adjusted) + 10% trust
+        # Country proximity bonus (supplier country only for now)
+        country_bonus = 0.0
+        s_country = profile.country or card.get("country", "")
+        if s_country and s_country not in ("国际", "未知", ""):
+            country_bonus = 0.10  # 有明确国家信息的供应商给基础加分
+
+        # Final score: 55% text match + 25% category (flywheel-adjusted) + 10% trust + 10% country
         final = (
-            tfidf_score * 0.6
-            + cat_score * cat_boost * 0.3
-            + (profile.trust_score or 0.0) * 0.1
+            tfidf_score * 0.55
+            + cat_score * cat_boost * 0.25
+            + (profile.trust_score or 0.0) * 0.10
+            + country_bonus * 0.10
         )
 
         matches.append({
@@ -182,6 +206,24 @@ async def run_matching(dry_run: bool = False, max_profiles: int | None = None) -
                         status=MatchStatus.PENDING,
                     )
                     session.add(match)
+                await session.commit()
+
+                # 通知已认领画像的拥有者
+                from src.shared.models import Notification
+                for m in matches[:3]:
+                    profile = id_to_profile.get(m["profile_id"])
+                    if profile and profile.is_claimed and profile.user_id:
+                        notif = Notification(
+                            id=str(uuid4()),
+                            user_id=profile.user_id,
+                            title=f"🔔 需求匹配: {(demand.raw_text or '')[:40]}...",
+                            body=f"您的团队画像收到了新的需求匹配（相似度: {m['score']:.0f}%）\n{demand.raw_text[:200]}",
+                            channel="match",
+                            urgency="normal",
+                            action_url=f"/suppliers.html?highlight={profile.id}",
+                            is_read=False,
+                        )
+                        session.add(notif)
                 await session.commit()
 
         print(f"[{i+1}/{len(demands)}] {demand.raw_text[:50]}... → {len(matches)} 候选")
