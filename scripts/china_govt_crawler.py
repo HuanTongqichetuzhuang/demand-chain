@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 需求链平台 — 中国部委/省级项目爬虫 v1.0
@@ -19,7 +20,7 @@ import hashlib, json, re, sys, time, urllib.request, urllib.error, urllib.parse
 from datetime import datetime
 
 API_BASE = "http://8.154.26.92:8080"
-DEEPSEEK_KEY = "***REDACTED***"
+DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 def log(msg):
     print(msg)

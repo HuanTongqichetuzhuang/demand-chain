@@ -1,3 +1,4 @@
+import os
 """
 用 DeepSeek 批量翻译英文需求为中文
 并修复 researcher_support_crawler.py 自动翻译
@@ -5,7 +6,7 @@
 import urllib.request, json, time, sys
 
 API = "http://demand-chain.duckdns.org:8080"
-DEEPSEEK_KEY = "***REDACTED***"
+DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 def is_mostly_english(text):
     if not text: return False

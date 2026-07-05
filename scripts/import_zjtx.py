@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 专精特新企业数据处理脚本
@@ -11,7 +12,7 @@
 import csv, json, os, sys, time, requests, hashlib
 
 API_BASE = "http://demand-chain.duckdns.org:8080"
-DEEPSEEK_KEY = "***REDACTED***"
+DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 def deepseek_batch(items, is_research=False):
     """批量提取 - 10家一次API调用"""

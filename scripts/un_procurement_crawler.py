@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 需求链平台 — 联合国采购项目爬虫 v2.1
@@ -15,7 +16,7 @@ from datetime import datetime
 # DuckDNS域名有时中断，用IP直连更稳定
 API_BASE = "http://8.154.26.92:8080"
 FIRECRAWL_KEY = "***REDACTED***"
-DEEPSEEK_KEY = "***REDACTED***"
+DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 SEARCH_QUERIES = [
     # UNGM 采购招标

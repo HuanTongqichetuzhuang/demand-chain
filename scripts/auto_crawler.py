@@ -22,8 +22,9 @@ import urllib.request
 import urllib.parse
 from datetime import datetime, timezone
 
-# DeepSeek 翻译
-DEEPSEEK_KEY = "***REDACTED***"
+# DeepSeek 翻译 — 从环境变量读取，禁止硬编码
+import os
+DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 def translate_to_chinese(text):
     """把英文翻译成中文，已经是中文的保留原样"""

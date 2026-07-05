@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 需求链平台 — 供应商深度爬虫 v3 (无Firecrawl依赖)
@@ -27,7 +28,7 @@ except ImportError:
 # Config
 # ============================================================
 API_BASE = "http://demand-chain.duckdns.org:8080"
-DEEPSEEK_KEY = "***REDACTED***"
+DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 RESULTS_DIR = "supplier_backups"
 
 os.makedirs(RESULTS_DIR, exist_ok=True)

@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 需求链平台 — 智能爬虫 v2.1
@@ -29,7 +30,7 @@ from datetime import datetime
 # ============================================================
 API_BASE = "http://demand-chain.duckdns.org:8080"
 FIRECRAWL_KEY = "***REDACTED***"
-DEEPSEEK_KEY = "***REDACTED***"
+DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 # Firecrawl 信用额度状态
 _firecrawl_credits_ok = True

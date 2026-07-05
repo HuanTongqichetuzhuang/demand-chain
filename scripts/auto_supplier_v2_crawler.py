@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 需求链平台 — 供应商深度爬虫 v2
@@ -21,7 +22,7 @@ from datetime import datetime
 # ============================================================
 API_BASE = "http://demand-chain.duckdns.org:8080"
 FIRECRAWL_KEY = "***REDACTED***"
-DEEPSEEK_KEY = "***REDACTED***"
+DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 # ============================================================
 # AI 结构化 Prompt — 提取供应商完整信息

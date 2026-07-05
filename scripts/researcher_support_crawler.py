@@ -1,3 +1,4 @@
+import os
 """
 研究人员支持爬虫 v2 — 只采集能产出干净数据的源
 ============================================
@@ -16,7 +17,7 @@ import json, re, sys, time, urllib.request, urllib.error, urllib.parse
 from datetime import datetime
 
 API_BASE = "http://demand-chain.duckdns.org:8080"
-DEEPSEEK_KEY = "***REDACTED***"
+DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 # ============================================================
 # P0 — 科研资助（只保留能产出真实资助机会的源）

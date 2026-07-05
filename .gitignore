@@ -36,7 +36,13 @@ LOGO/
 
 # GitHub workflow files — pushed via web UI only.github/workflows/
 
-# AI Agent internal files.reasonix/.workbuddy/.claude/
+# AI Agent internal files
+.reasonix/
+.workbuddy/
+.claude/
+
+# 开发记录（含凭据，永不推送）
+开发信息/
 
 # JSON data dumps
 *.json
