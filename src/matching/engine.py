@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.shared.database import async_session
 from src.shared.models import (
+    User,
     Demand, DemandStatus, CapabilityProfile, Match, MatchStatus
 )
 from src.shared.semantic_search import TfidfSearch, demand_search
@@ -210,9 +211,14 @@ async def run_matching(dry_run: bool = False, max_profiles: int | None = None) -
 
                 # 通知已认领画像的拥有者
                 from src.shared.models import Notification
+                # 获取有效用户ID集合
+                _valid_user_ids = set()
+                _uq = await session.execute(select(User.human_id))
+                for _r in _uq:
+                    _valid_user_ids.add(_r[0])
                 for m in matches[:3]:
                     profile = id_to_profile.get(m["profile_id"])
-                    if profile and profile.is_claimed and profile.user_id:
+                    if profile and profile.is_claimed and profile.user_id and profile.user_id in _valid_user_ids:
                         notif = Notification(
                             id=str(uuid4()),
                             user_id=profile.user_id,
