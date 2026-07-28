@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>绉戠爺宸ヤ綔鍙?| Research Workbench</title>
+<title>科研工作台 | Research Workbench</title>
 <link rel="icon" href="favicon.ico" type="image/x-icon">
 <style>
   :root {--purple:#7c6ef0;--muted:#8888aa;
@@ -62,10 +62,11 @@
   .source-crossref { background: rgba(0,184,148,0.15); color: var(--green); }
   .source-openalex { background: rgba(253,203,110,0.15); color: var(--amber); }
   .source-semantic { background: rgba(108,92,231,0.15); color: #a29bfe; }
-  .source-arxiv { background: rgba(231,76,60,0.15); color: #e74c3c; }
-  .source-europepmc { background: rgba(52,152,219,0.15); color: #3498db; }
-  .source-doaj { background: rgba(39,174,96,0.15); color: #27ae60; }
-  .source-zenodo { background: rgba(155,89,182,0.15); color: #9b59b6; }
+  .source-arxiv { background: rgba(226,75,74,0.15); color: var(--red); }
+  .source-europepmc { background: rgba(91,141,239,0.15); color: var(--blue); }
+  .source-doaj { background: rgba(0,184,148,0.15); color: var(--green); }
+  .source-zenodo { background: rgba(124,110,240,0.15); color: #a29bfe; }
+  .oa-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: .65em; font-weight: 600; background: rgba(0,184,148,0.15); color: var(--green); margin-left: 4px; }
 
   .status-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .7em; }
   .status-posted { background: rgba(0,184,148,0.15); color: var(--green); }
@@ -119,17 +120,17 @@
 
 <nav>
   <a class="brand" href="/">
-    <img src="logo_small.png" alt="闇€姹傞摼" onerror="this.style.display='none'">
-    闇€姹傞摼骞冲彴
+    <img src="logo_small.png" alt="需求链" onerror="this.style.display='none'">
+    需求链平台
   </a>
   <div class="links">
-    <a href="/">棣栭〉</a>
-    <a href="/demand_square.html">闇€姹傚箍鍦?/a>
-    <a href="/suppliers.html">渚涘簲鍟?/a>
-    <a href="/forum.html">璁哄潧</a>
-    <a href="/scientist_workbench.html" class="btn-nav">馃敩 绉戠爺宸ヤ綔鍙?/a>
-    <a href="/login.html" id="nav-login">鐧诲綍</a>
-    <a href="/profile.html" id="nav-profile" style="display:none">鎴戠殑</a>
+    <a href="/">首页</a>
+    <a href="/demand_square.html">需求广场</a>
+    <a href="/suppliers.html">供应商</a>
+    <a href="/forum.html">论坛</a>
+    <a href="/scientist_workbench.html" class="btn-nav">🔬 科研工作台</a>
+    <a href="/login.html" id="nav-login">登录</a>
+    <a href="/profile.html" id="nav-profile" style="display:none">我的</a>
   </div>
 </nav>
 
@@ -137,32 +138,32 @@
 
   <!-- Hero -->
   <div class="hero">
-    <h1>馃敩 绉戠爺宸ヤ綔鍙?/h1>
-    <p>鎼滅储瀛︽湳璁烘枃 路 鍙戠幇璧勫姪鏈轰細 路 鑾峰彇 AI 鐮旂┒鎬荤粨</p>
+    <h1>🔬 科研工作台</h1>
+    <p>搜索学术论文 · 发现资助机会 · 获取 AI 研究总结</p>
     <div class="search-box">
-      <input type="text" id="search-input" placeholder="杈撳叆鐮旂┒涓婚锛屽 CRISPR gene therapy 2024 鎴?閲忓瓙璁＄畻 鏉愭枡" autofocus>
-      <button id="search-btn" onclick="doSearch()">馃攳 鎼滅储</button>
+      <input type="text" id="search-input" placeholder="输入研究主题，如 CRISPR gene therapy 2024 或 量子计算 材料" autofocus>
+      <button id="search-btn" onclick="doSearch()">🔍 搜索</button>
     </div>
   </div>
 
   <!-- Tabs -->
   <div class="tabs" id="tabs-bar" style="display:none">
-    <button class="tab active" data-tab="summary" onclick="switchTab('summary')">馃搵 缁煎悎鎬荤粨</button>
-    <button class="tab" data-tab="papers" onclick="switchTab('papers')">馃搫 璁烘枃 <span id="paper-count" class="count-badge"></span></button>
-    <button class="tab" data-tab="funding" onclick="switchTab('funding')">馃挵 璧勫姪鏈轰細 <span id="funding-count" class="count-badge"></span></button>
+    <button class="tab active" data-tab="summary" onclick="switchTab('summary')">📋 综合总结</button>
+    <button class="tab" data-tab="papers" onclick="switchTab('papers')">📄 论文 <span id="paper-count" class="count-badge"></span></button>
+    <button class="tab" data-tab="funding" onclick="switchTab('funding')">💰 资助机会 <span id="funding-count" class="count-badge"></span></button>
   </div>
 
   <!-- Loading -->
   <div id="loading" class="loading" style="display:none">
     <div class="spinner"></div>
-    <p>姝ｅ湪鎼滅储瀛︽湳鏁版嵁搴?..</p>
+    <p>正在搜索学术数据库...</p>
   </div>
 
   <!-- Empty state -->
   <div id="empty-state" class="empty-state">
-    <div class="icon">馃敩</div>
-    <p>杈撳叆鐮旂┒涓婚锛屼竴閿绱㈣鏂囥€佽祫鍔╁拰绉戠爺鍔ㄦ€?/p>
-    <p style="font-size:.85em;color:var(--text-secondary);margin-top:8px">鏁版嵁鏉ユ簮锛歅ubMed 路 CrossRef 路 OpenAlex 路 Semantic Scholar 路 Grants.gov</p>
+    <div class="icon">🔬</div>
+    <p>输入研究主题，一键检索论文、资助和科研动态</p>
+    <p style="font-size:.85em;color:var(--text-secondary);margin-top:8px">数据来源：PubMed · CrossRef · OpenAlex · Semantic Scholar · arXiv · Europe PMC · DOAJ · Zenodo · Grants.gov</p>
   </div>
 
   <!-- Error -->
@@ -178,11 +179,11 @@
       <button data-source="PubMed" onclick="filterPapers('PubMed')">PubMed</button>
       <button data-source="CrossRef" onclick="filterPapers('CrossRef')">CrossRef</button>
       <button data-source="OpenAlex" onclick="filterPapers('OpenAlex')">OpenAlex</button>
-      <button data-source="Semantic Scholar" onclick="filterPapers('Semantic Scholar')">Semantic Scholar</button>
+      <button data-source="Semantic Scholar" onclick="filterPapers('Semantic Scholar')
       <button data-source="arXiv" onclick="filterPapers('arXiv')">arXiv</button>
       <button data-source="Europe PMC" onclick="filterPapers('Europe PMC')">Europe PMC</button>
       <button data-source="DOAJ" onclick="filterPapers('DOAJ')">DOAJ</button>
-      <button data-source="Zenodo" onclick="filterPapers('Zenodo')">Zenodo</button>
+      <button data-source="Zenodo" onclick="filterPapers('Zenodo')">Zenodo</button>">Semantic Scholar</button>
     </div>
     <div id="papers-list"></div>
   </div>
@@ -196,23 +197,23 @@
 
 <footer>
   <div class="links">
-    <a href="/">棣栭〉</a>
-    <a href="/demand_square.html">闇€姹傚箍鍦?/a>
-    <a href="/forum.html">璁哄潧</a>
-    <a href="/api_docs.html">API 鏂囨。</a>
+    <a href="/">首页</a>
+    <a href="/demand_square.html">需求广场</a>
+    <a href="/forum.html">论坛</a>
+    <a href="/api_docs.html">API 文档</a>
   </div>
-  <p>闇€姹傞摼骞冲彴 漏 2026 鈥?AI 椹卞姩鐨勫垱鏂板熀纭€璁炬柦</p>
+  <p>需求链平台 © 2026 — AI 驱动的创新基础设施</p>
 </footer>
 
 <script>
-// 鈹€鈹€ State 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ── State ───────────────────────────────────────────
 let allPapers = [];
 let allFunding = [];
 let currentQuery = '';
 let activeSource = 'all';
 let userEmail = '';
 
-// 鈹€鈹€ Init 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ── Init ────────────────────────────────────────────
 (async function() {
   const u = localStorage.getItem('session_email');
   if (u) { userEmail = u; document.getElementById('nav-login').style.display='none'; document.getElementById('nav-profile').style.display=''; }
@@ -226,7 +227,7 @@ let userEmail = '';
   }
 })();
 
-// 鈹€鈹€ Search 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ── Search ──────────────────────────────────────────
 async function doSearch() {
   const q = document.getElementById('search-input').value.trim();
   if (!q) return;
@@ -294,33 +295,33 @@ async function doSearch() {
   } catch (err) {
     document.getElementById('loading').style.display = 'none';
     const errEl = document.getElementById('error-message');
-    errEl.textContent = '鎼滅储澶辫触锛? + (err.message || '鏈煡閿欒');
+    errEl.textContent = '搜索失败：' + (err.message || '未知错误');
     errEl.style.display = '';
   }
 }
 
-// 鈹€鈹€ Render Summary 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ── Render Summary ──────────────────────────────────
 function renderSummary(data) {
   const el = document.getElementById('panel-summary');
   if (!data || (!data.paper_count && !data.funding_count)) {
-    el.innerHTML = `<div class="empty-state"><div class="icon">馃搵</div><p>鏈壘鍒扮浉鍏崇爺绌舵暟鎹?/p></div>`;
+    el.innerHTML = `<div class="empty-state"><div class="icon">📋</div><p>未找到相关研究数据</p></div>`;
     el.style.display = '';
     return;
   }
 
-  let html = `<div class="summary-card"><h3>馃搵 鐮旂┒涓婚锛?{escapeHtml(currentQuery)}</h3>`;
+  let html = `<div class="summary-card"><h3>📋 研究主题：${escapeHtml(currentQuery)}</h3>`;
   html += `<div class="stat-row">`;
-  html += `<div class="stat"><div class="num">${data.paper_count || 0}</div><div class="label">鐩稿叧璁烘枃</div></div>`;
-  html += `<div class="stat"><div class="num">${data.funding_count || 0}</div><div class="label">璧勫姪鏈轰細</div></div>`;
+  html += `<div class="stat"><div class="num">${data.paper_count || 0}</div><div class="label">相关论文</div></div>`;
+  html += `<div class="stat"><div class="num">${data.funding_count || 0}</div><div class="label">资助机会</div></div>`;
   if (data.year_range && data.year_range[0]) {
-    html += `<div class="stat"><div class="num">${data.year_range[0]}-${data.year_range[1]}</div><div class="label">璁烘枃骞翠唤鑼冨洿</div></div>`;
+    html += `<div class="stat"><div class="num">${data.year_range[0]}-${data.year_range[1]}</div><div class="label">论文年份范围</div></div>`;
   }
   html += `</div>`;
 
   if (data.summary) {
     html += `<div class="summary-text">${escapeHtml(data.summary)}</div>`;
   } else {
-    html += `<div class="summary-text" style="color:var(--muted)">馃挕 鐧诲綍鍚庡彲鑾峰彇 AI 鐢熸垚鐨勭爺绌舵€荤粨</div>`;
+    html += `<div class="summary-text" style="color:var(--muted)">💡 登录后可获取 AI 生成的研究总结</div>`;
   }
 
   if (data.keywords && data.keywords.length) {
@@ -331,12 +332,12 @@ function renderSummary(data) {
 
   // Latest papers
   if (data.papers && data.papers.length) {
-    html += `<h4 style="margin-top:16px;margin-bottom:8px">馃搫 鏈€鏂拌鏂?/h4>`;
+    html += `<h4 style="margin-top:16px;margin-bottom:8px">📄 最新论文</h4>`;
     data.papers.slice(0, 5).forEach(p => {
       html += paperCard(p);
     });
     if (data.papers.length > 5) {
-      html += `<p style="font-size:.85em;color:var(--text-secondary);text-align:center">... 杩樻湁 ${data.papers.length - 5} 绡囷紝鍒囨崲鍒般€岃鏂囥€嶆爣绛炬煡鐪嬪叏閮?/p>`;
+      html += `<p style="font-size:.85em;color:var(--text-secondary);text-align:center">... 还有 ${data.papers.length - 5} 篇，切换到「论文」标签查看全部</p>`;
     }
   }
 
@@ -345,14 +346,14 @@ function renderSummary(data) {
   el.style.display = '';
 }
 
-// 鈹€鈹€ Render Papers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ── Render Papers ───────────────────────────────────
 function renderPapers() {
   const el = document.getElementById('papers-list');
   if (!allPapers.length) {
-    el.innerHTML = `<div class="empty-state"><div class="icon">馃搫</div><p>鏈壘鍒扮浉鍏宠鏂?/p></div>`;
+    el.innerHTML = `<div class="empty-state"><div class="icon">📄</div><p>未找到相关论文</p></div>`;
     return;
   }
-  let html = `<p style="font-size:.85em;color:var(--text-secondary);margin-bottom:10px">鍏?${allPapers.length} 绡囪鏂?/p>`;
+  let html = `<p style="font-size:.85em;color:var(--text-secondary);margin-bottom:10px">共 ${allPapers.length} 篇论文</p>`;
   allPapers.forEach(p => { html += paperCard(p); });
   el.innerHTML = html;
 }
@@ -363,65 +364,67 @@ function paperCard(p) {
   return `<div class="card">
     <h4><a href="${escapeHtml(p.url || '#')}" target="_blank" style="color:var(--text);text-decoration:none;hover:text-decoration:underline">${escapeHtml(p.title)}</a></h4>
     <div class="meta">
-      <span>${p.year || '鈥?}</span>
+      <span>${p.year || '—'}</span>
       <span class="source-badge ${srcClass}">${escapeHtml(p.source || '')}</span>
-      ${p.cited_by !== undefined ? `<span>馃搳 ${p.cited_by} 寮曠敤</span>` : ''}
+      ${p.cited_by !== undefined ? `<span>📊 ${p.cited_by} 引用</span>` : ''}
       <span>${escapeHtml(p.journal || '')}</span>
     </div>
-    ${authors ? `<div class="meta">鉁嶏笍 ${authors}</div>` : ''}
+    ${authors ? `<div class="meta">✍️ ${authors}</div>` : ''}
     ${p.doi ? `<div class="meta">DOI: ${escapeHtml(p.doi)}</div>` : ''}
+      ${p.is_oa ? `<span class="oa-badge">开放获取</span>` : ''}
     <div class="abstract">${escapeHtml((p.abstract || '').slice(0, 300))}${(p.abstract || '').length > 300 ? '...' : ''}</div>
     <div class="actions">
-      <button onclick="window.open('${escapeHtml(p.url || '')}','_blank')">馃敆 鎵撳紑</button>
-      ${p.doi ? `<button onclick="copyToClipboard('${escapeHtml(p.doi)}')">馃搵 澶嶅埗 DOI</button>` : ''}
-      <button onclick="shareToForum('${escapeHtml(p.title)}','${escapeHtml(p.url || '')}')">馃挰 鍒嗕韩鍒拌鍧?/button>
+      <button onclick="window.open('${escapeHtml(p.url || '')}','_blank')">🔗 打开</button>
+      ${p.pdf_url ? `<button onclick="window.open('${escapeHtml(p.pdf_url)}','_blank')">📄 PDF</button>` : ''}
+      ${p.doi ? `<button onclick="copyToClipboard('${escapeHtml(p.doi)}')">📋 复制 DOI</button>` : ''}
+      <button onclick="shareToForum('${escapeHtml(p.title)}','${escapeHtml(p.url || '')}')">💬 分享到论坛</button>
     </div>
   </div>`;
 }
 
-// 鈹€鈹€ Render Funding 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ── Render Funding ──────────────────────────────────
 function renderFunding() {
   const el = document.getElementById('funding-list');
   if (!allFunding.length) {
-    el.innerHTML = `<div class="empty-state"><div class="icon">馃挵</div><p>鏈壘鍒扮浉鍏宠祫鍔╂満浼?/p></div>`;
+    el.innerHTML = `<div class="empty-state"><div class="icon">💰</div><p>未找到相关资助机会</p></div>`;
     return;
   }
-  let html = `<p style="font-size:.85em;color:var(--text-secondary);margin-bottom:10px">鍏?${allFunding.length} 鏉¤祫鍔╂満浼?/p>`;
+  let html = `<p style="font-size:.85em;color:var(--text-secondary);margin-bottom:10px">共 ${allFunding.length} 条资助机会</p>`;
   allFunding.forEach(f => {
     const st = (f.status || '').toLowerCase();
     const stClass = st === 'posted' ? 'status-posted' : (st === 'forecasted' ? 'status-forecasted' : '');
     html += `<div class="card">
       <h4><a href="${escapeHtml(f.url || '#')}" target="_blank" style="color:var(--text);text-decoration:none">${escapeHtml(f.title)}</a></h4>
       <div class="meta">
-        <span>馃彌锔?${escapeHtml(f.agency || f.funder || '')}</span>
+        <span>🏛️ ${escapeHtml(f.agency || f.funder || '')}</span>
         ${f.status ? `<span class="status-badge ${stClass}">${escapeHtml(f.status)}</span>` : ''}
-        ${f.close_date ? `<span>馃搮 鎴: ${escapeHtml(f.close_date)}</span>` : ''}
-        ${f.source ? `<span>馃摗 ${escapeHtml(f.source)}</span>` : ''}
+        ${f.close_date ? `<span>📅 截止: ${escapeHtml(f.close_date)}</span>` : ''}
+        ${f.source ? `<span>📡 ${escapeHtml(f.source)}</span>` : ''}
       </div>
       ${f.description ? `<div class="abstract">${escapeHtml(f.description.slice(0, 300))}</div>` : ''}
       <div class="actions">
-        <button onclick="window.open('${escapeHtml(f.url || '')}','_blank')">馃敆 鏌ョ湅璇︽儏</button>
-        <button onclick="createDemand('${escapeHtml(f.title)}')">馃摑 鐢熸垚闇€姹?/button>
+        <button onclick="window.open('${escapeHtml(f.url || '')}','_blank')">🔗 查看详情</button>
+        <button onclick="createDemand('${escapeHtml(f.title)}')">📝 生成需求</button>
       </div>
     </div>`;
   });
   el.innerHTML = html;
 }
 
-// 鈹€鈹€ Tab switching 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ── Tab switching ───────────────────────────────────
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p => {
     p.classList.remove('active');
-    p.style.display = '';  // 娓呴櫎 doSearch 閲岃缃殑鍐呰仈 display:none
+    p.style.display = '';  // 清除 doSearch 里设置的内联 display:none
   });
   document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
   const panel = document.getElementById(`panel-${name}`);
   panel.classList.add('active');
-  panel.style.display = '';  // 纭繚鏄剧ず
+  panel.style.display = '';  // 确保显示
 }
 
-// 鈹€鈹€ Filter papers by source 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ── Filter papers by source ─────────────────────────
 function filterPapers(source) {
   activeSource = source;
   document.querySelectorAll('.source-filter button').forEach(b => b.classList.remove('active'));
@@ -430,35 +433,35 @@ function filterPapers(source) {
   const filtered = source === 'all' ? allPapers : allPapers.filter(p => p.source === source);
   const el = document.getElementById('papers-list');
   if (!filtered.length) {
-    el.innerHTML = `<div class="empty-state"><div class="icon">馃搫</div><p>璇ユ暟鎹簮鏃犵粨鏋?/p></div>`;
+    el.innerHTML = `<div class="empty-state"><div class="icon">📄</div><p>该数据源无结果</p></div>`;
     return;
   }
-  let html = `<p style="font-size:.85em;color:var(--text-secondary);margin-bottom:10px">${filtered.length} 绡囪鏂?(${source === 'all' ? '鍏ㄩ儴' : source})</p>`;
+  let html = `<p style="font-size:.85em;color:var(--text-secondary);margin-bottom:10px">${filtered.length} 篇论文 (${source === 'all' ? '全部' : source})</p>`;
   filtered.forEach(p => { html += paperCard(p); });
   el.innerHTML = html;
 }
 
-// 鈹€鈹€ Share to forum 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ── Share to forum ──────────────────────────────────
 function shareToForum(title, url) {
-  if (!userEmail) { alert('璇峰厛鐧诲綍鍚庡啀鍒嗕韩鍒拌鍧?); window.location='/login.html'; return; }
+  if (!userEmail) { alert('请先登录后再分享到论坛'); window.location='/login.html'; return; }
   // Pre-fill forum create with this paper
-  window.location = `/forum.html?action=create&title=馃搫 鍒嗕韩璁烘枃: ${encodeURIComponent(title)}&body=馃敆 ${encodeURIComponent(url)}`;
+  window.location = `/forum.html?action=create&title=📄 分享论文: ${encodeURIComponent(title)}&body=🔗 ${encodeURIComponent(url)}`;
 }
 
-// 鈹€鈹€ Create demand from funding 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ── Create demand from funding ──────────────────────
 function createDemand(fundingTitle) {
-  if (!userEmail) { alert('璇峰厛鐧诲綍'); window.location='/login.html'; return; }
-  window.location = `/demand_square.html?action=publish&text=${encodeURIComponent(`鎴戣鐢宠璧勫姪: ${fundingTitle}`)}`;
+  if (!userEmail) { alert('请先登录'); window.location='/login.html'; return; }
+  window.location = `/demand_square.html?action=publish&text=${encodeURIComponent(`我要申请资助: ${fundingTitle}`)}`;
 }
 
-// 鈹€鈹€ Copy to clipboard 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ── Copy to clipboard ───────────────────────────────
 function copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => {
     // Flash feedback
   }).catch(() => {});
 }
 
-// 鈹€鈹€ Util 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ── Util ────────────────────────────────────────────
 function escapeHtml(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
